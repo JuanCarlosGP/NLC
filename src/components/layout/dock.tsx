@@ -49,7 +49,6 @@ function DockButton({
       ]}
     >
       {children}
-      <View style={[styles.activeDot, { backgroundColor: active ? colors.ink : "transparent" }]} />
     </Pressable>
   );
 }
@@ -59,22 +58,53 @@ function DockIcons() {
   const pathname = usePathname();
   const homeActive = isHomeRoute(pathname);
   const libraryActive =
-    pathname.startsWith("/library") || pathname.startsWith("/album") || pathname.startsWith("/artist");
+    pathname.startsWith("/library") ||
+    pathname.startsWith("/album") ||
+    pathname.startsWith("/artist") ||
+    pathname.startsWith("/imported");
   const searchActive = pathname.startsWith("/search");
   const settingsActive = pathname.startsWith("/settings");
 
   return (
     <>
-      <DockButton active={homeActive} label="Inicio" onPress={() => router.push("/")}>
+      <DockButton
+        active={homeActive}
+        label="Inicio"
+        onPress={() => {
+          if (isHomeRoute(pathname)) return;
+          router.push("/");
+        }}
+      >
         <Home color={homeActive ? colors.ink : colors.muted} size={26} strokeWidth={1.75} />
       </DockButton>
-      <DockButton active={searchActive} label="Buscar" onPress={() => router.push("/search")}>
+      <DockButton
+        active={searchActive}
+        label="Buscar"
+        onPress={() => {
+          if (pathname.startsWith("/search")) return;
+          router.push("/search");
+        }}
+      >
         <Search color={searchActive ? colors.ink : colors.muted} size={26} strokeWidth={1.75} />
       </DockButton>
-      <DockButton active={libraryActive} label="Biblioteca" onPress={() => router.push("/library")}>
+      <DockButton
+        active={libraryActive}
+        label="Biblioteca"
+        onPress={() => {
+          if (pathname === "/library" || pathname.replace(/\/$/, "") === "/library") return;
+          router.push("/library");
+        }}
+      >
         <Library color={libraryActive ? colors.ink : colors.muted} size={26} strokeWidth={1.75} />
       </DockButton>
-      <DockButton active={settingsActive} label="Ajustes" onPress={() => router.push("/settings")}>
+      <DockButton
+        active={settingsActive}
+        label="Ajustes"
+        onPress={() => {
+          if (pathname.startsWith("/settings")) return;
+          router.push("/settings");
+        }}
+      >
         <Settings color={settingsActive ? colors.ink : colors.muted} size={26} strokeWidth={1.75} />
       </DockButton>
     </>
@@ -93,11 +123,13 @@ function glassChrome() {
 
 export function Dock() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const dock = useDock();
   const { nowPlayingOpen } = usePlayerUi();
   const progress = useRef(new Animated.Value(0)).current;
 
-  const visible = (dock?.visible ?? true) && !nowPlayingOpen;
+  const watching = pathname === "/watch" || pathname.startsWith("/watch/");
+  const visible = (dock?.visible ?? true) && !nowPlayingOpen && !watching;
   const hiddenOffset = DOCK_HEIGHT + insets.bottom + 24;
 
   useEffect(() => {
@@ -170,12 +202,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  activeDot: {
-    position: "absolute",
-    bottom: 7,
-    width: 5,
-    height: 5,
-    borderRadius: 999,
   },
 });

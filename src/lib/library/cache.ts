@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { withTrackArtwork } from "@/lib/library/artwork-cache";
 import { isMockTrack } from "@/lib/nas/mock-source";
 import type { Album, Artist, MusicSourceKind, Track } from "@/lib/nas/types";
 
@@ -50,7 +51,8 @@ export async function loadRecents(sourceKind?: MusicSourceKind): Promise<Track[]
 
 export async function pushRecent(track: Track): Promise<Track[]> {
   const current = await loadRecents();
-  const next = [track, ...current.filter((item) => item.id !== track.id)].slice(0, 20);
+  const stamped = withTrackArtwork(track);
+  const next = [stamped, ...current.filter((item) => item.id !== stamped.id)].slice(0, 20);
   await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(next));
   return next;
 }
@@ -65,4 +67,40 @@ export async function toggleFavorite(track: Track): Promise<Track[]> {
   const next = exists ? current.filter((item) => item.id !== track.id) : [track, ...current];
   await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
   return next;
+}
+
+export async function removeFavorite(trackId: string): Promise<Track[]> {
+  const current = await loadFavorites();
+  const next = current.filter((item) => item.id !== trackId);
+  if (next.length !== current.length) {
+    await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
+  }
+  return next;
+}
+
+export async function removeRecent(trackId: string): Promise<Track[]> {
+  const current = await loadRecents();
+  const next = current.filter((item) => item.id !== trackId);
+  if (next.length !== current.length) {
+    await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(next));
+  }
+  return next;
+}
+
+/** Drop recents/favorites whose files are no longer in the NAS index. */
+export async function pruneMissingLibraryTracks(existingIds: Set<string>): Promise<Track[]> {
+  const [recents, favorites] = await Promise.all([loadRecents(), loadFavorites()]);
+  const nextRecents = recents.filter((track) => existingIds.has(track.id));
+  const nextFavorites = favorites.filter((track) => existingIds.has(track.id));
+  if (nextRecents.length !== recents.length) {
+    await AsyncStorage.setItem(RECENTS_KEY, JSON.stringify(nextRecents));
+  }
+  if (nextFavorites.length !== favorites.length) {
+    await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(nextFavorites));
+  }
+  return nextRecents;
+}
+
+export async function clearLibraryCache(): Promise<void> {
+  await AsyncStorage.removeItem(CACHE_KEY);
 }

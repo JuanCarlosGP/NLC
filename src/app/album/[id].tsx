@@ -5,6 +5,7 @@ import { Cover } from "@/components/ui/cover";
 import { Screen } from "@/components/ui/screen";
 import { useAlbum } from "@/hooks/use-album";
 import { useCoverUrl } from "@/hooks/use-cover-url";
+import { isPodcastAlbum } from "@/lib/nas/webdav";
 import { usePlayer } from "@/lib/player/player-context";
 import { colors, fonts, type } from "@/lib/theme";
 
@@ -14,6 +15,7 @@ export default function AlbumScreen() {
   const { album, loading, error } = useAlbum(id);
   const { playTracks, current } = usePlayer();
   const cover = useCoverUrl(album?.coverId);
+  const podcast = album ? isPodcastAlbum(album) : false;
 
   return (
     <Screen>
@@ -24,12 +26,16 @@ export default function AlbumScreen() {
           <View style={styles.header}>
             <Cover id={album.id} label={album.name} uri={cover} size={160} radius={4} />
             <Text style={type.pageTitle}>{album.name}</Text>
-            <Pressable onPress={() => router.push(`/artist/${album.artistId}`)}>
-              <Text style={type.body}>{album.artistName}</Text>
-            </Pressable>
+            {podcast ? (
+              <Text style={type.body}>Podcast</Text>
+            ) : (
+              <Pressable onPress={() => router.push(`/artist/${album.artistId}`)}>
+                <Text style={type.body}>{album.artistName}</Text>
+              </Pressable>
+            )}
             <Text style={type.meta}>
               {album.year ? `${album.year} · ` : ""}
-              {album.tracks.length} pistas
+              {album.tracks.length} {podcast ? "episodios" : "pistas"}
             </Text>
           </View>
           <View style={styles.actions}>

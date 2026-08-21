@@ -27,6 +27,8 @@ export type Track = {
   disc?: number;
   contentType?: string;
   coverId?: string | null;
+  /** Remote artwork (e.g. Spotify) when the NAS file has no cover. */
+  artworkUrl?: string | null;
 };
 
 export type AlbumDetail = Album & { tracks: Track[] };
@@ -58,4 +60,6 @@ export interface MusicSource {
   search(q: string): Promise<SearchResults>;
   streamUrl(trackId: string): Promise<PlayableSource>;
   coverUrl(id: string, size?: number): Promise<string | null>;
+  /** Permanently remove a track file (WebDAV). Optional on other sources. */
+  deleteTrack?(trackId: string): Promise<void>;
 }

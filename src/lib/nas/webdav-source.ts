@@ -172,6 +172,38 @@ export async function putWebDavText(
   }
 }
 
+export async function deleteWebDavFile(
+  settings: NasSettings,
+  password: string,
+  path: string,
+): Promise<void> {
+  const { davFetch } = createDavTransport(settings, password);
+  const response = await davFetch(path, { method: "DELETE" });
+  const body = await response.text();
+  let proxyError = "";
+  try {
+    const parsed = JSON.parse(body) as { error?: string };
+    if (parsed.error) proxyError = parsed.error;
+  } catch {
+    // HTML or empty WebDAV body.
+  }
+  if (response.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+  if (response.status === 403) {
+    throw new Error(
+      "El usuario no tiene permiso de escritura en esa carpeta. En el NAS, dale a Viewer permiso de escritura sobre /Music.",
+    );
+  }
+  // Already gone — treat as success so the app can purge recents/favorites.
+  if (response.status === 404) return;
+  if (response.status === 405) {
+    throw new Error("El NAS no permite borrar archivos por WebDAV con esta cuenta.");
+  }
+  // 204 No Content / 200 OK are success; some servers also return 202.
+  if (!response.ok && response.status !== 204) {
+    throw new Error(proxyError || `El NAS respondió HTTP ${response.status} al borrar el archivo.`);
+  }
+}
+
 export function createWebDavSource(settings: NasSettings, password: string): MusicSource {
   const { rootPath, auth, absolute, davFetch } = createDavTransport(settings, password);
   let index: WebDavIndex | null = null;
@@ -280,7 +312,14 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
   }
 
   function matches(haystack: string, q: string): boolean {
-    return haystack.toLowerCase().includes(q.trim().toLowerCase());
+    const blob = haystack.toLowerCase();
+    const tokens = q
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (!tokens.length) return false;
+    return tokens.every((token) => blob.includes(token));
   }
 
   return {
@@ -352,8 +391,8 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
       return {
         artists: library.artists.filter((item) => matches(item.name, q)),
         albums: library.albums.filter((item) => matches(item.name, q) || matches(item.artistName, q)),
-        tracks: library.tracks.filter(
-          (item) => matches(item.title, q) || matches(item.artistName, q) || matches(item.albumName, q),
+        tracks: library.tracks.filter((item) =>
+          matches(`${item.title} ${item.artistName} ${item.albumName}`, q),
         ),
       };
     },
@@ -378,6 +417,13 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
       } catch {
         return nasUrl;
       }
+    },
+
+    async deleteTrack(trackId: string): Promise<void> {
+      if (!trackId.startsWith("/")) throw new Error("Pista WebDAV no válida.");
+      await deleteWebDavFile(settings, password, trackId);
+      index = null;
+      scanPromise = null;
     },
   };
 }

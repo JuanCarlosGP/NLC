@@ -20,6 +20,8 @@ const OPEN_FADE_MS = 180;
 const CLOSE_MS = 200;
 const SHEET_OVERDRAG_TAIL = 96;
 const DEFAULT_VIEWPORT_RATIO = 0.75;
+/** Below MiniPlayer (35) and Dock (40) so chrome stays visible/tappable. */
+const OVERLAY_Z_INDEX = 30;
 
 function resolveBottomInset(inset: number): number {
   if (inset > 0) return inset;
@@ -28,6 +30,7 @@ function resolveBottomInset(inset: number): number {
 
 /**
  * Sheet inferior (mismo chrome/animación que AppDomus).
+ * `presentation="overlay"` evita Modal para dejar visible el dock / mini player.
  */
 export function BottomSheet({
   open,
@@ -36,6 +39,8 @@ export function BottomSheet({
   accessibilityCloseLabel = "Cerrar",
   sheetBackgroundColor,
   viewportRatio = DEFAULT_VIEWPORT_RATIO,
+  presentation = "modal",
+  reserveBottom = 0,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,15 +48,21 @@ export function BottomSheet({
   accessibilityCloseLabel?: string;
   sheetBackgroundColor?: string;
   viewportRatio?: number;
+  presentation?: "modal" | "overlay";
+  /** Extra space above the bottom edge (e.g. dock + mini player). */
+  reserveBottom?: number;
 }) {
   const insets = useSafeAreaInsets();
   const bottomInset = resolveBottomInset(insets.bottom);
   const { height: windowHeight } = useWindowDimensions();
   const layoutHeight =
     Platform.OS === "web" ? windowHeight : Math.max(windowHeight - insets.top, 0);
+  const chrome = Math.max(0, reserveBottom);
   const viewportCap = layoutHeight * viewportRatio;
-  const maxSheetHeight = viewportCap + bottomInset;
+  const available = Math.max(layoutHeight - chrome, 200);
+  const maxSheetHeight = Math.min(viewportCap, available) + (chrome > 0 ? 0 : bottomInset);
   const slideDistance = maxSheetHeight + 48;
+  const overlay = presentation === "overlay";
 
   const [mounted, setMounted] = useState(false);
   if (open && !mounted) {
@@ -133,6 +144,85 @@ export function BottomSheet({
     </View>
   );
 
+  const body = (
+    <GestureHandlerRootView style={styles.root} pointerEvents={overlay ? "box-none" : "auto"}>
+      <View
+        style={styles.root}
+        pointerEvents={open ? (overlay ? "box-none" : "auto") : "none"}
+        accessibilityViewIsModal={open && !overlay}
+      >
+        <Animated.View
+          style={[
+            styles.backdrop,
+            chrome > 0 ? { bottom: chrome } : null,
+            backdropAnimatedStyle,
+          ]}
+          pointerEvents={open ? "auto" : "none"}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              triggerUiHaptic();
+              onOpenChange(false);
+            }}
+            accessibilityLabel={accessibilityCloseLabel}
+          />
+        </Animated.View>
+
+        <Animated.View
+          {...sheetProps}
+          style={[
+            styles.sheet,
+            {
+              height: maxSheetHeight + SHEET_OVERDRAG_TAIL,
+              maxHeight: maxSheetHeight + SHEET_OVERDRAG_TAIL,
+              paddingBottom: SHEET_OVERDRAG_TAIL,
+              marginBottom:
+                chrome > 0 ? chrome - SHEET_OVERDRAG_TAIL : -bottomInset - SHEET_OVERDRAG_TAIL,
+              backgroundColor: sheetBg,
+              borderColor: colors.rule,
+            },
+            sheetAnimatedStyle,
+            Platform.OS === "web" ? ({ touchAction: "pan-y" } as object) : null,
+          ]}
+        >
+          {handlePanGesture ? <GestureDetector gesture={handlePanGesture}>{handle}</GestureDetector> : handle}
+          <View style={styles.sheetBody} collapsable={false}>
+            <BottomSheetProvider
+              reportScrollOffset={reportScrollOffset}
+              nativeGesture={nativeGesture}
+              scrollLocked={scrollLocked}
+            >
+              {sheetPanGesture ? (
+                <GestureDetector gesture={sheetPanGesture}>
+                  <View style={styles.sheetBodyInner} collapsable={false}>
+                    {children}
+                  </View>
+                </GestureDetector>
+              ) : (
+                children
+              )}
+            </BottomSheetProvider>
+          </View>
+        </Animated.View>
+      </View>
+    </GestureHandlerRootView>
+  );
+
+  if (overlay) {
+    return (
+      <View
+        pointerEvents={open ? "box-none" : "none"}
+        style={[
+          styles.overlayHost,
+          Platform.OS === "web" ? ({ position: "fixed" } as object) : null,
+        ]}
+      >
+        {body}
+      </View>
+    );
+  }
+
   return (
     <Modal
       visible
@@ -141,68 +231,16 @@ export function BottomSheet({
       onRequestClose={() => onOpenChange(false)}
       statusBarTranslucent={Platform.OS !== "web"}
     >
-      <GestureHandlerRootView style={styles.root}>
-        <View
-          style={styles.root}
-          pointerEvents={open ? "auto" : "none"}
-          accessibilityViewIsModal={open}
-        >
-          <Animated.View
-            style={[styles.backdrop, backdropAnimatedStyle]}
-            pointerEvents={open ? "auto" : "none"}
-          >
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={() => {
-                triggerUiHaptic();
-                onOpenChange(false);
-              }}
-              accessibilityLabel={accessibilityCloseLabel}
-            />
-          </Animated.View>
-
-          <Animated.View
-            {...sheetProps}
-            style={[
-              styles.sheet,
-              {
-                height: maxSheetHeight + SHEET_OVERDRAG_TAIL,
-                maxHeight: maxSheetHeight + SHEET_OVERDRAG_TAIL,
-                paddingBottom: SHEET_OVERDRAG_TAIL,
-                marginBottom: -bottomInset - SHEET_OVERDRAG_TAIL,
-                backgroundColor: sheetBg,
-                borderColor: colors.rule,
-              },
-              sheetAnimatedStyle,
-              Platform.OS === "web" ? ({ touchAction: "pan-y" } as object) : null,
-            ]}
-          >
-            {handlePanGesture ? <GestureDetector gesture={handlePanGesture}>{handle}</GestureDetector> : handle}
-            <View style={styles.sheetBody} collapsable={false}>
-              <BottomSheetProvider
-                reportScrollOffset={reportScrollOffset}
-                nativeGesture={nativeGesture}
-                scrollLocked={scrollLocked}
-              >
-                {sheetPanGesture ? (
-                  <GestureDetector gesture={sheetPanGesture}>
-                    <View style={styles.sheetBodyInner} collapsable={false}>
-                      {children}
-                    </View>
-                  </GestureDetector>
-                ) : (
-                  children
-                )}
-              </BottomSheetProvider>
-            </View>
-          </Animated.View>
-        </View>
-      </GestureHandlerRootView>
+      {body}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  overlayHost: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: OVERLAY_Z_INDEX,
+  },
   root: {
     flex: 1,
     justifyContent: "flex-end",

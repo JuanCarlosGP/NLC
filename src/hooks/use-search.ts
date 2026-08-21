@@ -1,4 +1,9 @@
 import { useEffect, useState } from "react";
+import {
+  hydrateTrackArtworkCache,
+  subscribeTrackArtwork,
+  withTracksArtwork,
+} from "@/lib/library/artwork-cache";
 import { loadLibraryCache, loadRecents } from "@/lib/library/cache";
 import type { SearchResults, Track } from "@/lib/nas/types";
 import { usePlayer } from "@/lib/player/player-context";
@@ -14,27 +19,36 @@ export function useSearch(query: string) {
   const [listTitle, setListTitle] = useState("Recientes");
 
   useEffect(() => {
+    void hydrateTrackArtworkCache();
+    return subscribeTrackArtwork(() => {
+      setResults((prev) => ({
+        ...prev,
+        tracks: withTracksArtwork(prev.tracks),
+      }));
+    });
+  }, []);
+
+  useEffect(() => {
     if (!ready) return;
     const q = query.trim();
     let cancelled = false;
+    void hydrateTrackArtworkCache();
 
     if (!q) {
       void (async () => {
-        const recentTracks = await loadRecents(settings.sourceKind);
-        if (cancelled) return;
-        if (recentTracks.length) {
-          setLoading(false);
-          setListTitle("Recientes");
-          setResults({ artists: [], albums: [], tracks: recentTracks });
-          return;
-        }
         setLoading(true);
+        setListTitle("Recientes");
         try {
-          const tracks = await fallbackTracks();
-          if (!cancelled) {
-            setListTitle("Canciones");
-            setResults({ artists: [], albums: [], tracks });
-          }
+          const [recentTracks, allTracks] = await Promise.all([
+            loadRecents(settings.sourceKind),
+            loadAllTracks(),
+          ]);
+          if (cancelled) return;
+          setResults({
+            artists: [],
+            albums: [],
+            tracks: withTracksArtwork(orderRecentsFirst(allTracks, recentTracks)),
+          });
         } finally {
           if (!cancelled) setLoading(false);
         }
@@ -66,7 +80,7 @@ export function useSearch(query: string) {
             setResults({
               artists: mergeById(local.artists, remote.artists),
               albums: mergeById(local.albums, remote.albums),
-              tracks: remote.tracks,
+              tracks: withTracksArtwork(remote.tracks),
             });
           }
         } finally {
@@ -80,28 +94,46 @@ export function useSearch(query: string) {
       clearTimeout(handle);
     };
 
-    async function fallbackTracks(): Promise<Track[]> {
+    async function loadAllTracks(): Promise<Track[]> {
       try {
         const searched = await source.search("*");
-        if (searched.tracks.length) return searched.tracks.slice(0, 20);
+        if (searched.tracks.length) return searched.tracks;
       } catch {
-        // Sigue con álbumes.
+        // Fallback por álbumes.
       }
       const collected: Track[] = [];
+      const seen = new Set<string>();
       try {
         const albums = await source.getAlbums();
-        for (const album of albums.slice(0, 8)) {
-          collected.push(...(await source.getTracks(album.id)));
-          if (collected.length >= 20) break;
+        for (const album of albums) {
+          const albumTracks = await source.getTracks(album.id);
+          for (const track of albumTracks) {
+            if (seen.has(track.id)) continue;
+            seen.add(track.id);
+            collected.push(track);
+          }
         }
       } catch {
         return collected;
       }
-      return collected.slice(0, 20);
+      return collected;
     }
   }, [playNonce, query, ready, settings.sourceKind, source]);
 
   return { results, loading, listTitle };
+}
+
+/** Heard tracks first (recents order), then everything else. */
+function orderRecentsFirst(all: Track[], recents: Track[]): Track[] {
+  const recentIds = new Set(recents.map((track) => track.id));
+  const byId = new Map(all.map((track) => [track.id, track]));
+  const heard: Track[] = [];
+  for (const recent of recents) {
+    const track = byId.get(recent.id) ?? recent;
+    heard.push(track);
+  }
+  const rest = all.filter((track) => !recentIds.has(track.id));
+  return [...heard, ...rest];
 }
 
 function mergeById<T extends { id: string }>(a: T[], b: T[]): T[] {

@@ -1,5 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Heart } from "lucide-react-native";
+import { Cover } from "@/components/ui/cover";
+import { useTrackArtwork } from "@/hooks/use-cover-url";
+import { withTrackArtwork } from "@/lib/library/artwork-cache";
 import { useFavorites } from "@/lib/favorites/favorites-context";
 import type { Track } from "@/lib/nas/types";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -26,18 +29,22 @@ export function TrackRow({
 }) {
   const { isFavorite, toggleFavorite } = useFavorites();
   const liked = isFavorite(track.id);
+  const cover = useTrackArtwork(track);
+  const display = withTrackArtwork(track);
+  const time = formatDuration(display.durationMs);
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.8 : 1 }]}>
-      <Text style={[styles.num, active && styles.active]}>{index ?? track.track ?? "·"}</Text>
+      <Cover id={track.id} label={track.title} uri={cover} size={44} radius={4} />
       <View style={styles.meta}>
         <Text numberOfLines={1} style={[styles.title, active && styles.active]}>
           {track.title}
         </Text>
         <Text numberOfLines={1} style={styles.sub}>
-          {track.artistName}
+          {[index != null ? `${index}` : null, track.artistName].filter(Boolean).join(" · ")}
         </Text>
       </View>
+      {time ? <Text style={styles.time}>{time}</Text> : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={liked ? "Quitar de favoritos" : "Añadir a favoritos"}
@@ -50,7 +57,6 @@ export function TrackRow({
       >
         <Heart color={liked ? colors.accent : colors.muted} fill={liked ? colors.accent : "transparent"} size={16} />
       </Pressable>
-      <Text style={styles.time}>{formatDuration(track.durationMs)}</Text>
     </Pressable>
   );
 }
@@ -60,16 +66,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 11,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.rule,
-  },
-  num: {
-    width: 24,
-    fontFamily: fonts.sans,
-    fontSize: 13,
-    color: colors.muted,
-    textAlign: "center",
+    paddingVertical: 6,
   },
   meta: { flex: 1, gap: 2 },
   heart: {

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import { usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Heart, Pause, Play } from "lucide-react-native";
 import { Cover } from "@/components/ui/cover";
-import { useCoverUrl } from "@/hooks/use-cover-url";
+import { useTrackArtwork } from "@/hooks/use-cover-url";
 import { DOCK_HEIGHT, DOCK_MARGIN, useDock } from "@/lib/dock-context";
 import { useFavorites } from "@/lib/favorites/favorites-context";
 import type { Track } from "@/lib/nas/types";
@@ -13,6 +14,10 @@ import { usePlayerUi } from "@/lib/player/player-ui-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { USE_NATIVE_DRIVER } from "@/lib/use-native-driver";
 import { colors, fonts, layout } from "@/lib/theme";
+
+function isWatchRoute(pathname: string): boolean {
+  return pathname === "/watch" || pathname.startsWith("/watch/");
+}
 
 const GLASS_FILL = "rgba(14, 13, 12, 0.94)";
 const SWIPE_DISTANCE = 52;
@@ -38,7 +43,7 @@ export function MiniPlayerTrack({ track }: { track: Track }) {
   const { openNowPlaying, dismissMiniPlayer } = usePlayerUi();
   const { isFavorite, toggleFavorite } = useFavorites();
   const liked = isFavorite(track.id);
-  const cover = useCoverUrl(track.coverId);
+  const cover = useTrackArtwork(track);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const longTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -217,10 +222,12 @@ export function MiniPlayerTrack({ track }: { track: Track }) {
 
 export function MiniPlayer() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const { current, playNonce } = usePlayer();
   const { nowPlayingOpen, miniPlayerDismissed, revealMiniPlayer } = usePlayerUi();
   const dock = useDock();
   const progress = useRef(new Animated.Value(0)).current;
+  const watching = isWatchRoute(pathname);
 
   useEffect(() => {
     revealMiniPlayer();
@@ -231,7 +238,11 @@ export function MiniPlayer() {
   }, [current, revealMiniPlayer]);
 
   const visible =
-    Boolean(current) && (dock?.visible ?? true) && !nowPlayingOpen && !miniPlayerDismissed;
+    Boolean(current) &&
+    (dock?.visible ?? true) &&
+    !nowPlayingOpen &&
+    !miniPlayerDismissed &&
+    !watching;
   const interactive = Boolean(current) && !miniPlayerDismissed && !nowPlayingOpen;
   const hiddenOffset = layout.miniPlayerHeight + DOCK_HEIGHT + insets.bottom + 48;
 

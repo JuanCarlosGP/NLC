@@ -10,21 +10,28 @@ export type SettingsFeedback = {
   color: string;
 };
 
+/** Survives Settings screen remounts so the APK doesn't flash disabled→enabled. */
+let cachedShareConnected = false;
+
 export function useNasSettings() {
   const ctx = useSettings();
   const { settings, password } = ctx;
   const [feedback, setFeedback] = useState<SettingsFeedback | null>(null);
   const [busy, setBusy] = useState(false);
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(cachedShareConnected);
 
   useEffect(() => {
     if (settings.sourceKind !== "webdav") {
+      cachedShareConnected = false;
       setConnected(false);
       return;
     }
+
     let cancelled = false;
     void probeWebDav(settings, password).then((ok) => {
-      if (!cancelled) setConnected(ok);
+      if (cancelled) return;
+      cachedShareConnected = ok;
+      setConnected(ok);
     });
     return () => {
       cancelled = true;
@@ -45,6 +52,7 @@ export function useNasSettings() {
     try {
       const source = createMusicSource(ctx.settings, ctx.password);
       const ping = await source.ping();
+      cachedShareConnected = ping.ok;
       setConnected(ping.ok);
       setFeedback({
         text: ping.message,
@@ -61,6 +69,7 @@ export function useNasSettings() {
     try {
       await ctx.persist();
       if (ctx.settings.sourceKind === "mock") {
+        cachedShareConnected = false;
         setConnected(false);
         setFeedback({
           text: "Ajustes guardados. Estás usando la biblioteca de ejemplo.",
@@ -70,6 +79,7 @@ export function useNasSettings() {
       }
       const source = createMusicSource(ctx.settings, ctx.password);
       const ping = await source.ping();
+      cachedShareConnected = ping.ok;
       setConnected(ping.ok);
       setFeedback(
         ping.ok

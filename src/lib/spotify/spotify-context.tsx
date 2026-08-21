@@ -1,10 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  hydrateTrackArtworkCache,
+  syncArtworkFromPlaylists,
+} from "@/lib/library/artwork-cache";
 import { matchImportedTracks } from "@/lib/spotify/match";
 import { parseSpotifyUrl } from "@/lib/spotify/parse-url";
 import { fetchPublicSpotifyEntity } from "@/lib/spotify/public-playlist";
 import {
   loadImportedPlaylists,
   removeImportedPlaylist,
+  toggleImportedPlaylistLiked,
   upsertImportedPlaylist,
 } from "@/lib/spotify/playlist-store";
 import { useSettings } from "@/lib/settings/settings-context";
@@ -16,6 +21,8 @@ type SpotifyContextValue = {
   importPlaylistUrl: (url: string) => Promise<ImportedPlaylist>;
   hydratePlaylistCovers: (playlist: ImportedPlaylist) => Promise<void>;
   deletePlaylist: (id: string) => Promise<void>;
+  togglePlaylistLiked: (id: string) => Promise<void>;
+  rematchPlaylist: (id: string) => Promise<void>;
 };
 
 const SpotifyContext = createContext<SpotifyContextValue | null>(null);
@@ -30,13 +37,15 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    void loadImportedPlaylists()
-      .then((stored) => {
-        if (!cancelled) setPlaylists(stored.map(withKind));
-      })
-      .catch(() => {
-        if (!cancelled) setPlaylists([]);
-      });
+    void (async () => {
+      await hydrateTrackArtworkCache();
+      const stored = await loadImportedPlaylists();
+      if (cancelled) return;
+      setPlaylists(stored.map(withKind));
+      void syncArtworkFromPlaylists(stored);
+    })().catch(() => {
+      if (!cancelled) setPlaylists([]);
+    });
     return () => {
       cancelled = true;
     };
@@ -60,6 +69,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
           const updated = { ...playlist, tracks };
           const stored = await upsertImportedPlaylist(updated);
           setPlaylists(stored.map(withKind));
+          void syncArtworkFromPlaylists(stored);
         })
         .catch(() => {
           // Se muestra igual; las coincidencias con el NAS se pueden reintentar luego.
@@ -84,6 +94,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
       const updated = { ...latest, tracks: applyCoverMap(latest.tracks, covers) };
       const stored = await upsertImportedPlaylist(updated);
       setPlaylists(stored.map(withKind));
+      void syncArtworkFromPlaylists(stored);
     } finally {
       hydratingCovers.current.delete(playlist.id);
     }
@@ -94,9 +105,38 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
     setPlaylists(next.map(withKind));
   }, []);
 
+  const togglePlaylistLiked = useCallback(async (id: string) => {
+    const next = await toggleImportedPlaylistLiked(id);
+    setPlaylists(next.map(withKind));
+  }, []);
+
+  const rematchPlaylist = useCallback(
+    async (id: string) => {
+      // WebDAV keeps an in-memory index; refresh so new Canciones files are visible.
+      if (source.kind === "webdav") {
+        await source.ping();
+      }
+      const current = (await loadImportedPlaylists()).find((item) => item.id === id);
+      if (!current) return;
+      const cleared = current.tracks.map((track) => ({ ...track, matched: null }));
+      const tracks = await matchImportedTracks(source, cleared);
+      const stored = await upsertImportedPlaylist({ ...current, tracks });
+      setPlaylists(stored.map(withKind));
+      void syncArtworkFromPlaylists(stored);
+    },
+    [source],
+  );
+
   const value = useMemo(
-    () => ({ playlists, importPlaylistUrl, hydratePlaylistCovers, deletePlaylist }),
-    [deletePlaylist, hydratePlaylistCovers, importPlaylistUrl, playlists],
+    () => ({
+      playlists,
+      importPlaylistUrl,
+      hydratePlaylistCovers,
+      deletePlaylist,
+      togglePlaylistLiked,
+      rematchPlaylist,
+    }),
+    [deletePlaylist, hydratePlaylistCovers, importPlaylistUrl, playlists, rematchPlaylist, togglePlaylistLiked],
   );
 
   return <SpotifyContext.Provider value={value}>{children}</SpotifyContext.Provider>;

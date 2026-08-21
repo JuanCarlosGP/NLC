@@ -19,5 +19,6 @@ export type ImportedPlaylist = {
   coverUrl: string | null;
   spotifyUrl: string;
   importedAt: number;
+  liked?: boolean;
   tracks: ImportedTrack[];
 };

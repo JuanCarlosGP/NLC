@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { Platform, ScrollView, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
 import { mergeSheetScrollProps, useBottomSheet } from "@/components/layout/sheet-context";
+import { mergeDockOnScroll, useDock } from "@/lib/dock-context";
 
 export function SheetScrollView({
   children,
@@ -13,6 +14,7 @@ export function SheetScrollView({
   contentContainerStyle?: StyleProp<ViewStyle>;
 }) {
   const sheet = useBottomSheet();
+  const dock = useDock();
 
   const scroll = (
     <ScrollView
@@ -25,7 +27,7 @@ export function SheetScrollView({
       nestedScrollEnabled
       keyboardShouldPersistTaps="handled"
       scrollEnabled={!sheet?.scrollLocked}
-      onScroll={mergeSheetScrollProps(sheet)}
+      onScroll={mergeSheetScrollProps(sheet, mergeDockOnScroll(dock))}
       {...(Platform.OS === "web" ? ({ "data-sheet-scroll": "true" } as object) : null)}
     >
       {children}

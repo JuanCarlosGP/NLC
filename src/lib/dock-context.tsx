@@ -21,6 +21,7 @@ type DockContextValue = {
   visible: boolean;
   reservedBottom: number;
   handleScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  reveal: () => void;
 };
 
 const DockContext = createContext<DockContextValue | null>(null);
@@ -71,6 +72,7 @@ export function DockProvider({
       visible,
       reservedBottom,
       handleScroll,
+      reveal: () => setVisible(true),
     }),
     [enabled, handleScroll, reservedBottom, visible],
   );

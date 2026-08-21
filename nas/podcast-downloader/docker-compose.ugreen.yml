@@ -1,0 +1,29 @@
+# Ugreen: mount the whole Music share so podcasts and songs land in different folders.
+services:
+  podcast-downloader:
+    image: python:3.12-slim
+    container_name: snd-podcast-downloader
+    working_dir: /app
+    restart: unless-stopped
+    ports:
+      - "8091:8091"
+    environment:
+      LIBRARY_DIR: /library
+      PODCAST_DIR: /library/Podcasts
+      SONG_DIR: /library/Canciones
+      BIND_HOST: 0.0.0.0
+      BIND_PORT: "8091"
+      AUTH_TOKEN: ""
+      MAX_WORKERS: "2"
+      PODCAST_MIN_SECONDS: "600"
+    volumes:
+      - /volume1/Music/snd-downloader-app:/app
+      - /volume1/Music:/library
+    command:
+      - bash
+      - -lc
+      - |
+        apt-get update
+        apt-get install -y --no-install-recommends ffmpeg ca-certificates
+        pip install --no-cache-dir -r requirements.txt
+        exec python app.py

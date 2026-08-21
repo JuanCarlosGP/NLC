@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { loadFavorites, toggleFavorite as persistToggle } from "@/lib/library/cache";
+import { loadFavorites, removeFavorite as persistRemove, toggleFavorite as persistToggle } from "@/lib/library/cache";
 import type { Track } from "@/lib/nas/types";
 import { useSettings } from "@/lib/settings/settings-context";
 
@@ -7,6 +7,7 @@ type FavoritesContextValue = {
   favorites: Track[];
   isFavorite: (id: string) => boolean;
   toggleFavorite: (track: Track) => Promise<void>;
+  removeFavorite: (trackId: string) => Promise<void>;
 };
 
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
@@ -37,9 +38,14 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     setFavorites(next);
   }, []);
 
+  const removeFavorite = useCallback(async (trackId: string) => {
+    const next = await persistRemove(trackId);
+    setFavorites(next);
+  }, []);
+
   const value = useMemo(
-    () => ({ favorites, isFavorite, toggleFavorite }),
-    [favorites, isFavorite, toggleFavorite],
+    () => ({ favorites, isFavorite, toggleFavorite, removeFavorite }),
+    [favorites, isFavorite, removeFavorite, toggleFavorite],
   );
 
   return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>;

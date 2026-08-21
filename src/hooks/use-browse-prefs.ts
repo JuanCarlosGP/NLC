@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { LibrarySort } from "@/components/library/library-sort-sheet";
 
@@ -20,6 +20,9 @@ export const DEFAULT_BROWSE_PREFS: BrowsePrefs = {
   viewMode: "list",
 };
 
+/** Survive tab remounts so grid/list doesn't flash to the default. */
+const prefsMemory = new Map<string, BrowsePrefs>();
+
 export function parseBrowsePrefs(raw: string | null): BrowsePrefs {
   if (!raw) return { ...DEFAULT_BROWSE_PREFS };
   try {
@@ -34,9 +37,10 @@ export function parseBrowsePrefs(raw: string | null): BrowsePrefs {
 }
 
 export function useBrowsePrefs(storageKey: string) {
-  const [sort, setSort] = useState<LibrarySort>(DEFAULT_BROWSE_PREFS.sort);
-  const [viewMode, setViewMode] = useState<BrowseViewMode>(DEFAULT_BROWSE_PREFS.viewMode);
-  const [ready, setReady] = useState(false);
+  const seed = prefsMemory.get(storageKey) ?? DEFAULT_BROWSE_PREFS;
+  const [sort, setSortState] = useState<LibrarySort>(seed.sort);
+  const [viewMode, setViewModeState] = useState<BrowseViewMode>(seed.viewMode);
+  const [ready, setReady] = useState(prefsMemory.has(storageKey));
 
   useEffect(() => {
     let cancelled = false;
@@ -44,8 +48,9 @@ export function useBrowsePrefs(storageKey: string) {
       .then((raw) => {
         if (cancelled) return;
         const stored = parseBrowsePrefs(raw);
-        setSort(stored.sort);
-        setViewMode(stored.viewMode);
+        prefsMemory.set(storageKey, stored);
+        setSortState(stored.sort);
+        setViewModeState(stored.viewMode);
       })
       .finally(() => {
         if (!cancelled) setReady(true);
@@ -57,8 +62,18 @@ export function useBrowsePrefs(storageKey: string) {
 
   useEffect(() => {
     if (!ready) return;
-    void AsyncStorage.setItem(storageKey, JSON.stringify({ sort, viewMode }));
+    const next = { sort, viewMode };
+    prefsMemory.set(storageKey, next);
+    void AsyncStorage.setItem(storageKey, JSON.stringify(next));
   }, [ready, sort, storageKey, viewMode]);
 
-  return { sort, viewMode, setSort, setViewMode };
+  const setSort = useCallback((next: LibrarySort) => {
+    setSortState(next);
+  }, []);
+
+  const setViewMode = useCallback((next: BrowseViewMode) => {
+    setViewModeState(next);
+  }, []);
+
+  return { sort, viewMode, setSort, setViewMode, ready };
 }

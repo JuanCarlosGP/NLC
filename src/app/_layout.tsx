@@ -16,13 +16,12 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { Dock } from "@/components/layout/dock";
 import { MiniPlayer } from "@/components/layout/mini-player";
 import { NowPlayingSheet } from "@/components/player/now-playing-sheet";
-import { ImportedPlaylistSheet } from "@/components/library/imported-playlist-sheet";
 import { DockProvider } from "@/lib/dock-context";
 import { FavoritesProvider } from "@/lib/favorites/favorites-context";
+import { DownloadSettingsProvider } from "@/lib/podcasts/download-settings-context";
 import { PlayerProvider } from "@/lib/player/player-context";
 import { PlayerUiProvider } from "@/lib/player/player-ui-context";
 import { SettingsProvider } from "@/lib/settings/settings-context";
-import { ImportedSheetProvider } from "@/lib/spotify/imported-sheet-context";
 import { SpotifyProvider } from "@/lib/spotify/spotify-context";
 import { colors } from "@/lib/theme";
 
@@ -57,8 +56,8 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <SettingsProvider>
+        <DownloadSettingsProvider>
         <SpotifyProvider>
-          <ImportedSheetProvider>
           <FavoritesProvider>
             <PlayerProvider>
               <PlayerUiProvider>
@@ -79,20 +78,25 @@ export default function RootLayout() {
                       <Stack.Screen name="artist/[id]" />
                       <Stack.Screen name="imported/[id]" />
                       <Stack.Screen name="favorites" />
+                      <Stack.Screen name="music" />
+                      <Stack.Screen name="podcasts" />
+                      <Stack.Screen name="video/onepiece" />
+                      <Stack.Screen name="video/saga/[id]" />
+                      <Stack.Screen name="video/arc/[id]" />
+                      <Stack.Screen name="watch/[...path]" options={{ animation: "fade" }} />
                       <Stack.Screen name="now-playing" />
                       <Stack.Screen name="queue" />
                     </Stack>
                     <MiniPlayer />
                     <Dock />
                     <NowPlayingSheet />
-                    <ImportedPlaylistSheet />
                   </GestureHandlerRootView>
                 </DockChrome>
               </PlayerUiProvider>
           </PlayerProvider>
           </FavoritesProvider>
-          </ImportedSheetProvider>
         </SpotifyProvider>
+        </DownloadSettingsProvider>
       </SettingsProvider>
     </SafeAreaProvider>
   );

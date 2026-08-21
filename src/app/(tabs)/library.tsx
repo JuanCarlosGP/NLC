@@ -12,19 +12,22 @@ import { Screen } from "@/components/ui/screen";
 import { useBrowsePrefs } from "@/hooks/use-browse-prefs";
 import { useLibrary, type LibraryTab } from "@/hooks/use-library";
 import { usePlayer } from "@/lib/player/player-context";
-import { useImportedSheet } from "@/lib/spotify/imported-sheet-context";
 import { useSpotify } from "@/lib/spotify/spotify-context";
 import { colors, fonts, layout, type } from "@/lib/theme";
+import { isPodcastAlbum, isPodcastArtist, isSongsAlbum, isSongsArtist } from "@/lib/nas/webdav";
 import type { Album, Artist } from "@/lib/nas/types";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
 
 const TABS: { id: LibraryTab; label: string }[] = [
-  { id: "recents", label: "Recientes" },
+  { id: "recents", label: "General" },
   { id: "playlists", label: "Playlists" },
+  { id: "tracks", label: "Canciones" },
+  { id: "podcasts", label: "Podcasts" },
   { id: "artists", label: "Artistas" },
   { id: "albums", label: "Álbumes" },
-  { id: "tracks", label: "Canciones" },
 ];
+
+const GENERAL_RECENT_LIMIT = 8;
 
 function compareText(a: string, b: string): number {
   return a.localeCompare(b, "es", { sensitivity: "base" });
@@ -76,10 +79,9 @@ export default function LibraryScreen() {
   const { tab, setTab, artists, albums, tracks, error } = useLibrary();
   const { playTracks } = usePlayer();
   const { playlists } = useSpotify();
-  const { openImported } = useImportedSheet();
   const [importOpen, setImportOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
-  const { sort, viewMode, setSort, setViewMode } = useBrowsePrefs("snd.library.browse.v1");
+  const { sort, viewMode, setSort, setViewMode, ready: browseReady } = useBrowsePrefs("snd.library.browse.v1");
   const grid = viewMode === "grid";
 
   const playlistAlbums = useMemo<PlaylistEntry[]>(
@@ -105,8 +107,35 @@ export default function LibraryScreen() {
     return next;
   }, [playlistAlbums, sort]);
 
+  const musicAlbums = useMemo(
+    () => albums.filter((album) => !isPodcastAlbum(album) && !isSongsAlbum(album)),
+    [albums],
+  );
+  const musicArtistIds = useMemo(
+    () => new Set(musicAlbums.map((album) => album.artistId)),
+    [musicAlbums],
+  );
+  const musicArtists = useMemo(
+    () =>
+      artists.filter(
+        (artist) =>
+          !isPodcastArtist(artist) &&
+          !isSongsArtist(artist) &&
+          musicArtistIds.has(artist.id),
+      ),
+    [artists, musicArtistIds],
+  );
+
   const sortedAlbums = useMemo(() => {
-    const next = [...albums];
+    const next = [...musicAlbums];
+    if (sort === "alpha") next.sort((a, b) => compareText(a.name, b.name));
+    else if (sort === "creator") next.sort((a, b) => compareText(a.artistName, b.artistName));
+    else if (sort === "added") next.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
+    return next;
+  }, [musicAlbums, sort]);
+
+  const podcastAlbums = useMemo(() => {
+    const next = albums.filter(isPodcastAlbum);
     if (sort === "alpha") next.sort((a, b) => compareText(a.name, b.name));
     else if (sort === "creator") next.sort((a, b) => compareText(a.artistName, b.artistName));
     else if (sort === "added") next.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
@@ -114,34 +143,59 @@ export default function LibraryScreen() {
   }, [albums, sort]);
 
   const sortedArtists = useMemo(() => {
-    const next = [...artists];
+    const next = [...musicArtists];
     if (sort === "alpha" || sort === "creator") next.sort((a, b) => compareText(a.name, b.name));
     return next;
-  }, [artists, sort]);
+  }, [musicArtists, sort]);
 
-  const mixed = useMemo(
-    () =>
-      sortMix(
-        [
-          ...playlistAlbums.map((entry) => ({
-            kind: "playlist" as const,
-            key: `pl-${entry.playlist.id}`,
-            ...entry,
-          })),
-          ...albums.map((album) => ({ kind: "album" as const, key: `al-${album.id}`, album })),
-          ...artists.map((artist) => ({ kind: "artist" as const, key: `ar-${artist.id}`, artist })),
-        ],
-        sort,
-      ),
-    [albums, artists, playlistAlbums, sort],
+  const allMix = useMemo(
+    () => [
+      ...playlistAlbums.map((entry) => ({
+        kind: "playlist" as const,
+        key: `pl-${entry.playlist.id}`,
+        ...entry,
+      })),
+      ...musicAlbums.map((album) => ({ kind: "album" as const, key: `al-${album.id}`, album })),
+      ...musicArtists.map((artist) => ({ kind: "artist" as const, key: `ar-${artist.id}`, artist })),
+    ],
+    [musicAlbums, musicArtists, playlistAlbums],
   );
+
+  const recentMix = useMemo(() => {
+    const byRecency = sortMix(allMix, "added");
+    return byRecency.slice(0, GENERAL_RECENT_LIMIT);
+  }, [allMix]);
+
+  const restMix = useMemo(() => {
+    const recentKeys = new Set(recentMix.map((item) => item.key));
+    return sortMix(
+      allMix.filter((item) => !recentKeys.has(item.key)),
+      sort,
+    );
+  }, [allMix, recentMix, sort]);
+
+  function renderMixItem(item: MixItem) {
+    if (item.kind === "playlist") {
+      return wrap(item.key, playlistNode(item.playlist, item.album));
+    }
+    if (item.kind === "album") {
+      return wrap(
+        item.key,
+        albumNode(
+          item.album,
+          isPodcastAlbum(item.album) ? "Podcast" : `Álbum · ${item.album.artistName}`,
+        ),
+      );
+    }
+    return wrap(item.key, artistNode(item.artist, "Artista"));
+  }
 
   function wrap(key: string, node: ReactNode) {
     return grid ? <Cell key={key}>{node}</Cell> : <View key={key}>{node}</View>;
   }
 
   function playlistNode(playlist: ImportedPlaylist, album: Album) {
-    const go = () => openImported(playlist.id);
+    const go = () => router.push(`/imported/${playlist.id}`);
     const subtitle = `Playlist · ${playlist.ownerName}`;
     return grid ? (
       <AlbumTile album={album} coverUri={playlist.coverUrl} subtitle={subtitle} onPress={go} />
@@ -150,12 +204,12 @@ export default function LibraryScreen() {
     );
   }
 
-  function albumNode(album: Album) {
+  function albumNode(album: Album, subtitle = `Álbum · ${album.artistName}`) {
     const go = () => router.push(`/album/${album.id}`);
     return grid ? (
-      <AlbumTile album={album} subtitle={`Álbum · ${album.artistName}`} onPress={go} />
+      <AlbumTile album={album} subtitle={subtitle} onPress={go} />
     ) : (
-      <AlbumRow album={album} subtitle={`Álbum · ${album.artistName}`} onPress={go} />
+      <AlbumRow album={album} subtitle={subtitle} onPress={go} />
     );
   }
 
@@ -213,7 +267,7 @@ export default function LibraryScreen() {
           })}
         </ScrollView>
 
-        {tab !== "tracks" ? (
+        {tab !== "tracks" && browseReady ? (
           <View style={styles.sortBar}>
             <Pressable
               onPress={() => setSortOpen(true)}
@@ -238,18 +292,26 @@ export default function LibraryScreen() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
+        {browseReady ? (
+          <>
         {tab === "recents" ? (
-          <Collection>
-            {mixed.map((item) => {
-              if (item.kind === "playlist") {
-                return wrap(item.key, playlistNode(item.playlist, item.album));
-              }
-              if (item.kind === "album") {
-                return wrap(item.key, albumNode(item.album));
-              }
-              return wrap(item.key, artistNode(item.artist, "Artista"));
-            })}
-          </Collection>
+          <>
+            {recentMix.length ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Recientes</Text>
+                <Collection>{recentMix.map((item) => renderMixItem(item))}</Collection>
+              </View>
+            ) : null}
+            {restMix.length ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Todo</Text>
+                <Collection>{restMix.map((item) => renderMixItem(item))}</Collection>
+              </View>
+            ) : null}
+            {!recentMix.length && !restMix.length ? (
+              <Text style={type.body}>Aún no hay nada en la biblioteca.</Text>
+            ) : null}
+          </>
         ) : null}
 
         {tab === "playlists" ? (
@@ -261,6 +323,18 @@ export default function LibraryScreen() {
             </Collection>
           ) : (
             <Text style={type.body}>Aún no hay playlists. Pulsa + para importar un enlace.</Text>
+          )
+        ) : null}
+
+        {tab === "podcasts" ? (
+          podcastAlbums.length ? (
+            <Collection>
+              {podcastAlbums.map((album) => wrap(album.id, albumNode(album, "Podcast")))}
+            </Collection>
+          ) : (
+            <Text style={type.body}>
+              Aún no hay podcasts. Descarga uno en Ajustes → Podcasts (yt-dlp) a Music/Podcasts.
+            </Text>
           )
         ) : null}
 
@@ -291,6 +365,8 @@ export default function LibraryScreen() {
               />
             ))
           : null}
+          </>
+        ) : null}
       </Screen>
       <ImportSheet
         open={importOpen}
@@ -360,6 +436,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   sortLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.ink },
+  section: { gap: 10 },
+  sectionLabel: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.inkSoft,
+    paddingTop: 4,
+  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",

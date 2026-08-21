@@ -67,7 +67,7 @@ Si el ping falla: el teléfono y el NAS deben estar en la misma LAN; Navidrome d
 - Streaming HTTP, sin descargar la librería al móvil (MVP).
 - Reproductor: `expo-audio` (Expo 54). Cubre foreground, y en un development/EAS build puede mostrar controles de lock screen con `setActiveForLockScreen`.
 - Formatos: mp3, m4a, ogg suelen ir bien. **FLAC** depende del decodificador del dispositivo (ExoPlayer). Si un teléfono no lo reproduce, usa calidad 320 kbps en Ajustes (transcode en Navidrome) o convierte ese álbum; no bloquea el resto de la app.
-- Descargas offline: toggle deshabilitado, «próximamente».
+- **Podcasts / yt-dlp:** el APK no embebe yt-dlp. Corre en Docker en el NAS (ver [`nas/podcast-downloader/README.md`](nas/podcast-downloader/README.md)). En SND → Ajustes → **Podcasts (yt-dlp)** configuras host `192.168.1.106`, puerto `8091` y el mismo token que `AUTH_TOKEN` del compose. Las descargas van a `Music/Podcasts`; refresca la biblioteca para reproducirlas. No descarga audio de Spotify.
 
 ## Stack
 
@@ -79,7 +79,9 @@ Expo SDK 54, React Native 0.81.5, React 19.1, TypeScript, expo-router (`src/app`
 src/app/          rutas
 src/components/   UI
 src/hooks/        un hook por pantalla
-src/lib/nas/      MusicSource (mock + OpenSubsonic)
+src/lib/nas/      MusicSource (mock + OpenSubsonic + WebDAV)
+src/lib/podcasts/ cliente del downloader yt-dlp en el NAS
 src/lib/player/   cola y reproducción
 src/lib/settings/ host NAS + SecureStore
+nas/podcast-downloader/  Docker + API yt-dlp para Ugreen
 ```

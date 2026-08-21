@@ -18,7 +18,19 @@ export async function saveImportedPlaylists(playlists: ImportedPlaylist[]): Prom
 
 export async function upsertImportedPlaylist(playlist: ImportedPlaylist): Promise<ImportedPlaylist[]> {
   const current = await loadImportedPlaylists();
-  const next = [playlist, ...current.filter((item) => item.id !== playlist.id)];
+  const prev = current.find((item) => item.id === playlist.id);
+  const merged: ImportedPlaylist = {
+    ...playlist,
+    liked: playlist.liked ?? prev?.liked,
+  };
+  const next = [merged, ...current.filter((item) => item.id !== playlist.id)];
+  await saveImportedPlaylists(next);
+  return next;
+}
+
+export async function toggleImportedPlaylistLiked(id: string): Promise<ImportedPlaylist[]> {
+  const current = await loadImportedPlaylists();
+  const next = current.map((item) => (item.id === id ? { ...item, liked: !item.liked } : item));
   await saveImportedPlaylists(next);
   return next;
 }

@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       body?: string;
     };
     const method = (payload.method ?? "GET").toUpperCase();
-    if (!["GET", "HEAD", "OPTIONS", "PROPFIND", "PUT"].includes(method)) {
+    if (!["GET", "HEAD", "OPTIONS", "PROPFIND", "PUT", "DELETE"].includes(method)) {
       return Response.json({ error: "Método no permitido." }, { status: 405 });
     }
     return await relayLanRequest(payload.url ?? "", method, payload.headers ?? {}, payload.body);

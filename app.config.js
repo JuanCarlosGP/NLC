@@ -47,6 +47,7 @@ export default {
           recordAudioAndroid: false,
         },
       ],
+      "expo-video",
       "./plugins/with-lan-cleartext.js",
     ],
     web: {

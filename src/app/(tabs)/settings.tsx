@@ -1,21 +1,56 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
+import { DownloadSheet } from "@/components/settings/download-sheet";
 import { SourceConfigSheet } from "@/components/settings/source-config-sheet";
 import { Screen } from "@/components/ui/screen";
+import { useDownloadSettings } from "@/hooks/use-download-settings";
 import { useNasSettings } from "@/hooks/use-nas-settings";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
-import { colors, fonts, type } from "@/lib/theme";
+import { colors, fonts, layout, type } from "@/lib/theme";
 import type { MusicSourceKind } from "@/lib/nas/types";
+
+const SOURCE_TABS: { id: MusicSourceKind; label: string }[] = [
+  { id: "webdav", label: "Carpeta compartida" },
+  { id: "mock", label: "Biblioteca de ejemplo" },
+  { id: "opensubsonic", label: "Navidrome" },
+];
 
 export default function SettingsScreen() {
   const nas = useNasSettings();
+  const download = useDownloadSettings();
   const { settings, setSettings, password, setPassword, feedback, connected } = nas;
   const [configOpen, setConfigOpen] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const shareReady = connected && settings.sourceKind === "webdav";
+  const canSaveShare = shareReady && !nas.busy;
+  const downloadSummary = download.settings.enabled
+    ? `${download.settings.host}:${download.settings.port}`
+    : "Desactivado";
 
-  function setKind(kind: MusicSourceKind) {
-    setSettings({ ...settings, sourceKind: kind });
+  function selectSource(kind: MusicSourceKind) {
+    if (kind === "webdav") {
+      setSettings({
+        ...settings,
+        sourceKind: "webdav",
+        host: settings.host || "192.168.1.106",
+        port: settings.port === "4533" ? "5005" : settings.port || "5005",
+        username: settings.username || "Viewer",
+        sharePath: settings.sharePath || "/Music",
+        useHttps: false,
+      });
+      if (!password) setPassword("Viewer");
+      return;
+    }
+    if (kind === "opensubsonic") {
+      setSettings({
+        ...settings,
+        sourceKind: "opensubsonic",
+        port: settings.port === "5005" ? "4533" : settings.port || "4533",
+      });
+      return;
+    }
+    setSettings({ ...settings, sourceKind: "mock" });
   }
 
   const summary =
@@ -30,42 +65,26 @@ export default function SettingsScreen() {
       <Text style={type.pageTitle}>Ajustes</Text>
 
       <Text style={type.sectionTitle}>Fuente</Text>
-      <View style={styles.row}>
-        <Choice
-          label="Carpeta compartida"
-          active={settings.sourceKind === "webdav"}
-          onPress={() => {
-            setKind("webdav");
-            setSettings({
-              ...settings,
-              sourceKind: "webdav",
-              host: settings.host || "192.168.1.106",
-              port: settings.port === "4533" ? "5005" : settings.port || "5005",
-              username: settings.username || "Viewer",
-              sharePath: settings.sharePath || "/Music",
-              useHttps: false,
-            });
-            if (!password) setPassword("Viewer");
-          }}
-        />
-        <Choice
-          label="Biblioteca de ejemplo"
-          active={settings.sourceKind === "mock"}
-          onPress={() => setKind("mock")}
-        />
-        <Choice
-          label="Navidrome"
-          active={settings.sourceKind === "opensubsonic"}
-          onPress={() => {
-            setKind("opensubsonic");
-            setSettings({
-              ...settings,
-              sourceKind: "opensubsonic",
-              port: settings.port === "5005" ? "4533" : settings.port || "4533",
-            });
-          }}
-        />
-      </View>
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabsScroll}
+        contentContainerStyle={styles.tabs}
+      >
+        {SOURCE_TABS.map((item) => {
+          const active = settings.sourceKind === item.id;
+          return (
+            <Pressable
+              key={item.id}
+              onPress={() => selectSource(item.id)}
+              style={[styles.tab, active && styles.tabActive]}
+            >
+              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{item.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
       <View style={styles.configBlock}>
         <Pressable
@@ -75,7 +94,7 @@ export default function SettingsScreen() {
           }}
           style={({ pressed }) => [styles.configBtn, { opacity: pressed ? 0.85 : 1 }]}
         >
-          {shareReady ? <View style={styles.statusDot} /> : null}
+          <View style={[styles.statusDot, { opacity: shareReady ? 1 : 0 }]} />
           <View style={styles.configMeta}>
             <Text style={styles.configTitle}>Configuración</Text>
             <Text numberOfLines={1} style={styles.configSummary}>
@@ -84,34 +103,50 @@ export default function SettingsScreen() {
           </View>
           <ChevronRight color={colors.muted} size={20} />
         </Pressable>
-        {shareReady ? (
-          <Pressable
-            disabled={nas.busy}
-            onPress={() => {
-              triggerUiHaptic();
-              void nas.saveShareConfig();
-            }}
-            style={({ pressed }) => [
-              styles.saveShareBtn,
-              { opacity: nas.busy ? 0.55 : pressed ? 0.85 : 1 },
-            ]}
-          >
-            <Text style={styles.saveShareLabel}>Guardar configuración</Text>
-          </Pressable>
-        ) : null}
+        <Pressable
+          disabled={!canSaveShare}
+          onPress={() => {
+            triggerUiHaptic();
+            void nas.saveShareConfig();
+          }}
+          style={({ pressed }) => [
+            styles.saveShareBtn,
+            { opacity: !canSaveShare ? 0.45 : pressed ? 0.85 : 1 },
+          ]}
+        >
+          <Text style={styles.saveShareLabel}>Guardar configuración</Text>
+        </Pressable>
       </View>
-      {feedback ? (
-        <Text style={[type.meta, { color: feedback.color }]}>{feedback.text}</Text>
-      ) : null}
+      <Text style={[type.meta, styles.feedbackSlot, feedback ? { color: feedback.color } : null]}>
+        {feedback?.text ?? " "}
+      </Text>
 
       <Text style={type.sectionTitle}>Descargas</Text>
-      <View style={styles.switchRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.switchLabel}>Descargas</Text>
-          <Text style={type.meta}>Próximamente. El MVP reproduce en streaming.</Text>
+      <Pressable
+        onPress={() => {
+          triggerUiHaptic();
+          setDownloadOpen(true);
+        }}
+        style={({ pressed }) => [styles.configBtn, { opacity: pressed ? 0.85 : 1 }]}
+      >
+        <View style={[styles.statusDot, { opacity: download.settings.enabled ? 1 : 0 }]} />
+        <View style={styles.configMeta}>
+          <Text style={styles.configTitle}>yt-dlp</Text>
+          <Text numberOfLines={1} style={styles.configSummary}>
+            {downloadSummary}
+          </Text>
         </View>
-        <Switch value={false} disabled trackColor={{ false: colors.rule, true: colors.rule }} />
-      </View>
+        <ChevronRight color={colors.muted} size={20} />
+      </Pressable>
+      <Text
+        style={[
+          type.meta,
+          styles.feedbackSlot,
+          download.feedback && !downloadOpen ? { color: download.feedback.color } : null,
+        ]}
+      >
+        {download.feedback && !downloadOpen ? download.feedback.text : " "}
+      </Text>
 
       <SourceConfigSheet
         open={configOpen}
@@ -125,28 +160,37 @@ export default function SettingsScreen() {
         testConnection={nas.testConnection}
         save={nas.save}
       />
+      <DownloadSheet open={downloadOpen} onOpenChange={setDownloadOpen} download={download} />
     </Screen>
   );
 }
 
-function Choice({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={[styles.choice, active && styles.choiceActive]}>
-      <Text style={[styles.choiceLabel, active && styles.choiceLabelActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  tabsScroll: {
+    marginHorizontal: -layout.screenPad,
+    flexGrow: 0,
+  },
+  tabs: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: layout.screenPad,
+  },
+  tab: {
+    borderWidth: 1,
+    borderColor: colors.rule,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: colors.sheet,
+    flexShrink: 0,
+  },
+  tabActive: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
+  },
+  tabLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.inkSoft },
+  tabLabelActive: { color: colors.void },
   configBlock: { gap: 8 },
   configBtn: {
     flexDirection: "row",
@@ -179,22 +223,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   saveShareLabel: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 4,
-  },
-  switchLabel: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-  choice: {
-    borderWidth: 1,
-    borderColor: colors.rule,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  choiceActive: { backgroundColor: colors.sheetRaised, borderColor: colors.ruleLight },
-  choiceLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted },
-  choiceLabelActive: { color: colors.ink },
+  feedbackSlot: { minHeight: 18 },
 });

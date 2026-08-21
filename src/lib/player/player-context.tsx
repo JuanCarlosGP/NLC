@@ -21,15 +21,13 @@ import type { Track } from "@/lib/nas/types";
 import { useSettings } from "@/lib/settings/settings-context";
 import type { RepeatMode } from "@/lib/player/types";
 
-type PlayerContextValue = {
+type PlayerSessionValue = {
   player: AudioPlayer;
   queue: Track[];
   index: number;
   current: Track | null;
   playing: boolean;
   buffering: boolean;
-  currentTime: number;
-  duration: number;
   shuffle: boolean;
   repeat: RepeatMode;
   playNonce: number;
@@ -42,9 +40,22 @@ type PlayerContextValue = {
   seek: (seconds: number) => Promise<void>;
   toggleShuffle: () => void;
   cycleRepeat: () => void;
+  removeTrackFromQueue: (trackId: string) => Promise<void>;
 };
 
-const PlayerContext = createContext<PlayerContextValue | null>(null);
+type PlayerProgressValue = {
+  currentTime: number;
+  duration: number;
+};
+
+/** @deprecated Prefer usePlayer + usePlayerProgress; kept for seek/now-playing. */
+export type PlayerContextValue = PlayerSessionValue & PlayerProgressValue;
+
+const PlayerSessionContext = createContext<PlayerSessionValue | null>(null);
+const PlayerProgressContext = createContext<PlayerProgressValue>({
+  currentTime: 0,
+  duration: 0,
+});
 
 async function ensureNotificationPermission(): Promise<void> {
   if (Platform.OS !== "android") return;
@@ -78,11 +89,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const indexRef = useRef(index);
   const repeatRef = useRef(repeat);
   const sourceRef = useRef(source);
+  const currentTimeRef = useRef(0);
+  const playingRef = useRef(false);
+  const loadedRef = useRef(false);
 
   queueRef.current = queue;
   indexRef.current = index;
   repeatRef.current = repeat;
   sourceRef.current = source;
+  currentTimeRef.current = status.currentTime ?? 0;
+  playingRef.current = status.playing;
+  loadedRef.current = status.isLoaded;
 
   const current = queue[index] ?? null;
 
@@ -108,9 +125,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       void pushRecent(track);
       void ensureNotificationPermission();
       try {
-        const cover = track.coverId
-          ? await sourceRef.current.coverUrl(track.coverId, 256)
-          : null;
+        const cover =
+          track.artworkUrl ||
+          (track.coverId ? await sourceRef.current.coverUrl(track.coverId, 256) : null);
         const lockPlayer = player as AudioPlayer & {
           setActiveForLockScreen?: (
             active: boolean,
@@ -161,17 +178,18 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const togglePlay = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (!current) return;
-    if (status.playing) {
+    const track = queueRef.current[indexRef.current];
+    if (!track) return;
+    if (playingRef.current) {
       pause();
       return;
     }
-    if (!status.isLoaded) {
-      await loadAndPlay(current);
+    if (!loadedRef.current) {
+      await loadAndPlay(track);
       return;
     }
     player.play();
-  }, [current, loadAndPlay, pause, player, status.isLoaded, status.playing]);
+  }, [loadAndPlay, pause, player]);
 
   const next = useCallback(async () => {
     const items = queueRef.current;
@@ -199,7 +217,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const prev = useCallback(async () => {
     const items = queueRef.current;
     if (!items.length) return;
-    if (status.currentTime > 3) {
+    if (currentTimeRef.current > 3) {
       await player.seekTo(0);
       return;
     }
@@ -207,7 +225,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const upcoming = Math.max(0, currentIndex - 1);
     setIndex(upcoming);
     await loadAndPlay(items[upcoming]);
-  }, [loadAndPlay, player, status.currentTime]);
+  }, [loadAndPlay, player]);
 
   const skipQueue = useCallback(
     async (direction: 1 | -1) => {
@@ -244,6 +262,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setRepeat((value) => (value === "off" ? "all" : value === "all" ? "one" : "off"));
   }, []);
 
+  const removeTrackFromQueue = useCallback(
+    async (trackId: string) => {
+      const items = queueRef.current;
+      const currentIndex = indexRef.current;
+      if (!items.length) return;
+      const nextQueue = items.filter((track) => track.id !== trackId);
+      if (nextQueue.length === items.length) return;
+
+      const wasCurrent = items[currentIndex]?.id === trackId;
+      const removedBefore = items
+        .slice(0, currentIndex)
+        .filter((track) => track.id === trackId).length;
+
+      setQueue(nextQueue);
+      setPlayNonce((value) => value + 1);
+
+      if (!nextQueue.length) {
+        setIndex(0);
+        pause();
+        return;
+      }
+
+      if (wasCurrent) {
+        const newIndex = Math.min(currentIndex, nextQueue.length - 1);
+        setIndex(newIndex);
+        await loadAndPlay(nextQueue[newIndex]!);
+        return;
+      }
+
+      setIndex(Math.max(0, currentIndex - removedBefore));
+    },
+    [loadAndPlay, pause],
+  );
+
   useEffect(() => {
     if (!status.didJustFinish || finishingRef.current) return;
     finishingRef.current = true;
@@ -252,16 +304,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     });
   }, [next, status.didJustFinish]);
 
-  const value = useMemo(
+  const session = useMemo<PlayerSessionValue>(
     () => ({
       player,
       queue,
       index,
       current,
       playing: status.playing,
-      buffering: status.isBuffering,
-      currentTime: status.currentTime ?? 0,
-      duration: status.duration ?? 0,
+      buffering: Boolean(status.isBuffering),
       shuffle,
       repeat,
       playNonce,
@@ -274,6 +324,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       seek,
       toggleShuffle,
       cycleRepeat,
+      removeTrackFromQueue,
     }),
     [
       player,
@@ -282,8 +333,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       current,
       status.playing,
       status.isBuffering,
-      status.currentTime,
-      status.duration,
       shuffle,
       repeat,
       playNonce,
@@ -296,14 +345,33 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       seek,
       toggleShuffle,
       cycleRepeat,
+      removeTrackFromQueue,
     ],
   );
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+  const progress = useMemo<PlayerProgressValue>(
+    () => ({
+      currentTime: status.currentTime ?? 0,
+      duration: status.duration ?? 0,
+    }),
+    [status.currentTime, status.duration],
+  );
+
+  return (
+    <PlayerSessionContext.Provider value={session}>
+      <PlayerProgressContext.Provider value={progress}>{children}</PlayerProgressContext.Provider>
+    </PlayerSessionContext.Provider>
+  );
 }
 
-export function usePlayer(): PlayerContextValue {
-  const ctx = useContext(PlayerContext);
+/** Session + controls. Does not re-render every progress tick. */
+export function usePlayer(): PlayerSessionValue {
+  const ctx = useContext(PlayerSessionContext);
   if (!ctx) throw new Error("usePlayer must be used within PlayerProvider");
   return ctx;
+}
+
+/** High-frequency clock for seek UI only. */
+export function usePlayerProgress(): PlayerProgressValue {
+  return useContext(PlayerProgressContext);
 }

@@ -153,13 +153,43 @@ function utf8ToBase64(value: string): string {
   throw new Error("No hay codificador Base64.");
 }
 
+export function cleanDisplayTitle(value: string): string {
+  let next = value
+    // yt-dlp video id suffix
+    .replace(/\s*\[[a-zA-Z0-9_-]{11}\]\s*$/u, "")
+    // Anything in (), [], {}, fullwidth brackets
+    .replace(/[([{（【][^)\]}）】]*[)\]}）】]/gu, " ")
+    // Trailing junk: "_ Letra", "- Official Video", "| Lyrics"
+    .replace(
+      /(?:\s*[_\-|｜:/]+|\s+)\b(letra|lyrics?|oficial|official|video(?:clip)?|audio|visualizer|hd|4k|mv|topic|version|versión|legal)\b.*$/iu,
+      "",
+    )
+    .replace(/[_｜|]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return next || value.trim();
+}
+
 export function parseTrackName(filename: string): { title: string; track?: number } {
-  const base = filename.replace(/\.[^.]+$/, "").trim();
+  let base = filename.replace(/\.[^.]+$/, "").trim();
+  base = cleanDisplayTitle(base);
   const numbered = base.match(/^(\d{1,3})\s*[.\-_]\s*(.+)$/);
   if (numbered) {
-    return { track: Number(numbered[1]), title: numbered[2]?.trim() || base };
+    return { track: Number(numbered[1]), title: cleanDisplayTitle(numbered[2] ?? base) };
   }
   return { title: base };
+}
+
+/** "Artist - Title" filenames from yt-dlp song downloads. */
+export function splitArtistTitle(name: string): { artist: string; title: string } {
+  const match = name.match(/^(.+?)\s+[-–—]\s+(.+)$/u);
+  if (match?.[1] && match[2]) {
+    return {
+      artist: cleanDisplayTitle(match[1]),
+      title: cleanDisplayTitle(match[2]),
+    };
+  }
+  return { artist: "Desconocido", title: cleanDisplayTitle(name) };
 }
 
 function parseYear(albumName: string): number | null {
@@ -167,6 +197,47 @@ function parseYear(albumName: string): number | null {
   if (!match) return null;
   const year = Number((match[0] ?? "").replace(/\D/g, ""));
   return year || null;
+}
+
+/** Top-level Music/Podcasts/… — not a music artist. */
+export function isPodcastFolderName(name: string): boolean {
+  return name.trim().toLowerCase() === "podcasts";
+}
+
+export function isPodcastAlbum(album: Pick<Album, "id" | "name" | "artistName">): boolean {
+  return (
+    isPodcastFolderName(album.artistName) ||
+    isPodcastFolderName(album.name) ||
+    /(?:^|\/)podcasts(?:\/|$)/i.test(album.id)
+  );
+}
+
+export function isPodcastArtist(artist: Pick<Artist, "id" | "name">): boolean {
+  return isPodcastFolderName(artist.name) || /^artist:podcasts$/i.test(artist.id);
+}
+
+export function isPodcastTrack(track: Pick<Track, "albumId" | "albumName" | "artistName">): boolean {
+  return isPodcastAlbum({ id: track.albumId, name: track.albumName, artistName: track.artistName });
+}
+
+/** Top-level Music/Canciones/… — yt-dlp songs bucket. */
+export function isSongsFolderName(name: string): boolean {
+  return name.trim().toLowerCase() === "canciones";
+}
+
+export function isSongsAlbum(album: Pick<Album, "id" | "name" | "artistName">): boolean {
+  const name = album.name.trim().toLowerCase();
+  return (
+    isSongsFolderName(album.artistName) ||
+    isSongsFolderName(album.name) ||
+    name === "singles" ||
+    /(?:^|\/)canciones(?:\/|$)/i.test(album.id) ||
+    /\/singles$/i.test(album.id)
+  );
+}
+
+export function isSongsArtist(artist: Pick<Artist, "id" | "name">): boolean {
+  return isSongsFolderName(artist.name) || /^artist:canciones$/i.test(artist.id);
 }
 
 export function buildIndex(rootPath: string, files: WebDavEntry[], covers: Map<string, string>): WebDavIndex {
@@ -181,22 +252,39 @@ export function buildIndex(rootPath: string, files: WebDavEntry[], covers: Map<s
     if (!parts.length) continue;
     const filename = parts.at(-1) ?? file.name;
     const parentDir = file.path.replace(/\/[^/]+$/, "") || rootPath;
+    const podcastTree = isPodcastFolderName(parts[0] ?? "");
+    const songsTree = isSongsFolderName(parts[0] ?? "");
+    const parsed = parseTrackName(filename);
+    let title = parsed.title;
+    const track = parsed.track;
     let artistName = "Desconocido";
     let albumName = "Sin álbum";
-    if (parts.length >= 3) {
+
+    if (podcastTree) {
+      artistName = "Podcasts";
+      albumName = parts.length >= 3 ? (parts[1] ?? "Podcasts") : "Podcasts";
+    } else if (songsTree) {
+      // Flat Music/Canciones — one bucket, real artist only on the track.
+      const split = splitArtistTitle(title);
+      artistName = split.artist;
+      title = split.title;
+      albumName = "Canciones";
+    } else if (parts.length >= 3) {
       artistName = parts[0] ?? artistName;
       albumName = parts[1] ?? albumName;
     } else if (parts.length === 2) {
       artistName = parts[0] ?? artistName;
-      albumName = "Singles";
+      albumName = parts[0] ?? albumName;
     }
 
     const artistId = `artist:${artistName}`;
-    const albumId = `album:${artistName}/${albumName}`;
-    const { title, track } = parseTrackName(filename);
+    const albumId = songsTree ? "album:canciones" : `album:${artistName}/${albumName}`;
+    const albumArtistId = songsTree ? "artist:canciones" : artistId;
+    const albumArtistName = songsTree ? "Canciones" : artistName;
     const coverPath = covers.get(parentDir) ?? covers.get(`${parentDir}`) ?? null;
 
-    if (!artistMap.has(artistId)) {
+    // Don't invent artists/albums for the flat Canciones dump (same idea as podcasts).
+    if (!podcastTree && !songsTree && !artistMap.has(artistId)) {
       artistMap.set(artistId, { id: artistId, name: artistName, albumCount: 0, coverId: coverPath });
     }
     let album = albumMap.get(albumId);
@@ -204,15 +292,15 @@ export function buildIndex(rootPath: string, files: WebDavEntry[], covers: Map<s
       album = {
         id: albumId,
         name: albumName,
-        artistId,
-        artistName,
+        artistId: albumArtistId,
+        artistName: albumArtistName,
         year: parseYear(albumName),
         coverId: coverPath,
         trackCount: 0,
         tracks: [],
       };
       albumMap.set(albumId, album);
-      const artist = artistMap.get(artistId);
+      const artist = artistMap.get(albumArtistId);
       if (artist) artist.albumCount = (artist.albumCount ?? 0) + 1;
     }
 

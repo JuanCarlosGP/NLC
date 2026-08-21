@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LIBRARY_TAB_KEY } from "@/hooks/use-browse-prefs";
+import { withTracksArtwork } from "@/lib/library/artwork-cache";
 import { loadLibraryCache, saveLibraryCache } from "@/lib/library/cache";
 import type { Album, Artist, Track } from "@/lib/nas/types";
 import { useSettings } from "@/lib/settings/settings-context";
 
-export type LibraryTab = "recents" | "playlists" | "artists" | "albums" | "tracks";
+export type LibraryTab = "recents" | "playlists" | "podcasts" | "artists" | "albums" | "tracks";
 
-const TABS: LibraryTab[] = ["recents", "playlists", "artists", "albums", "tracks"];
+const TABS: LibraryTab[] = ["recents", "playlists", "podcasts", "artists", "albums", "tracks"];
+
+let tabMemory: LibraryTab | null = null;
 
 export function parseLibraryTab(raw: string | null): LibraryTab {
   return raw && TABS.includes(raw as LibraryTab) ? (raw as LibraryTab) : "recents";
@@ -15,19 +18,27 @@ export function parseLibraryTab(raw: string | null): LibraryTab {
 
 export function useLibrary() {
   const { source, ready, settings } = useSettings();
-  const [tab, setTab] = useState<LibraryTab>("recents");
-  const [tabReady, setTabReady] = useState(false);
+  const [tab, setTabState] = useState<LibraryTab>(tabMemory ?? "recents");
+  const [tabReady, setTabReady] = useState(tabMemory != null);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const setTab = useCallback((next: LibraryTab) => {
+    tabMemory = next;
+    setTabState(next);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     void AsyncStorage.getItem(LIBRARY_TAB_KEY)
       .then((raw) => {
-        if (!cancelled) setTab(parseLibraryTab(raw));
+        if (cancelled) return;
+        const next = parseLibraryTab(raw);
+        tabMemory = next;
+        setTabState(next);
       })
       .finally(() => {
         if (!cancelled) setTabReady(true);
@@ -39,6 +50,7 @@ export function useLibrary() {
 
   useEffect(() => {
     if (!tabReady) return;
+    tabMemory = tab;
     void AsyncStorage.setItem(LIBRARY_TAB_KEY, tab);
   }, [tab, tabReady]);
 
@@ -72,14 +84,14 @@ export function useLibrary() {
     try {
       const searched = await source.search("*");
       if (searched.tracks.length) {
-        setTracks(searched.tracks);
+        setTracks(withTracksArtwork(searched.tracks));
         return;
       }
       const collected: Track[] = [];
       for (const album of albums.slice(0, 20)) {
         collected.push(...(await source.getTracks(album.id)));
       }
-      setTracks(collected);
+      setTracks(withTracksArtwork(collected));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron listar las canciones.");
     }
