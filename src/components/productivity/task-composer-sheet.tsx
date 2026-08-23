@@ -12,10 +12,12 @@ export function TaskComposerSheet({
   open,
   onOpenChange,
   defaultProjectId,
+  defaultDue = "none",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultProjectId?: string | null;
+  defaultDue?: "none" | "today" | "tomorrow";
 }) {
   return (
     <BottomSheet
@@ -27,6 +29,7 @@ export function TaskComposerSheet({
       <TaskComposerBody
         open={open}
         defaultProjectId={defaultProjectId}
+        defaultDue={defaultDue}
         onDone={() => onOpenChange(false)}
       />
     </BottomSheet>
@@ -36,10 +39,12 @@ export function TaskComposerSheet({
 function TaskComposerBody({
   open,
   defaultProjectId,
+  defaultDue,
   onDone,
 }: {
   open: boolean;
   defaultProjectId?: string | null;
+  defaultDue: "none" | "today" | "tomorrow";
   onDone: () => void;
 }) {
   const { createTask } = useProductivity();
@@ -47,7 +52,7 @@ function TaskComposerBody({
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [projectId, setProjectId] = useState(defaultProjectId || INBOX_PROJECT_ID);
-  const [due, setDue] = useState<"none" | "today" | "tomorrow">("none");
+  const [due, setDue] = useState<"none" | "today" | "tomorrow">(defaultDue);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -55,9 +60,9 @@ function TaskComposerBody({
     setTitle("");
     setNotes("");
     setProjectId(defaultProjectId || INBOX_PROJECT_ID);
-    setDue("none");
+    setDue(defaultDue);
     setBusy(false);
-  }, [defaultProjectId, open]);
+  }, [defaultDue, defaultProjectId, open]);
 
   async function submit() {
     if (!title.trim() || busy) return;

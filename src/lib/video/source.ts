@@ -22,5 +22,5 @@ export function createVideoClient(settings: NasSettings, password: string) {
     return dav.playable(path);
   }
 
-  return { listDir, playable, absolute: dav.absolute, auth: dav.auth };
+  return { listDir, playable, absolute: dav.absolute };
 }

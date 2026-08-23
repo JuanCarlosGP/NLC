@@ -11,6 +11,7 @@ import {
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useKeyboardBottomOverlap } from "@/components/chat/use-keyboard-bottom-overlap";
 import { BottomSheetProvider } from "@/components/layout/sheet-context";
 import { useSheetDragDismiss } from "@/components/layout/use-sheet-drag-dismiss";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -60,16 +61,24 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   const bottomInset = resolveBottomInset(insets.bottom);
   const { height: windowHeight } = useWindowDimensions();
+  const { overlap: keyboardOverlap } = useKeyboardBottomOverlap(open);
   const layoutHeight =
     Platform.OS === "web" ? windowHeight : Math.max(windowHeight - insets.top, 0);
   const [expanded, setExpanded] = useState(false);
   const chrome = Math.max(0, reserveBottom);
   const ratio = expandable && expanded ? expandedRatio : viewportRatio;
   const viewportCap = layoutHeight * ratio;
-  const available = Math.max(layoutHeight - chrome, 200);
-  const maxSheetHeight = Math.min(viewportCap, available) + (chrome > 0 ? 0 : bottomInset);
+  const available = Math.max(layoutHeight - chrome - keyboardOverlap, 160);
+  const maxSheetHeight =
+    Math.min(viewportCap, available) + (chrome > 0 || keyboardOverlap > 0 ? 0 : bottomInset);
   const slideDistance = maxSheetHeight + 48;
   const overlay = presentation === "overlay";
+  const sheetMarginBottom =
+    chrome > 0
+      ? chrome - SHEET_OVERDRAG_TAIL + keyboardOverlap
+      : keyboardOverlap > 0
+        ? keyboardOverlap - SHEET_OVERDRAG_TAIL
+        : -bottomInset - SHEET_OVERDRAG_TAIL;
 
   const [mounted, setMounted] = useState(false);
   if (open && !mounted) {
@@ -195,8 +204,7 @@ export function BottomSheet({
               height: maxSheetHeight + SHEET_OVERDRAG_TAIL,
               maxHeight: maxSheetHeight + SHEET_OVERDRAG_TAIL,
               paddingBottom: SHEET_OVERDRAG_TAIL,
-              marginBottom:
-                chrome > 0 ? chrome - SHEET_OVERDRAG_TAIL : -bottomInset - SHEET_OVERDRAG_TAIL,
+              marginBottom: sheetMarginBottom,
               backgroundColor: sheetBg,
               borderColor: colors.rule,
             },

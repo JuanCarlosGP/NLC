@@ -12,9 +12,9 @@ import type {
   Track,
 } from "@/lib/nas/types";
 import { replaceLibrary } from "@/lib/db/catalog";
+import { createDavAuthSession } from "@/lib/nas/dav-auth";
 import {
   PROPFIND_BODY,
-  basicAuthHeader,
   buildIndex,
   isAudioFile,
   isCoverFile,
@@ -107,20 +107,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return out;
 }
 
-async function nativeCoverDataUri(nasUrl: string, auth: string): Promise<string | null> {
-  const cached = nativeCoverCache.get(nasUrl);
-  if (cached) return cached;
-  const response = await fetch(nasUrl, { headers: { Authorization: auth } });
-  if (!response.ok) return null;
-  const bytes = await response.arrayBuffer();
-  if (!bytes.byteLength) return null;
-  const type = (response.headers.get("content-type") ?? "image/jpeg").split(";")[0]!.trim();
-  if (!type.startsWith("image/")) return null;
-  const uri = `data:${type};base64,${arrayBufferToBase64(bytes)}`;
-  nativeCoverCache.set(nasUrl, uri);
-  return uri;
-}
-
 function isLanHttpUrl(raw: string): boolean {
   try {
     const url = new URL(raw);
@@ -145,7 +131,7 @@ function encodeDavPath(path: string): string {
 
 function createDavTransport(settings: NasSettings, password: string) {
   const rootPath = toWebDavPath(settings.sharePath);
-  const auth = basicAuthHeader(settings.username.trim(), password);
+  const session = createDavAuthSession(settings.username.trim(), password);
 
   function absolute(path: string): string {
     return `${nasBaseUrl(settings)}${encodeDavPath(toWebDavPath(path) || path)}`;
@@ -153,21 +139,23 @@ function createDavTransport(settings: NasSettings, password: string) {
 
   async function davFetch(path: string, init: RequestInit = {}): Promise<Response> {
     const nasUrl = path.startsWith("http") ? path : absolute(path);
-    const headers = {
-      Authorization: auth,
-      ...(init.headers as Record<string, string> | undefined),
-    };
-    if (Platform.OS === "web") {
-      const method = (init.method ?? "GET").toUpperCase();
-      if (method === "GET" || method === "HEAD") {
-        return webGet(nasUrl, headers, method);
+    const method = (init.method ?? "GET").toUpperCase();
+    return session.fetch(nasUrl, method, async (authorization) => {
+      const headers = {
+        ...(authorization ? { Authorization: authorization } : {}),
+        ...(init.headers as Record<string, string> | undefined),
+      };
+      if (Platform.OS === "web") {
+        if (method === "GET" || method === "HEAD") {
+          return webGet(nasUrl, headers, method);
+        }
+        return webMutate(nasUrl, method, headers, typeof init.body === "string" ? init.body : undefined);
       }
-      return webMutate(nasUrl, method, headers, typeof init.body === "string" ? init.body : undefined);
-    }
-    return fetch(nasUrl, { ...init, headers });
+      return fetch(nasUrl, { ...init, headers });
+    });
   }
 
-  return { rootPath, auth, absolute, davFetch };
+  return { rootPath, session, absolute, davFetch };
 }
 
 export async function probeWebDav(settings: NasSettings, password: string): Promise<boolean> {
@@ -313,7 +301,7 @@ export async function moveWebDavPath(
 }
 
 export function createWebDavSource(settings: NasSettings, password: string): MusicSource {
-  const { rootPath, auth, absolute, davFetch } = createDavTransport(settings, password);
+  const { rootPath, session, absolute, davFetch } = createDavTransport(settings, password);
   const podcastRoot = toWebDavPath(settings.podcastSharePath);
   setPodcastRootHint(podcastRoot);
   let index: WebDavIndex | null = null;
@@ -321,7 +309,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
 
   function playable(path: string): PlayableSource {
     const nasUrl = absolute(path);
-    const headers = { Authorization: auth };
+    const headers = { Authorization: session.authorization("GET", nasUrl) };
     if (Platform.OS === "web") {
       return {
         uri: webNasUri(nasUrl),
@@ -538,12 +526,18 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
     async coverUrl(id: string): Promise<string | null> {
       if (!id) return null;
       const nasUrl = absolute(id);
-      if (Platform.OS === "web") {
-        const token = auth.replace(/^Basic\s+/i, "");
-        return webNasUri(nasUrl, { a: token });
-      }
+      const cached = nativeCoverCache.get(nasUrl);
+      if (cached) return cached;
       try {
-        return await nativeCoverDataUri(nasUrl, auth);
+        const response = await davFetch(nasUrl);
+        if (!response.ok) return null;
+        const bytes = await response.arrayBuffer();
+        if (!bytes.byteLength) return null;
+        const type = (response.headers.get("content-type") ?? "image/jpeg").split(";")[0]!.trim();
+        if (!type.startsWith("image/")) return null;
+        const uri = `data:${type};base64,${arrayBufferToBase64(bytes)}`;
+        nativeCoverCache.set(nasUrl, uri);
+        return uri;
       } catch {
         return null;
       }

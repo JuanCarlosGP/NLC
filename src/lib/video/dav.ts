@@ -2,9 +2,9 @@ import { Platform } from "react-native";
 import type { NasSettings } from "@/lib/settings/storage";
 import { nasBaseUrl, videoSourceSettings } from "@/lib/settings/storage";
 import type { PlayableSource } from "@/lib/nas/types";
+import { createDavAuthSession } from "@/lib/nas/dav-auth";
 import {
   PROPFIND_BODY,
-  basicAuthHeader,
   parseHtmlIndex,
   parsePropfind,
   toWebDavPath,
@@ -44,7 +44,7 @@ function webNasUri(nasUrl: string): string {
 
 export function createVideoDavClient(settings: NasSettings, password: string) {
   const conn = videoSourceSettings(settings);
-  const auth = basicAuthHeader(conn.username.trim(), password);
+  const session = createDavAuthSession(conn.username.trim(), password);
 
   function absolute(path: string): string {
     return `${nasBaseUrl(conn)}${encodeDavPath(toWebDavPath(path) || path)}`;
@@ -52,18 +52,17 @@ export function createVideoDavClient(settings: NasSettings, password: string) {
 
   async function davFetch(path: string, init: RequestInit = {}): Promise<Response> {
     const nasUrl = path.startsWith("http") ? path : absolute(path);
-    const headers = {
-      Authorization: auth,
-      ...(init.headers as Record<string, string> | undefined),
-    };
-    if (Platform.OS === "web") {
-      const method = (init.method ?? "GET").toUpperCase();
-      if (method === "GET" || method === "HEAD") {
+    const method = (init.method ?? "GET").toUpperCase();
+    return session.fetch(nasUrl, method, async (authorization) => {
+      const headers = {
+        ...(authorization ? { Authorization: authorization } : {}),
+        ...(init.headers as Record<string, string> | undefined),
+      };
+      if (Platform.OS === "web") {
         return webGet(nasUrl, headers, method);
       }
-      return webGet(nasUrl, headers, method);
-    }
-    return fetch(nasUrl, { ...init, headers });
+      return fetch(nasUrl, { ...init, headers });
+    });
   }
 
   async function listDir(path: string): Promise<WebDavEntry[]> {
@@ -108,12 +107,12 @@ export function createVideoDavClient(settings: NasSettings, password: string) {
 
   function playable(path: string): PlayableSource {
     const nasUrl = absolute(path);
-    const headers = { Authorization: auth };
+    const headers = { Authorization: session.authorization("GET", nasUrl) };
     if (Platform.OS === "web") {
       return { uri: webNasUri(nasUrl), headers };
     }
     return { uri: nasUrl, headers };
   }
 
-  return { listDir, playable, absolute, auth };
+  return { listDir, playable, absolute };
 }
