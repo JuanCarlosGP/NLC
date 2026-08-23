@@ -7,7 +7,9 @@
     "start": "expo start",
     "start:clean": "expo start --clear",
     "android": "expo start --android",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "update:preview": "eas update --channel preview",
+    "update:production": "eas update --channel production"
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
@@ -30,6 +32,7 @@
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.8",
     "expo-system-ui": "~6.0.9",
+    "expo-updates": "~29.0.20",
     "expo-video": "~3.0.16",
     "expo-web-browser": "~15.0.11",
     "lucide-react-native": "^1.23.0",

@@ -1,10 +1,18 @@
 const pkg = require("./package.json");
 
+const EAS_PROJECT_ID = "1015393c-2e99-4548-8336-a256a97dbecc";
+
 export default {
   expo: {
     name: "SND",
     slug: "snd",
     version: pkg.version,
+    runtimeVersion: {
+      policy: "appVersion",
+    },
+    updates: {
+      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+    },
     scheme: "snd",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -64,8 +72,10 @@ export default {
     experiments: {
       typedRoutes: true,
     },
-    extra: process.env.EAS_PROJECT_ID
-      ? { eas: { projectId: process.env.EAS_PROJECT_ID } }
-      : {},
+    extra: {
+      eas: {
+        projectId: EAS_PROJECT_ID,
+      },
+    },
   },
 };
