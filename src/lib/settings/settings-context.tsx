@@ -33,11 +33,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [stored, storedPassword] = await Promise.all([loadNasSettings(), loadNasPassword()]);
-      if (cancelled) return;
-      setSettings(stored);
-      setPassword(storedPassword);
-      setReady(true);
+      try {
+        const [stored, storedPassword] = await Promise.all([loadNasSettings(), loadNasPassword()]);
+        if (cancelled) return;
+        setSettings(stored);
+        setPassword(storedPassword);
+      } catch (error) {
+        console.warn("No se pudieron cargar los ajustes", error);
+      } finally {
+        if (!cancelled) setReady(true);
+      }
     })();
     return () => {
       cancelled = true;

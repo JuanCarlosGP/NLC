@@ -19,7 +19,10 @@ export async function getDb(): Promise<CatalogDb> {
         await db.runAsync("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema', ?)", SCHEMA_VERSION);
       }
       return db;
-    })();
+    })().catch((error) => {
+      opened = null;
+      throw error;
+    });
   }
   return opened;
 }

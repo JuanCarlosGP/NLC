@@ -10,6 +10,7 @@ import { LocalFolderSheet } from "@/components/settings/local-folder-sheet";
 import { SourceConfigSheet } from "@/components/settings/source-config-sheet";
 import { ZoneSwitch } from "@/components/layout/zone-switch";
 import { Screen } from "@/components/ui/screen";
+import { useAppUpdate } from "@/hooks/use-app-update";
 import { useDownloadSettings } from "@/hooks/use-download-settings";
 import { useNasSettings } from "@/hooks/use-nas-settings";
 import { formatOfflineBytes } from "@/lib/offline/downloader";
@@ -27,6 +28,7 @@ import { useZone } from "@/lib/zone/zone-context";
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const update = useAppUpdate();
   const nas = useNasSettings();
   const download = useDownloadSettings();
   const offline = useOffline();
@@ -237,6 +239,55 @@ export default function SettingsScreen() {
             </SettingsGroup>
           </>
         ) : null}
+
+        <SettingsGroup
+          label="App"
+          hint={
+            update.apkStatus === "apk"
+              ? "La APK no se instala sola: hay que bajarla y abrirla en el teléfono."
+              : update.otaStatus === "available"
+                ? "La OTA actualiza la app sin instalar otra APK."
+                : null
+          }
+        >
+          <SettingsRow
+            title="Versión"
+            summary={update.buildLabel}
+            chevron={false}
+            onPress={() => {
+              triggerUiHaptic();
+              void update.refresh();
+            }}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            title="APK"
+            summary={update.apkSummary}
+            ready={update.apkStatus === "current"}
+            showStatus={update.apkStatus === "current" || update.apkStatus === "apk"}
+            tone={update.apkStatus === "apk" ? "warn" : update.apkStatus === "current" ? "ok" : undefined}
+            chevron={update.apkStatus === "apk"}
+            onPress={() => {
+              triggerUiHaptic();
+              if (update.apkStatus === "apk") update.downloadApk();
+              else void update.refresh();
+            }}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            title="OTA"
+            summary={update.otaSummary}
+            ready={update.otaStatus === "current"}
+            showStatus={update.otaStatus === "current" || update.otaStatus === "available"}
+            tone={update.otaStatus === "available" ? "warn" : update.otaStatus === "current" ? "ok" : undefined}
+            chevron={update.otaStatus === "available"}
+            onPress={() => {
+              triggerUiHaptic();
+              if (update.otaStatus === "available") void update.applyOta();
+              else void update.refresh();
+            }}
+          />
+        </SettingsGroup>
       </View>
 
       <SourceConfigSheet
@@ -331,26 +382,46 @@ function SettingsRow({
   summary,
   ready,
   showStatus,
+  tone,
+  chevron = true,
   onPress,
 }: {
   title: string;
   summary: string;
   ready?: boolean;
   showStatus?: boolean;
-  onPress: () => void;
+  tone?: "ok" | "warn";
+  chevron?: boolean;
+  onPress?: () => void;
 }) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.82 : 1 }]}>
+  const body = (
+    <>
       <View style={styles.rowMeta}>
         <View style={styles.rowTitleLine}>
           <Text style={styles.rowTitle}>{title}</Text>
           {ready || showStatus ? <StatusDot on={Boolean(ready)} /> : null}
         </View>
-        <Text numberOfLines={1} style={styles.rowSummary}>
+        <Text
+          numberOfLines={2}
+          style={[
+            styles.rowSummary,
+            tone === "warn" ? styles.rowSummaryWarn : tone === "ok" ? styles.rowSummaryOk : null,
+          ]}
+        >
           {summary}
         </Text>
       </View>
-      <ChevronRight color={colors.muted} size={18} />
+      {chevron ? <ChevronRight color={colors.muted} size={18} /> : null}
+    </>
+  );
+
+  if (!onPress) {
+    return <View style={styles.row}>{body}</View>;
+  }
+
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.82 : 1 }]}>
+      {body}
     </Pressable>
   );
 }
@@ -446,6 +517,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.muted,
   },
+  rowSummaryWarn: { color: colors.warn },
+  rowSummaryOk: { color: colors.ok },
   statusWrap: {
     width: 18,
     height: 18,

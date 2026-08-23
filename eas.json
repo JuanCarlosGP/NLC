@@ -5,6 +5,20 @@
   },
   "build": {
     "preview": {
+      "channel": "preview",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "github": {
+      "channel": "production",
       "distribution": "internal",
       "android": {
         "buildType": "apk"

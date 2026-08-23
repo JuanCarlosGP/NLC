@@ -1,10 +1,25 @@
 const pkg = require("./package.json");
+const fs = require("fs");
+const path = require("path");
+
+const EAS_PROJECT_ID = "1015393c-2e99-4548-8336-a256a97dbecc";
+const googleServices = fs.existsSync(path.join(__dirname, "google-services.json"))
+  ? "./google-services.json"
+  : undefined;
 
 export default {
   expo: {
     name: "SND",
     slug: "snd",
     version: pkg.version,
+    runtimeVersion: {
+      policy: "appVersion",
+    },
+    updates: {
+      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+      fallbackToCacheTimeout: 0,
+      checkAutomatically: "ON_ERROR_RECOVERY",
+    },
     scheme: "snd",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -12,13 +27,14 @@ export default {
     newArchEnabled: true,
     android: {
       package: "app.snd.player",
-      versionCode: 1,
+      versionCode: 3,
       softwareKeyboardLayoutMode: "resize",
       usesCleartextTraffic: true,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#0E0D0C",
       },
+      ...(googleServices ? { googleServicesFile: googleServices } : {}),
       permissions: [
         "android.permission.INTERNET",
         "android.permission.FOREGROUND_SERVICE",
@@ -57,6 +73,15 @@ export default {
       ],
       "./plugins/with-lan-cleartext.js",
       "expo-sqlite",
+      "expo-asset",
+      "expo-updates",
+      [
+        "expo-notifications",
+        {
+          color: "#E4D5B8",
+          defaultChannel: "ota",
+        },
+      ],
     ],
     web: {
       output: "server",
@@ -64,8 +89,12 @@ export default {
     experiments: {
       typedRoutes: true,
     },
-    extra: process.env.EAS_PROJECT_ID
-      ? { eas: { projectId: process.env.EAS_PROJECT_ID } }
-      : {},
+    extra: {
+      eas: {
+        projectId: EAS_PROJECT_ID,
+      },
+      githubReleases: "https://github.com/JuanCarlosGP/SND/releases/latest",
+      githubApk: "https://github.com/JuanCarlosGP/SND/releases/latest/download/SND.apk",
+    },
   },
 };

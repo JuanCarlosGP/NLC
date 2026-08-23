@@ -36,6 +36,8 @@ import { ZoneProvider } from "@/lib/zone/zone-context";
 import { TaskActionsSheet } from "@/components/productivity/task-actions-sheet";
 import { PlaylistActionsProvider } from "@/lib/spotify/playlist-actions-context";
 import { SpotifyProvider } from "@/lib/spotify/spotify-context";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { OtaBootstrap } from "@/lib/ota/ota-bootstrap";
 import { colors } from "@/lib/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -67,8 +69,10 @@ export default function RootLayout() {
   }
 
   return (
+    <ErrorBoundary>
     <SafeAreaProvider>
       <SettingsProvider>
+        <OtaBootstrap />
         <ZoneProvider>
         <ProductivityProvider>
         <TaskActionsProvider>
@@ -141,6 +145,7 @@ export default function RootLayout() {
         </ZoneProvider>
       </SettingsProvider>
     </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 

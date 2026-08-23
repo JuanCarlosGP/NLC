@@ -30,7 +30,7 @@ const COVER_NAMES = new Set([
   "artwork.jpg",
 ]);
 const SKIP_DIRS = new Set(["@eadir", "#recycle", "#snapshot", ".trash", "lost+found", ".ds_store"]);
-const SKIP_FILES = new Set(["snd.json"]);
+const SKIP_FILES = new Set(["snd.json", "snd-push-tokens.json"]);
 
 const PROPFIND_BODY = `<?xml version="1.0" encoding="utf-8"?>
 <d:propfind xmlns:d="DAV:">
