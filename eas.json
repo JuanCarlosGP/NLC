@@ -16,6 +16,13 @@
       "android": {
         "buildType": "apk"
       }
+    },
+    "github": {
+      "channel": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
     }
   }
 }

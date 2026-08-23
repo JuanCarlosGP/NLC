@@ -1,10 +1,19 @@
 # SND
 
-Reproductor Android personal para **tu** biblioteca de música en un NAS de la LAN. No es un clon de Spotify: no hay cuentas cloud, radio, amigos ni Play Store.
+Reproductor Android de código abierto para **tu** biblioteca en un NAS de la LAN (música, podcasts, vídeo). No es un clon de Spotify: no hay cuentas cloud, radio, amigos ni Play Store.
 
-El teléfono **no monta SMB**. El NAS sirve la música por HTTP (Navidrome / OpenSubsonic). Hasta que tengas la biblioteca en el NAS, la app usa una **biblioteca de ejemplo** con streams públicos para poder instalar y probar el APK.
+**[Descargar la última APK](https://github.com/JuanCarlosGP/SND/releases/latest/download/SND.apk)** · [código en GitHub](https://github.com/JuanCarlosGP/SND)
 
-Host por defecto: `192.168.1.106:4533`.
+En Releases **solo vive esa APK**. Cada rebuild nativo la sustituye; el historial de código sigue en `main`.
+
+## OTA vs APK
+
+| Cambio | Cómo sale |
+| --- | --- |
+| JS / pantallas / estilos | `npm run update:production` (OTA + aviso en el teléfono) |
+| Nativo / sistema (plugins, permisos, Expo SDK, notificaciones, `app.config` nativo) | `npm run apk:release` → GitHub Releases (una APK, la última) |
+
+Una OTA **no** puede añadir módulos nativos. Si hace falta APK nueva, el teléfono recibe un aviso distinto y abre la descarga de GitHub.
 
 ## Requisitos
 
@@ -15,29 +24,36 @@ Host por defecto: `192.168.1.106:4533`.
 ## Desarrollo (Windows / PowerShell)
 
 ```powershell
-cd e:\dev\sptfy
+cd e:\dev\SND
 npm install
 npx expo start
 ```
 
 La fuente por defecto es **Biblioteca de ejemplo**. En Ajustes puedes cambiar a Navidrome cuando esté instalado.
 
-## APK interno (no AAB, no Play Store)
+## APK (GitHub, solo la última)
 
-La primera vez, crea el proyecto EAS (te pedirá login):
+Perfil EAS `github`: APK interna, canal `production`.
 
-```powershell
-npx eas-cli login
-npx eas-cli init
-```
-
-Luego:
+En el PC (con `gh` y `eas` logueados):
 
 ```powershell
-npx eas-cli build --platform android --profile preview
+$env:SND_NAS_PASSWORD = "Viewer"
+npm run apk:release
 ```
 
-El perfil `preview` en `eas.json` genera un **APK** de distribución interna. Instálalo en el teléfono (origen desconocido).
+Por defecto sube el patch (`0.1.0` → `0.1.1`) y el `versionCode`. También: `node scripts/release-apk.mjs minor`.
+
+En GitHub Actions: **Actions → Release APK → Run workflow**. Secret necesario: `EXPO_TOKEN` ([expo.dev](https://expo.dev/accounts/[account]/settings/access-tokens)).
+
+La release fija `apk` se reescribe: un solo archivo `SND.apk`.
+
+## OTA (JS, sin reinstalar)
+
+```powershell
+$env:SND_NAS_PASSWORD = "Viewer"
+npm run update:production
+```
 
 ## Navidrome en el NAS (cuando tengas la música)
 
@@ -71,7 +87,7 @@ Si el ping falla: el teléfono y el NAS deben estar en la misma LAN; Navidrome d
 
 ## Stack
 
-Expo SDK 54, React Native 0.81.5, React 19.1, TypeScript, expo-router (`src/app`), New Architecture. Misma línea que AppDomus, sin Supabase / OTA / portal.
+Expo SDK 54, React Native 0.81.5, React 19.1, TypeScript, expo-router (`src/app`), New Architecture. Licencia MIT.
 
 ## Estructura
 

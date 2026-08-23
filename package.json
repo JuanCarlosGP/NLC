@@ -8,15 +8,18 @@
     "start:clean": "expo start --clear",
     "android": "expo start --android",
     "typecheck": "tsc --noEmit",
-    "update:preview": "eas update --channel preview",
-    "update:production": "eas update --channel production"
+    "update:preview": "eas update --channel preview && node scripts/notify-ota.mjs preview",
+    "update:production": "eas update --channel production && node scripts/notify-ota.mjs production",
+    "apk:release": "node scripts/release-apk.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
     "@expo-google-fonts/instrument-serif": "^0.4.1",
+    "@ide/backoff": "^1.0.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "babel-preset-expo": "~54.0.10",
     "expo": "^54.0.18",
+    "expo-asset": "~12.0.13",
     "expo-audio": "~1.1.1",
     "expo-auth-session": "~7.0.11",
     "expo-constants": "~18.0.9",
@@ -25,6 +28,7 @@
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",
     "expo-linking": "~8.0.8",
+    "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.13",
     "expo-screen-orientation": "~9.0.9",
     "expo-secure-store": "~15.0.8",
