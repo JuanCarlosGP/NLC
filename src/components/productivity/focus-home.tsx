@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { LadybugMark } from "@/components/brand/ladybug-mark";
 import { ZoneSwitch } from "@/components/layout/zone-switch";
 import { ShortcutCard } from "@/components/home/shortcut-card";
 import { TaskRow, taskListStyle } from "@/components/productivity/task-row";
@@ -41,7 +42,7 @@ export function FocusHome() {
   return (
     <Screen>
       <View style={styles.hero}>
-        <Text style={[type.pageTitle, styles.title]}>NLC</Text>
+        <LadybugMark />
         <ZoneSwitch />
       </View>
 

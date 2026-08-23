@@ -13,6 +13,7 @@ import { Screen } from "@/components/ui/screen";
 import { useAppUpdate } from "@/hooks/use-app-update";
 import { useDownloadSettings } from "@/hooks/use-download-settings";
 import { useNasSettings } from "@/hooks/use-nas-settings";
+import { sendTestPush } from "@/lib/ota/test-push";
 import { formatOfflineBytes } from "@/lib/offline/downloader";
 import { useOffline } from "@/lib/offline/offline-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -42,6 +43,8 @@ export default function SettingsScreen() {
   const [localOpen, setLocalOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [offlineOpen, setOfflineOpen] = useState(false);
+  const [pushStatus, setPushStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
+  const [pushSummary, setPushSummary] = useState("Toca para enviar una prueba");
   const videoSettings = videoSourceSettings(settings);
   const podcastSettings = podcastSourceSettings(settings);
   const shareReady = connected && settings.sourceKind === "webdav";
@@ -91,6 +94,15 @@ export default function SettingsScreen() {
   const musicSummary = pathSummary(settings.host, settings.port, settings.sharePath);
   const podcastSummary = pathSummary(podcastSettings.host, podcastSettings.port, podcastSettings.sharePath);
   const videoSummary = pathSummary(videoSettings.host, videoSettings.port, videoSettings.sharePath);
+
+  const sendTest = async () => {
+    if (pushStatus === "sending") return;
+    setPushStatus("sending");
+    setPushSummary("Enviando prueba…");
+    const result = await sendTestPush();
+    setPushStatus(result.ok ? "ok" : "error");
+    setPushSummary(result.message);
+  };
 
   return (
     <Screen>
@@ -244,7 +256,7 @@ export default function SettingsScreen() {
           label="App"
           hint={
             update.apkStatus === "apk"
-              ? "La APK no se instala sola: hay que bajarla y abrirla en el teléfono."
+              ? "La app baja NLC.apk de GitHub y abre el instalador. Hay que confirmar en el teléfono."
               : update.otaStatus === "available"
                 ? "La OTA actualiza la app sin instalar otra APK."
                 : null
@@ -269,7 +281,7 @@ export default function SettingsScreen() {
             chevron={update.apkStatus === "apk"}
             onPress={() => {
               triggerUiHaptic();
-              if (update.apkStatus === "apk") update.downloadApk();
+              if (update.apkStatus === "apk" || update.apkError) update.downloadApk();
               else void update.refresh();
             }}
           />
@@ -285,6 +297,19 @@ export default function SettingsScreen() {
               triggerUiHaptic();
               if (update.otaStatus === "available") void update.applyOta();
               else void update.refresh();
+            }}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            title="Notificaciones"
+            summary={pushSummary}
+            ready={pushStatus === "ok"}
+            showStatus={pushStatus === "ok" || pushStatus === "error"}
+            tone={pushStatus === "error" ? "warn" : pushStatus === "ok" ? "ok" : undefined}
+            chevron={false}
+            onPress={() => {
+              triggerUiHaptic();
+              void sendTest();
             }}
           />
         </SettingsGroup>

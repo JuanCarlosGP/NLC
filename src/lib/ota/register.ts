@@ -1,14 +1,10 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
-import * as Linking from "expo-linking";
+import { isRunningInExpoGo } from "expo";
 import * as Notifications from "expo-notifications";
 import type { NasSettings } from "@/lib/settings/storage";
-import {
-  applyOtaUpdate,
-  GITHUB_RELEASES_URL,
-  isApkNotification,
-  isOtaNotification,
-} from "@/lib/ota/apply-update";
+import { applyOtaUpdate, isApkNotification, isOtaNotification } from "@/lib/ota/apply-update";
+import { downloadAndInstallApk } from "@/lib/ota/install-apk";
 import { registerPushTokenOnNas, saveLocalPushToken } from "@/lib/ota/tokens";
 
 const OTA_CHANNEL = "ota";
@@ -29,6 +25,7 @@ function projectId(): string | undefined {
 
 export async function registerOtaPush(settings: NasSettings, password: string): Promise<void> {
   if (Platform.OS !== "android") return;
+  if (isRunningInExpoGo()) return;
 
   await Notifications.setNotificationChannelAsync(OTA_CHANNEL, {
     name: "Actualizaciones",
@@ -67,9 +64,9 @@ export async function registerOtaPush(settings: NasSettings, password: string): 
 
 function handleNotificationData(data: Record<string, unknown> | undefined) {
   Notifications.clearLastNotificationResponse();
+  if (data?.test === true || data?.test === "true") return;
   if (isApkNotification(data)) {
-    const url = typeof data?.url === "string" && data.url ? data.url : GITHUB_RELEASES_URL;
-    void Linking.openURL(url);
+    void downloadAndInstallApk();
     return;
   }
   if (isOtaNotification(data)) void applyOtaUpdate();

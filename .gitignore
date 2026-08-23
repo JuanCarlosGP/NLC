@@ -12,6 +12,8 @@ ios/
 *.orig.*
 .env
 .env*.local
+.secrets/
+*-firebase-adminsdk-*.json
 npm-debug.*
 .DS_Store
 expo-env.d.ts

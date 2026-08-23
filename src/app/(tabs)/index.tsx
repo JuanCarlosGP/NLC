@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowUpDown, LayoutGrid, List } from "lucide-react-native";
 import { FocusHome } from "@/components/productivity/focus-home";
+import { LadybugMark } from "@/components/brand/ladybug-mark";
 import { ZoneSwitch } from "@/components/layout/zone-switch";
 import { HomeListSkeleton, HomeShortcutBone } from "@/components/home/home-skeleton";
 import { ShortcutCard } from "@/components/home/shortcut-card";
@@ -202,7 +203,7 @@ export default function HomeScreen() {
     <>
       <Screen>
         <View style={styles.hero}>
-          <Text style={[type.pageTitle, styles.title]}>NLC</Text>
+          <LadybugMark />
           <ZoneSwitch />
         </View>
 

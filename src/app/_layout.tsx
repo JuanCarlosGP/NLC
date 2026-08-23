@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { Platform, View } from "react-native";
+import { LogBox, Platform, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -39,6 +39,8 @@ import { SpotifyProvider } from "@/lib/spotify/spotify-context";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { OtaBootstrap } from "@/lib/ota/ota-bootstrap";
 import { colors } from "@/lib/theme";
+
+LogBox.ignoreLogs(["expo-notifications: Android Push notifications"]);
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 

@@ -3,6 +3,7 @@ import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, Library, MessageCircle, Search, Settings } from "lucide-react-native";
+import { usePendingApk } from "@/hooks/use-app-update";
 import { useCursor } from "@/hooks/use-cursor";
 import { DOCK_HEIGHT, DOCK_MARGIN, useDock } from "@/lib/dock-context";
 import { webInteractiveStyle } from "@/lib/interactive";
@@ -21,11 +22,13 @@ function isHomeRoute(pathname: string): boolean {
 
 function DockButton({
   active,
+  badge,
   label,
   onPress,
   children,
 }: {
   active: boolean;
+  badge?: boolean;
   label: string;
   onPress: () => void;
   children: React.ReactNode;
@@ -33,7 +36,7 @@ function DockButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={badge ? `${label}, novedad` : label}
       accessibilityState={{ selected: active }}
       onPress={() => {
         triggerSelectionUiHaptic();
@@ -50,6 +53,7 @@ function DockButton({
       ]}
     >
       {children}
+      {badge ? <View pointerEvents="none" style={styles.badge} /> : null}
     </Pressable>
   );
 }
@@ -57,7 +61,8 @@ function DockButton({
 function DockIcons() {
   const router = useRouter();
   const pathname = usePathname();
-  const { chatOpen, setChatOpen } = useCursor();
+  const apkPending = usePendingApk();
+  const { chatOpen, chatUnread, setChatOpen } = useCursor();
   const homeActive = isHomeRoute(pathname);
   const libraryActive =
     pathname.startsWith("/library") ||
@@ -91,6 +96,7 @@ function DockIcons() {
       </DockButton>
       <DockButton
         active={chatOpen}
+        badge={chatUnread}
         label="Mensajes"
         onPress={() => setChatOpen(true)}
       >
@@ -108,6 +114,7 @@ function DockIcons() {
       </DockButton>
       <DockButton
         active={settingsActive}
+        badge={apkPending}
         label="Ajustes"
         onPress={() => {
           if (pathname.startsWith("/settings")) return;
@@ -212,5 +219,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    width: 10,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: colors.accent,
+    borderWidth: 2,
+    borderColor: colors.void,
   },
 });

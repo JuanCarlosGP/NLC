@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -47,6 +48,7 @@ type CursorContextValue = {
   feedback: CursorFeedback | null;
   messages: CursorChatMessage[];
   chatOpen: boolean;
+  chatUnread: boolean;
   setChatOpen: (open: boolean) => void;
   persist: () => Promise<void>;
   testConnection: () => Promise<void>;
@@ -67,6 +69,13 @@ export function CursorProvider({ children }: { children: ReactNode }) {
   const [feedback, setFeedback] = useState<CursorFeedback | null>(null);
   const [messages, setMessages] = useState<CursorChatMessage[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(false);
+  const chatOpenRef = useRef(false);
+
+  useEffect(() => {
+    chatOpenRef.current = chatOpen;
+    if (chatOpen) setChatUnread(false);
+  }, [chatOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,6 +185,7 @@ export function CursorProvider({ children }: { children: ReactNode }) {
           void saveCursorMessages(next);
           return next;
         });
+        if (!chatOpenRef.current) setChatUnread(true);
         setConnected(true);
       } catch (error) {
         const message = error instanceof Error ? error.message : "No se pudo hablar con Cursor.";
@@ -185,6 +195,7 @@ export function CursorProvider({ children }: { children: ReactNode }) {
           void saveCursorMessages(next);
           return next;
         });
+        if (!chatOpenRef.current) setChatUnread(true);
       } finally {
         setBusy(false);
       }
@@ -209,13 +220,14 @@ export function CursorProvider({ children }: { children: ReactNode }) {
       feedback,
       messages,
       chatOpen,
+      chatUnread,
       setChatOpen,
       persist,
       testConnection,
       send,
       clearHistory,
     }),
-    [apiKey, busy, chatOpen, clearHistory, connected, feedback, messages, persist, ready, send, testConnection],
+    [apiKey, busy, chatOpen, chatUnread, clearHistory, connected, feedback, messages, persist, ready, send, testConnection],
   );
 
   return <CursorContext.Provider value={value}>{children}</CursorContext.Provider>;

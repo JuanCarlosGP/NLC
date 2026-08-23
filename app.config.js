@@ -27,12 +27,13 @@ export default {
     newArchEnabled: true,
     android: {
       package: "app.nlc.player",
-      versionCode: 4,
+      versionCode: 6,
       softwareKeyboardLayoutMode: "resize",
       usesCleartextTraffic: true,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#0E0D0C",
+        monochromeImage: "./assets/monochrome-icon.png",
+        backgroundColor: "#F0EBE3",
       },
       ...(googleServices ? { googleServicesFile: googleServices } : {}),
       permissions: [
@@ -41,6 +42,7 @@ export default {
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.WAKE_LOCK",
         "android.permission.POST_NOTIFICATIONS",
+        "android.permission.REQUEST_INSTALL_PACKAGES",
       ],
       blockedPermissions: ["android.permission.RECORD_AUDIO"],
     },
@@ -78,6 +80,7 @@ export default {
       [
         "expo-notifications",
         {
+          icon: "./assets/notification-icon.png",
           color: "#E4D5B8",
           defaultChannel: "ota",
         },
