@@ -9,23 +9,35 @@ import { colors, layout } from "@/lib/theme";
 export function Screen({
   children,
   scroll = true,
+  flush = false,
 }: {
   children: ReactNode;
   scroll?: boolean;
+  flush?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const { current } = usePlayer();
-  const { nowPlayingOpen, miniPlayerDismissed } = usePlayerUi();
+  const { miniPlayerDismissed } = usePlayerUi();
   const dock = useDock();
   const mini =
-    !nowPlayingOpen && current && !miniPlayerDismissed
+    current && !miniPlayerDismissed
       ? layout.miniPlayerHeight + layout.miniPlayerGap
       : 0;
-  const bottom = insets.bottom + layout.dockHeight + layout.dockMargin + mini + 16;
+  const reserved = dock?.reservedBottom ?? insets.bottom + layout.dockHeight + layout.dockMargin;
+  const bottom = reserved + mini + 16;
 
   if (!scroll) {
     return (
-      <View style={[styles.fill, { paddingTop: insets.top + 8, paddingBottom: bottom }]}>
+      <View
+        style={[
+          styles.fill,
+          {
+            paddingTop: flush ? 0 : insets.top + 8,
+            paddingBottom: bottom,
+            paddingHorizontal: flush ? 0 : layout.screenPad,
+          },
+        ]}
+      >
         {children}
       </View>
     );

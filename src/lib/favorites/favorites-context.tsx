@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
 import { loadFavorites, removeFavorite as persistRemove, toggleFavorite as persistToggle } from "@/lib/library/cache";
 import type { Track } from "@/lib/nas/types";
 import { useSettings } from "@/lib/settings/settings-context";
@@ -8,6 +9,7 @@ type FavoritesContextValue = {
   isFavorite: (id: string) => boolean;
   toggleFavorite: (track: Track) => Promise<void>;
   removeFavorite: (trackId: string) => Promise<void>;
+  reloadFavorites: () => Promise<void>;
 };
 
 const FavoritesContext = createContext<FavoritesContextValue | null>(null);
@@ -43,9 +45,16 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     setFavorites(next);
   }, []);
 
+  const reloadFavorites = useCallback(async () => {
+    const stored = await loadFavorites(settings.sourceKind);
+    setFavorites(stored);
+  }, [settings.sourceKind]);
+
+  useEffect(() => subscribeAssistantMutations(() => { void reloadFavorites(); }), [reloadFavorites]);
+
   const value = useMemo(
-    () => ({ favorites, isFavorite, toggleFavorite, removeFavorite }),
-    [favorites, isFavorite, removeFavorite, toggleFavorite],
+    () => ({ favorites, isFavorite, toggleFavorite, removeFavorite, reloadFavorites }),
+    [favorites, isFavorite, reloadFavorites, removeFavorite, toggleFavorite],
   );
 
   return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>;

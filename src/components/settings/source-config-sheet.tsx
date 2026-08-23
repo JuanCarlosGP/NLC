@@ -16,6 +16,7 @@ export function SourceConfigSheet({
   busy,
   testConnection,
   save,
+  variant = "music",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -27,8 +28,19 @@ export function SourceConfigSheet({
   busy: boolean;
   testConnection: () => Promise<void>;
   save: () => Promise<void>;
+  variant?: "music" | "podcast" | "video";
 }) {
   const shared = settings.sourceKind !== "mock";
+  const folderPlaceholder =
+    variant === "video" ? "/volume1/Popcorn" : variant === "podcast" ? "/volume1/Music/Podcasts" : "/volume1/Music";
+  const title = variant === "video" ? "Vídeo" : variant === "podcast" ? "Podcasts" : "Música";
+  const summary = `${settings.useHttps ? "https" : "http"}://${settings.host}:${settings.port}`;
+  const folderHint =
+    variant === "video"
+      ? "La ruta que ves en el NAS, por ejemplo /volume1/Popcorn. Dentro: series/ y movies/."
+      : variant === "podcast"
+        ? "La ruta que ves en el NAS, por ejemplo /volume1/Music/Podcasts."
+        : "La ruta que ves en el NAS, por ejemplo /volume1/Music.";
 
   return (
     <BottomSheet
@@ -38,98 +50,120 @@ export function SourceConfigSheet({
       viewportRatio={0.82}
     >
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text style={type.label}>Fuente</Text>
-        <Text style={type.pageTitle}>Configuración</Text>
-
-        <Field
-          label="Host"
-          value={settings.host}
-          onChange={(host) => setSettings({ ...settings, host })}
-          autoCapitalize="none"
-        />
-        <View style={styles.pair}>
-          <View style={styles.pairItem}>
-            <Field
-              label="Puerto"
-              value={settings.port}
-              onChange={(port) => setSettings({ ...settings, port })}
-              keyboardType="number-pad"
-            />
-          </View>
-          <View style={styles.pairItem}>
-            <Field
-              label="Usuario"
-              value={settings.username}
-              onChange={(username) => setSettings({ ...settings, username })}
-              autoCapitalize="none"
-            />
-          </View>
-        </View>
-        <Field label="Contraseña" value={password} onChange={setPassword} secure autoCapitalize="none" />
-        {settings.sourceKind === "webdav" ? (
-          <Field
-            label="Carpeta"
-            value={settings.sharePath || "/Music"}
-            onChange={(sharePath) => setSettings({ ...settings, sharePath })}
-            autoCapitalize="none"
-          />
-        ) : null}
-
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>HTTPS</Text>
-          <Switch
-            value={settings.useHttps}
-            onValueChange={(useHttps) => setSettings({ ...settings, useHttps })}
-            trackColor={{ false: colors.rule, true: colors.accent }}
-            thumbColor={colors.ink}
-          />
+        <View style={styles.titleMeta}>
+          <Text style={type.label}>Fuente</Text>
+          <Text style={type.pageTitle}>{title}</Text>
         </View>
 
-        {settings.sourceKind === "opensubsonic" ? (
-          <View style={styles.bitRate}>
-            <Text style={type.label}>Calidad de stream</Text>
-            <View style={styles.row}>
-              {[
-                { id: "0", label: "Original" },
-                { id: "320", label: "320 kbps" },
-                { id: "192", label: "192 kbps" },
-              ].map((item) => (
-                <Pressable
-                  key={item.id}
-                  onPress={() => setSettings({ ...settings, maxBitRate: item.id })}
-                  style={[styles.choice, settings.maxBitRate === item.id && styles.choiceActive]}
-                >
-                  <Text style={[styles.choiceLabel, settings.maxBitRate === item.id && styles.choiceLabelActive]}>
-                    {item.label}
-                  </Text>
-                </Pressable>
-              ))}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Conexión</Text>
+          <View style={styles.card}>
+            <View style={styles.cardBody}>
+              <View style={styles.pair}>
+                <View style={styles.pairItem}>
+                  <Field
+                    label="Host"
+                    value={settings.host}
+                    onChange={(host) => setSettings({ ...settings, host })}
+                    autoCapitalize="none"
+                  />
+                </View>
+                <View style={[styles.pairItem, styles.port]}>
+                  <Field
+                    label="Puerto"
+                    value={settings.port}
+                    onChange={(port) => setSettings({ ...settings, port })}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+              <Field
+                label="Usuario"
+                value={settings.username}
+                onChange={(username) => setSettings({ ...settings, username })}
+                autoCapitalize="none"
+              />
+              <Field label="Contraseña" value={password} onChange={setPassword} secure autoCapitalize="none" />
+              {settings.sourceKind === "webdav" ? (
+                <>
+                  <Field
+                    label="Ruta"
+                    value={settings.sharePath}
+                    onChange={(sharePath) => setSettings({ ...settings, sharePath })}
+                    placeholder={folderPlaceholder}
+                    autoCapitalize="none"
+                  />
+                  <Text style={styles.folderHint}>{folderHint}</Text>
+                </>
+              ) : null}
             </View>
           </View>
-        ) : null}
-
-        <View style={styles.actions}>
-          <Pressable
-            onPress={() => void testConnection()}
-            disabled={busy || !shared}
-            style={({ pressed }) => [
-              styles.btn,
-              styles.btnGhost,
-              { opacity: busy || !shared ? 0.55 : pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Text style={styles.btnGhostText}>{busy ? "Probando…" : "Probar"}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => void save()}
-            disabled={busy}
-            style={({ pressed }) => [styles.btn, styles.btnSolid, { opacity: pressed || busy ? 0.7 : 1 }]}
-          >
-            <Text style={styles.btnSolidText}>Guardar</Text>
-          </Pressable>
         </View>
 
-        {feedback ? <Text style={[type.body, { color: feedback.color }]}>{feedback.text}</Text> : null}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Acceso</Text>
+          <View style={styles.card}>
+            <View style={styles.switchRow}>
+              <View style={styles.switchMeta}>
+                <Text style={styles.switchLabel}>HTTPS</Text>
+                <Text style={styles.switchHint}>{summary}</Text>
+              </View>
+              <Switch
+                value={settings.useHttps}
+                onValueChange={(useHttps) => setSettings({ ...settings, useHttps })}
+                trackColor={{ false: colors.rule, true: colors.accent }}
+                thumbColor={colors.ink}
+              />
+            </View>
+
+            {settings.sourceKind === "opensubsonic" ? (
+              <View style={styles.cardBody}>
+                <Text style={type.label}>Calidad de stream</Text>
+                <View style={styles.row}>
+                  {[
+                    { id: "0", label: "Original" },
+                    { id: "320", label: "320 kbps" },
+                    { id: "192", label: "192 kbps" },
+                  ].map((item) => {
+                    const active = settings.maxBitRate === item.id;
+                    return (
+                      <Pressable
+                        key={item.id}
+                        onPress={() => setSettings({ ...settings, maxBitRate: item.id })}
+                        style={[styles.choice, active && styles.choiceActive]}
+                      >
+                        <Text style={[styles.choiceLabel, active && styles.choiceLabelActive]}>{item.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+
+            <View style={styles.actions}>
+              <Pressable
+                onPress={() => void testConnection()}
+                disabled={busy || !shared}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnGhost,
+                  { opacity: busy || !shared ? 0.45 : pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Text style={styles.btnGhostText}>{busy ? "Probando…" : "Probar"}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void save()}
+                disabled={busy}
+                style={({ pressed }) => [styles.btn, styles.btnSolid, { opacity: pressed || busy ? 0.7 : 1 }]}
+              >
+                <Text style={styles.btnSolidText}>Guardar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
+        {feedback ? <Text style={[type.body, styles.feedback, { color: feedback.color }]}>{feedback.text}</Text> : null}
       </SheetScrollView>
     </BottomSheet>
   );
@@ -142,6 +176,7 @@ function Field({
   secure,
   keyboardType,
   autoCapitalize,
+  placeholder,
 }: {
   label: string;
   value: string;
@@ -149,6 +184,7 @@ function Field({
   secure?: boolean;
   keyboardType?: "number-pad" | "default";
   autoCapitalize?: "none" | "sentences";
+  placeholder?: string;
 }) {
   return (
     <View style={styles.field}>
@@ -160,6 +196,7 @@ function Field({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
+        placeholder={placeholder}
         placeholderTextColor={colors.muted}
         style={styles.input}
       />
@@ -171,12 +208,39 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,
-    paddingBottom: 32,
-    gap: 12,
+    paddingBottom: 48,
+    gap: 22,
+  },
+  titleMeta: { gap: 4 },
+  section: { gap: 10 },
+  sectionLabel: {
+    ...type.label,
+    paddingHorizontal: 2,
+  },
+  card: {
+    borderWidth: 1,
+    borderColor: colors.rule,
+    backgroundColor: colors.sheet,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  cardBody: {
+    gap: 14,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 16,
+  },
+  folderHint: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.muted,
+    marginTop: -4,
   },
   field: { gap: 6 },
   pair: { flexDirection: "row", gap: 10 },
   pairItem: { flex: 1 },
+  port: { maxWidth: 110 },
   input: {
     borderWidth: 1,
     borderColor: colors.rule,
@@ -193,30 +257,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    paddingVertical: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.rule,
   },
-  switchLabel: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-  bitRate: { gap: 8 },
+  switchMeta: { flex: 1, gap: 2 },
+  switchLabel: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
+  switchHint: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   choice: {
     borderWidth: 1,
     borderColor: colors.rule,
-    borderRadius: 999,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
+    backgroundColor: colors.void,
   },
-  choiceActive: { backgroundColor: colors.sheetHover, borderColor: colors.ruleLight },
+  choiceActive: { backgroundColor: colors.sheetRaised, borderColor: colors.accent },
   choiceLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.muted },
   choiceLabelActive: { color: colors.ink },
-  actions: { flexDirection: "row", gap: 10, paddingTop: 4 },
+  actions: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 16,
+  },
   btn: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 13,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
   },
   btnGhost: { borderWidth: 1, borderColor: colors.rule, backgroundColor: colors.sheetRaised },
   btnSolid: { backgroundColor: colors.accent },
   btnGhostText: { fontFamily: fonts.sansSemiBold, color: colors.ink },
   btnSolidText: { fontFamily: fonts.sansSemiBold, color: colors.accentText },
+  feedback: { paddingHorizontal: 2 },
 });

@@ -5,7 +5,10 @@ import { Music2 } from "lucide-react-native";
 import { AlbumRow } from "@/components/library/album-row";
 import { TrackRow } from "@/components/library/track-row";
 import { Screen } from "@/components/ui/screen";
-import { isPodcastAlbum, isSongsAlbum } from "@/lib/nas/webdav";
+import { getAlbum, getAlbums } from "@/lib/db/catalog";
+import { nasScanOk } from "@/lib/db/from-source";
+import { albumHref } from "@/lib/library/href";
+import { isLooseSongsAlbum, isPodcastAlbum } from "@/lib/nas/webdav";
 import type { Album, Track } from "@/lib/nas/types";
 import { usePlayer } from "@/lib/player/player-context";
 import { useSettings } from "@/lib/settings/settings-context";
@@ -24,16 +27,17 @@ export default function MusicScreen() {
     setLoading(true);
     setError(null);
     try {
-      const all = await source.getAlbums();
-      const songBucket = all.find(isSongsAlbum);
-      const music = all.filter((album) => !isPodcastAlbum(album) && !isSongsAlbum(album));
+      const offlineOnly = !(await nasScanOk(source));
+      const all = await getAlbums({ offlineOnly });
+      const loose = all.filter(isLooseSongsAlbum);
+      const music = all.filter((album) => !isPodcastAlbum(album) && !isLooseSongsAlbum(album));
       setAlbums(music);
-      if (songBucket && !music.length) {
-        const detail = await source.getAlbum(songBucket.id);
-        setTracks(detail.tracks);
-      } else if (music.length === 1 && !songBucket) {
-        const detail = await source.getAlbum(music[0]!.id);
-        setTracks(detail.tracks);
+      if (!music.length && loose.length) {
+        const details = await Promise.all(loose.map((album) => getAlbum(album.id, offlineOnly)));
+        setTracks(details.flatMap((detail) => detail?.tracks ?? []));
+      } else if (music.length === 1 && !loose.length) {
+        const detail = await getAlbum(music[0]!.id, offlineOnly);
+        setTracks(detail?.tracks ?? []);
       } else {
         setTracks([]);
       }
@@ -109,7 +113,7 @@ export default function MusicScreen() {
             key={album.id}
             album={album}
             subtitle={`Álbum · ${album.artistName}`}
-            onPress={() => router.push(`/album/${album.id}`)}
+            onPress={() => router.push(albumHref(album.id))}
           />
         ))
       )}

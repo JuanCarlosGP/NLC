@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Clapperboard, Heart, Mic, Music2 } from "lucide-react-native";
+import { CalendarDays, Clapperboard, FolderKanban, Heart, Inbox, Mic, Music2 } from "lucide-react-native";
 import { Cover } from "@/components/ui/cover";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
@@ -14,7 +14,9 @@ export function ShortcutCard({
   podcast,
   music,
   video,
+  focus,
   onPress,
+  onLongPress,
 }: {
   id: string;
   title: string;
@@ -24,15 +26,23 @@ export function ShortcutCard({
   podcast?: boolean;
   music?: boolean;
   video?: boolean;
+  focus?: "today" | "inbox" | "projects";
   onPress: () => void;
+  onLongPress?: () => void;
 }) {
-  const nasCover = useCoverUrl(uri || liked || podcast || music || video ? null : coverId);
+  const nasCover = useCoverUrl(uri || liked || podcast || music || video || focus ? null : coverId);
   const cover = uri ?? nasCover;
 
   let art: React.ReactNode;
   if (liked && podcast) {
     art = (
       <View style={[styles.badge, styles.likedPodcast]}>
+        <Heart color={colors.accent} fill={colors.accent} size={22} />
+      </View>
+    );
+  } else if (liked && video) {
+    art = (
+      <View style={[styles.badge, styles.likedVideo]}>
         <Heart color={colors.accent} fill={colors.accent} size={22} />
       </View>
     );
@@ -60,6 +70,24 @@ export function ShortcutCard({
         <Clapperboard color={colors.accent} size={22} strokeWidth={1.8} />
       </View>
     );
+  } else if (focus === "today") {
+    art = (
+      <View style={[styles.badge, styles.focusToday]}>
+        <CalendarDays color={colors.accent} size={22} strokeWidth={1.8} />
+      </View>
+    );
+  } else if (focus === "inbox") {
+    art = (
+      <View style={[styles.badge, styles.focusInbox]}>
+        <Inbox color={colors.accent} size={22} strokeWidth={1.8} />
+      </View>
+    );
+  } else if (focus === "projects") {
+    art = (
+      <View style={[styles.badge, styles.focusProjects]}>
+        <FolderKanban color={colors.accent} size={22} strokeWidth={1.8} />
+      </View>
+    );
   } else {
     art = <Cover id={id} label={title} uri={cover} size={56} radius={0} />;
   }
@@ -70,6 +98,8 @@ export function ShortcutCard({
         triggerSelectionUiHaptic();
         onPress();
       }}
+      onLongPress={onLongPress}
+      delayLongPress={350}
       style={({ pressed }) => [styles.card, { opacity: pressed ? 0.86 : 1 }]}
     >
       {art}
@@ -104,6 +134,9 @@ const styles = StyleSheet.create({
   likedPodcast: {
     backgroundColor: "#2E3A32",
   },
+  likedVideo: {
+    backgroundColor: "#3A2E38",
+  },
   podcast: {
     backgroundColor: "#2A322E",
   },
@@ -112,6 +145,15 @@ const styles = StyleSheet.create({
   },
   video: {
     backgroundColor: "#322A38",
+  },
+  focusToday: {
+    backgroundColor: "#353029",
+  },
+  focusInbox: {
+    backgroundColor: "#2C3330",
+  },
+  focusProjects: {
+    backgroundColor: "#2E3140",
   },
   title: {
     flex: 1,

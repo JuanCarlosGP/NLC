@@ -12,7 +12,7 @@ Requires a Ugreen **DXP** (or other host) with Docker. DH series without Docker:
 
 Auth (optional): if `AUTH_TOKEN` is empty, leave Token blank in SND. If you set a token in compose, put the same value in SND (`X-Download-Token` / Bearer).
 
-Audio is saved as MP3 under **Music/Canciones** (songs) or **Music/Podcasts** (podcasts). No channel/artist subfolders.
+Audio is saved as MP3 under **Music/Canciones** (songs) or **Music/Podcasts** (podcasts). No channel/artist subfolders. yt-dlp also writes a sidecar JPG with the same name (`Episodio.mp3` + `Episodio.jpg`). SND only uses that file as cover — never a shared `cover.jpg` in the dump folder.
 
 ## Deploy on Ugreen
 

@@ -1,12 +1,17 @@
+import { relayCursorFromRequest } from "@/lib/cursor/proxy";
 import { relayLanGet, relayLanRequest } from "@/lib/nas/lan-proxy";
 
 export async function GET(request: Request) {
+  const cursor = await relayCursorFromRequest(request);
+  if (cursor) return cursor;
   const proxied = await relayLanGet(request);
   if (proxied) return proxied;
   return Response.json({ error: "Falta la URL del NAS." }, { status: 400 });
 }
 
 export async function POST(request: Request) {
+  const cursor = await relayCursorFromRequest(request);
+  if (cursor) return cursor;
   try {
     const payload = (await request.json()) as {
       url?: string;

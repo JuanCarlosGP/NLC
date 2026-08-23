@@ -28,3 +28,12 @@ export function triggerSelectionUiHaptic(): void {
   }
   runHaptic(() => Haptics.selectionAsync());
 }
+
+export function triggerLongPressUiHaptic(): void {
+  if (Platform.OS === "web") return;
+  if (Platform.OS === "android") {
+    runHaptic(() => Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Long_Press));
+    return;
+  }
+  runHaptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
+}

@@ -1,5 +1,6 @@
 import type { MusicSource, Track } from "@/lib/nas/types";
 import { rememberTrackArtwork } from "@/lib/library/artwork-cache";
+import { persistTrackCovers } from "@/lib/library/persist-covers";
 import type { ImportedTrack } from "@/lib/spotify/types";
 
 function normalize(value: string): string {
@@ -81,15 +82,16 @@ export async function matchImportedTracks(
       },
     };
   });
-  void rememberTrackArtwork(
-    matched
-      .filter((track) => track.matched?.id)
-      .map((track) => ({
-        trackId: track.matched!.id,
-        url: track.coverUrl || track.matched!.artworkUrl || undefined,
-        durationMs: track.durationMs || track.matched!.durationMs || undefined,
-      })),
-  );
+  const artwork = matched
+    .filter((track) => track.matched?.id)
+    .map((track) => ({
+      trackId: track.matched!.id,
+      url: track.coverUrl || undefined,
+      coverId: track.matched!.coverId,
+      durationMs: track.durationMs || track.matched!.durationMs || undefined,
+    }));
+  void rememberTrackArtwork(artwork);
+  persistTrackCovers(source, artwork);
   return matched;
 }
 

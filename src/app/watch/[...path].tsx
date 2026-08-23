@@ -1,20 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, SkipForward } from "lucide-react-native";
+import { ChevronLeft, RotateCw, SkipForward } from "lucide-react-native";
 import type { PlayableSource } from "@/lib/nas/types";
 import { usePlayer } from "@/lib/player/player-context";
 import { useSettings } from "@/lib/settings/settings-context";
+import { episodeLocation, inspectFolder, seriesFromPath, toVideoEpisode } from "@/lib/video/browse";
+import { decodeVideoId, episodeStreamUrl } from "@/lib/video/onepiece";
+import { useWatchOrientation } from "@/lib/video/use-watch-orientation";
 import {
-  decodeVideoId,
-  episodeStreamUrl,
-  listOnePieceEpisodes,
-  parseArcName,
-} from "@/lib/video/onepiece";
+  flushWatchProgress,
+  loadWatchHistory,
+  markWatching,
+  peekWatchForPath,
+  updateWatchProgress,
+} from "@/lib/video/watch-history";
 import type { VideoEpisode } from "@/lib/video/types";
+import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
 function toVideoSource(source: PlayableSource) {
@@ -27,7 +32,13 @@ export default function WatchScreen() {
   const insets = useSafeAreaInsets();
   const { settings, password } = useSettings();
   const { pause } = usePlayer();
-  const params = useLocalSearchParams<{ path?: string | string[]; arc?: string; index?: string }>();
+  const { landscape, toggleLandscape } = useWatchOrientation();
+  const params = useLocalSearchParams<{
+    path?: string | string[];
+    arc?: string;
+    index?: string;
+    start?: string;
+  }>();
 
   const pathSegments = useMemo(() => {
     const raw = params.path;
@@ -47,7 +58,7 @@ export default function WatchScreen() {
 
   const arcTitle = useMemo(() => {
     const name = arcPath.split("/").pop() ?? "";
-    return parseArcName(name)?.title ?? name;
+    return name.replace(/[-_]+/g, " ");
   }, [arcPath]);
 
   const [episodes, setEpisodes] = useState<VideoEpisode[]>([]);
@@ -61,24 +72,48 @@ export default function WatchScreen() {
 
   const current = episodes[index] ?? null;
   const nextEpisode = episodes[index + 1] ?? null;
+  const currentRef = useRef(current);
+  currentRef.current = current;
 
-  const videoSource = useMemo(() => {
-    if (!current) return null;
-    try {
-      return toVideoSource(episodeStreamUrl(settings, password, current.path));
-    } catch {
-      return null;
+  const startAt = useMemo(() => {
+    const raw = Array.isArray(params.start) ? params.start[0] : params.start;
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 3 ? n : 0;
+  }, [params.start]);
+
+  const [videoSource, setVideoSource] = useState<ReturnType<typeof toVideoSource> | null>(null);
+
+  useEffect(() => {
+    if (!current) {
+      setVideoSource(null);
+      return;
     }
+    let cancelled = false;
+    void episodeStreamUrl(settings, password, current.path)
+      .then((source) => {
+        if (!cancelled) setVideoSource(toVideoSource(source));
+      })
+      .catch(() => {
+        if (!cancelled) setVideoSource(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [current, settings, password]);
 
   const player = useVideoPlayer(videoSource, (instance) => {
     instance.loop = false;
+    instance.timeUpdateEventInterval = 2;
     instance.play();
   });
 
   useEffect(() => {
     pause();
   }, [pause]);
+
+  useEffect(() => {
+    void loadWatchHistory();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,8 +135,9 @@ export default function WatchScreen() {
         return;
       }
       try {
-        const list = await listOnePieceEpisodes(settings, password, arcPath);
+        const listing = await inspectFolder(settings, password, arcPath);
         if (cancelled) return;
+        const list = listing.episodes.map(toVideoEpisode);
         setEpisodes(list);
         const fromPath = list.findIndex((ep) => ep.path === initialPath);
         if (fromPath >= 0) setIndex(fromPath);
@@ -140,17 +176,95 @@ export default function WatchScreen() {
   }, [nextEpisode]);
 
   useEffect(() => {
-    const sub = player.addListener("playToEnd", () => {
+    if (!current) return;
+    const location = episodeLocation(current.path);
+    const series = seriesFromPath(current.path);
+    void markWatching({
+      seriesId: series.id,
+      seriesTitle: series.title,
+      path: current.path,
+      arcPath: current.arcPath || location.arcPath,
+      sagaPath: location.sagaPath,
+      number: current.number,
+      title: current.title,
+      arcTitle: location.arcTitle,
+      sagaTitle: location.sagaTitle,
+      positionSec: startAt,
+      durationSec: 0,
+    });
+  }, [current, startAt]);
+
+  useEffect(() => {
+    if (!current) return;
+    const saved = peekWatchForPath(current.path);
+    const target =
+      startAt || (saved?.path === current.path && saved.positionSec > 3 ? saved.positionSec : 0);
+    if (target < 3) return;
+    let applied = false;
+    const seek = () => {
+      if (applied) return;
+      const duration = player.duration;
+      if (duration > 0 && target >= duration - 2) return;
+      try {
+        player.currentTime = target;
+        applied = true;
+      } catch {
+        // Native player may not be ready yet.
+      }
+    };
+    const sub = player.addListener("sourceLoad", seek);
+    const timer = setTimeout(seek, 700);
+    return () => {
+      sub.remove();
+      clearTimeout(timer);
+    };
+  }, [current, player, startAt]);
+
+  useEffect(() => {
+    const timeSub = player.addListener("timeUpdate", ({ currentTime }) => {
+      updateWatchProgress(currentTime, player.duration);
+    });
+    const endSub = player.addListener("playToEnd", () => {
+      const episode = currentRef.current;
+      if (episode) {
+        const duration = player.duration || 1;
+        void flushWatchProgress(duration, duration, episode.path);
+      }
       playNext();
     });
-    return () => sub.remove();
+    return () => {
+      timeSub.remove();
+      endSub.remove();
+    };
   }, [player, playNext]);
+
+  useEffect(() => {
+    return () => {
+      const episode = currentRef.current;
+      void flushWatchProgress(player.currentTime, player.duration, episode?.path);
+    };
+  }, [player]);
 
   return (
     <View style={styles.root}>
-      <Stack.Screen options={{ headerShown: false, animation: "fade" }} />
+      <Stack.Screen
+        options={{
+          headerShown: false,
+          animation: "fade",
+          orientation: landscape ? "landscape" : "portrait_up",
+        }}
+      />
       <StatusBar style="light" hidden />
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
+      <View
+        style={[
+          styles.topBar,
+          {
+            paddingTop: insets.top + 8,
+            paddingLeft: insets.left + 8,
+            paddingRight: insets.right + 8,
+          },
+        ]}
+      >
         <Pressable
           accessibilityLabel="Cerrar"
           onPress={() => router.back()}
@@ -168,6 +282,18 @@ export default function WatchScreen() {
             </Text>
           ) : null}
         </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={landscape ? "Volver a vertical" : "Ver en horizontal"}
+          accessibilityState={{ selected: landscape }}
+          onPress={() => {
+            triggerUiHaptic();
+            toggleLandscape();
+          }}
+          style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
+        >
+          <RotateCw color={landscape ? colors.accent : colors.ink} size={22} strokeWidth={2} />
+        </Pressable>
         {nextEpisode ? (
           <Pressable
             accessibilityLabel="Siguiente episodio"
@@ -176,9 +302,7 @@ export default function WatchScreen() {
           >
             <SkipForward color={colors.ink} size={22} strokeWidth={2} />
           </Pressable>
-        ) : (
-          <View style={styles.iconBtn} />
-        )}
+        ) : null}
       </View>
 
       <View style={styles.stage}>
@@ -219,7 +343,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 8,
     paddingBottom: 10,
     backgroundColor: "rgba(0,0,0,0.45)",
   },

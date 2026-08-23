@@ -13,15 +13,28 @@ import {
 } from "@expo-google-fonts/figtree";
 import { InstrumentSerif_400Regular } from "@expo-google-fonts/instrument-serif";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
+import { ChatSheet } from "@/components/chat/chat-sheet";
 import { Dock } from "@/components/layout/dock";
 import { MiniPlayer } from "@/components/layout/mini-player";
 import { NowPlayingSheet } from "@/components/player/now-playing-sheet";
+import { PlaylistActionsSheet } from "@/components/library/playlist-actions-sheet";
+import { TrackActionsSheet } from "@/components/player/track-actions-sheet";
+import { VideoActionsSheet } from "@/components/video/video-actions-sheet";
 import { DockProvider } from "@/lib/dock-context";
 import { FavoritesProvider } from "@/lib/favorites/favorites-context";
+import { CursorProvider } from "@/lib/cursor/cursor-context";
 import { DownloadSettingsProvider } from "@/lib/podcasts/download-settings-context";
 import { PlayerProvider } from "@/lib/player/player-context";
 import { PlayerUiProvider } from "@/lib/player/player-ui-context";
+import { TrackActionsProvider } from "@/lib/player/track-actions-context";
+import { VideoActionsProvider } from "@/lib/video/video-actions-context";
+import { OfflineProvider } from "@/lib/offline/offline-context";
 import { SettingsProvider } from "@/lib/settings/settings-context";
+import { ProductivityProvider } from "@/lib/productivity/productivity-context";
+import { TaskActionsProvider } from "@/lib/productivity/task-actions-context";
+import { ZoneProvider } from "@/lib/zone/zone-context";
+import { TaskActionsSheet } from "@/components/productivity/task-actions-sheet";
+import { PlaylistActionsProvider } from "@/lib/spotify/playlist-actions-context";
 import { SpotifyProvider } from "@/lib/spotify/spotify-context";
 import { colors } from "@/lib/theme";
 
@@ -56,11 +69,19 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <SettingsProvider>
+        <ZoneProvider>
+        <ProductivityProvider>
+        <TaskActionsProvider>
+        <OfflineProvider>
         <DownloadSettingsProvider>
+        <CursorProvider>
         <SpotifyProvider>
           <FavoritesProvider>
             <PlayerProvider>
               <PlayerUiProvider>
+                <TrackActionsProvider>
+                <VideoActionsProvider>
+                <PlaylistActionsProvider>
                 <DockChrome>
                   <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.void }}>
                     <StatusBar style="light" />
@@ -69,6 +90,7 @@ export default function RootLayout() {
                         headerShown: false,
                         contentStyle: {
                           backgroundColor: colors.void,
+                          elevation: 0,
                           ...(Platform.OS === "web" ? { flex: 1 } : null),
                         },
                       }}
@@ -80,23 +102,43 @@ export default function RootLayout() {
                       <Stack.Screen name="favorites" />
                       <Stack.Screen name="music" />
                       <Stack.Screen name="podcasts" />
+                      <Stack.Screen name="video/browse/[id]" />
                       <Stack.Screen name="video/onepiece" />
+                      <Stack.Screen name="video/series/[id]" />
                       <Stack.Screen name="video/saga/[id]" />
                       <Stack.Screen name="video/arc/[id]" />
                       <Stack.Screen name="watch/[...path]" options={{ animation: "fade" }} />
+                      <Stack.Screen name="task/[id]" />
+                      <Stack.Screen name="focus/today" />
+                      <Stack.Screen name="focus/inbox" />
+                      <Stack.Screen name="projects" />
+                      <Stack.Screen name="project/[id]" />
                       <Stack.Screen name="now-playing" />
                       <Stack.Screen name="queue" />
                     </Stack>
                     <MiniPlayer />
                     <Dock />
+                    <ChatSheet />
                     <NowPlayingSheet />
+                    <TrackActionsSheet />
+                    <VideoActionsSheet />
+                    <PlaylistActionsSheet />
+                    <TaskActionsSheet />
                   </GestureHandlerRootView>
                 </DockChrome>
+                </PlaylistActionsProvider>
+                </VideoActionsProvider>
+                </TrackActionsProvider>
               </PlayerUiProvider>
           </PlayerProvider>
           </FavoritesProvider>
         </SpotifyProvider>
+        </CursorProvider>
         </DownloadSettingsProvider>
+        </OfflineProvider>
+        </TaskActionsProvider>
+        </ProductivityProvider>
+        </ZoneProvider>
       </SettingsProvider>
     </SafeAreaProvider>
   );

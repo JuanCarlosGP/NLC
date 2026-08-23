@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { loadRecents, pruneMissingLibraryTracks } from "@/lib/library/cache";
+import { catalogTrackCount, getAlbums, getRecents, getTracks } from "@/lib/db/catalog";
+import { nasScanOk } from "@/lib/db/from-source";
+import { loadRecents, pruneMissingLibraryTracks, subscribeLibraryChanged } from "@/lib/library/cache";
 import { hydrateTrackArtworkCache, withTracksArtwork } from "@/lib/library/artwork-cache";
+import { persistLibraryCovers } from "@/lib/library/persist-covers";
 import type { Album, Track } from "@/lib/nas/types";
-import { isPodcastAlbum, isSongsAlbum } from "@/lib/nas/webdav";
 import { useSettings } from "@/lib/settings/settings-context";
 
 /** Keep last home payload across tab remounts (APK) to avoid skeleton flashes. */
@@ -10,14 +12,6 @@ let cachedSourceKind: string | null = null;
 let cachedRecents: Track[] = [];
 let cachedMusicAlbums: Album[] = [];
 let cachedPodcastAlbums: Album[] = [];
-
-function musicAlbumsForHome(all: Album[]): Album[] {
-  return all.filter((album) => !isPodcastAlbum(album) && !isSongsAlbum(album)).slice(0, 8);
-}
-
-function podcastAlbumsForHome(all: Album[]): Album[] {
-  return all.filter(isPodcastAlbum).slice(0, 8);
-}
 
 export function useHome() {
   const { source, ready, settings } = useSettings();
@@ -37,17 +31,20 @@ export function useHome() {
     if (!hasVisibleData) setLoading(true);
     setError(null);
     try {
-      const [recentTracks, allAlbums, library] = await Promise.all([
-        loadRecents(settings.sourceKind),
-        source.getAlbums(),
-        source.search("*").catch(() => ({ tracks: [] as Track[] })),
+      const online = await nasScanOk(source);
+      const offlineOnly = !online;
+      const [recentTracks, nextMusic, nextPodcasts, libraryTracks] = await Promise.all([
+        offlineOnly ? getRecents(true) : loadRecents(settings.sourceKind),
+        getAlbums({ home: "music", offlineOnly }),
+        getAlbums({ home: "podcast", offlineOnly }),
+        getTracks({ offlineOnly }),
       ]);
       await hydrateTrackArtworkCache();
-      const existingIds = new Set(library.tracks.map((track) => track.id));
+      const existingIds = new Set(libraryTracks.map((track) => track.id));
       const prunedRecents =
-        existingIds.size > 0 ? await pruneMissingLibraryTracks(existingIds) : recentTracks;
-      const nextMusic = musicAlbumsForHome(allAlbums);
-      const nextPodcasts = podcastAlbumsForHome(allAlbums);
+        !offlineOnly && existingIds.size > 0
+          ? await pruneMissingLibraryTracks(existingIds, libraryTracks)
+          : recentTracks;
       cachedSourceKind = settings.sourceKind;
       cachedRecents = withTracksArtwork(prunedRecents);
       cachedMusicAlbums = nextMusic;
@@ -55,6 +52,10 @@ export function useHome() {
       setRecents(cachedRecents);
       setMusicAlbums(nextMusic);
       setPodcastAlbums(nextPodcasts);
+      if (online) persistLibraryCovers(source, libraryTracks);
+      if (offlineOnly && !(await catalogTrackCount())) {
+        setError("Sin conexión al NAS y sin copias en el teléfono.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cargar el inicio.");
     } finally {
@@ -65,6 +66,16 @@ export function useHome() {
   useEffect(() => {
     if (ready) void refresh();
   }, [ready, refresh]);
+
+  useEffect(() => {
+    return subscribeLibraryChanged((removedTrackId) => {
+      if (removedTrackId) {
+        cachedRecents = cachedRecents.filter((track) => track.id !== removedTrackId);
+        setRecents(cachedRecents);
+      }
+      void refresh();
+    });
+  }, [refresh]);
 
   return {
     recents,

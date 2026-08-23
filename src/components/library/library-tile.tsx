@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Cover } from "@/components/ui/cover";
+import { triggerLongPressUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
 export function LibraryTile({
@@ -9,6 +10,7 @@ export function LibraryTile({
   uri,
   round = false,
   onPress,
+  onLongPress,
 }: {
   id: string;
   title: string;
@@ -16,9 +18,22 @@ export function LibraryTile({
   uri?: string | null;
   round?: boolean;
   onPress: () => void;
+  onLongPress?: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, { opacity: pressed ? 0.82 : 1 }]}>
+    <Pressable
+      onPress={onPress}
+      onLongPress={
+        onLongPress
+          ? () => {
+              triggerLongPressUiHaptic();
+              onLongPress();
+            }
+          : undefined
+      }
+      delayLongPress={350}
+      style={({ pressed }) => [styles.tile, { opacity: pressed ? 0.82 : 1 }]}
+    >
       <Cover id={id} label={title} uri={uri} size="fill" radius={round ? 999 : 4} />
       <View style={styles.meta}>
         <Text numberOfLines={2} style={styles.title}>

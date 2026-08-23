@@ -1,6 +1,9 @@
 import { parseSpotifyEmbedHtml } from "@/lib/spotify/embed-parse";
 import { hydrateTrackCovers, playlistNeedsCovers } from "@/lib/spotify/track-covers";
+import { relayCursorFromRequest } from "@/lib/cursor/proxy";
 import { relayLanGet, relayLanRequest } from "@/lib/nas/lan-proxy";
+import { fetchYoutubeMusicEntity } from "@/lib/youtube/innertube";
+import { parseYoutubeMusicUrl } from "@/lib/youtube/parse-url";
 
 const EMBED_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
@@ -8,10 +11,33 @@ const EMBED_UA =
 const KINDS = new Set(["playlist", "album", "track"]);
 
 export async function GET(request: Request) {
+  const cursor = await relayCursorFromRequest(request);
+  if (cursor) return cursor;
   const proxied = await relayLanGet(request);
   if (proxied) return proxied;
 
   const url = new URL(request.url);
+  const youtubeUrl = url.searchParams.get("yt") ?? "";
+  if (youtubeUrl) {
+    const parsed = parseYoutubeMusicUrl(youtubeUrl);
+    if (!parsed) {
+      return Response.json({ error: "Ese enlace de YouTube Music no es válido." }, { status: 400 });
+    }
+    try {
+      return Response.json(await fetchYoutubeMusicEntity(parsed));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "No se pudo leer YouTube Music.";
+      return Response.json(
+        {
+          error: /failed to fetch|network/i.test(message)
+            ? "YouTube Music no respondió desde el PC."
+            : message,
+        },
+        { status: 502 },
+      );
+    }
+  }
+
   const id = url.searchParams.get("id") ?? "";
   const type = (url.searchParams.get("type") ?? "playlist").toLowerCase();
   if (!KINDS.has(type)) {
@@ -54,6 +80,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const cursor = await relayCursorFromRequest(request);
+  if (cursor) return cursor;
   try {
     const payload = (await request.json()) as {
       url?: string;

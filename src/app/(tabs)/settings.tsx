@@ -1,227 +1,483 @@
-import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useActiveProjects, useProductivity } from "@/lib/productivity/productivity-context";
 import { DownloadSheet } from "@/components/settings/download-sheet";
+import { OfflineSheet } from "@/components/settings/offline-sheet";
+import { LocalFolderSheet } from "@/components/settings/local-folder-sheet";
 import { SourceConfigSheet } from "@/components/settings/source-config-sheet";
+import { ZoneSwitch } from "@/components/layout/zone-switch";
 import { Screen } from "@/components/ui/screen";
 import { useDownloadSettings } from "@/hooks/use-download-settings";
 import { useNasSettings } from "@/hooks/use-nas-settings";
+import { formatOfflineBytes } from "@/lib/offline/downloader";
+import { useOffline } from "@/lib/offline/offline-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
-import { colors, fonts, layout, type } from "@/lib/theme";
-import type { MusicSourceKind } from "@/lib/nas/types";
-
-const SOURCE_TABS: { id: MusicSourceKind; label: string }[] = [
-  { id: "webdav", label: "Carpeta compartida" },
-  { id: "mock", label: "Biblioteca de ejemplo" },
-  { id: "opensubsonic", label: "Navidrome" },
-];
+import {
+  applyPodcastSourceSettings,
+  applyVideoSourceSettings,
+  podcastSourceSettings,
+  videoSourceSettings,
+} from "@/lib/settings/storage";
+import { colors, fonts, type } from "@/lib/theme";
+import { USE_NATIVE_DRIVER } from "@/lib/use-native-driver";
+import { useZone } from "@/lib/zone/zone-context";
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const nas = useNasSettings();
   const download = useDownloadSettings();
-  const { settings, setSettings, password, setPassword, feedback, connected } = nas;
+  const offline = useOffline();
+  const { zone } = useZone();
+  const { clearDone } = useProductivity();
+  const projects = useActiveProjects();
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearBusy, setClearBusy] = useState(false);
+  const { settings, setSettings, password, setPassword, feedback, connected, videoConnected } = nas;
   const [configOpen, setConfigOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [offlineOpen, setOfflineOpen] = useState(false);
+  const videoSettings = videoSourceSettings(settings);
+  const podcastSettings = podcastSourceSettings(settings);
   const shareReady = connected && settings.sourceKind === "webdav";
-  const canSaveShare = shareReady && !nas.busy;
+  const videoReady = videoConnected;
   const downloadSummary = download.settings.enabled
     ? `${download.settings.host}:${download.settings.port}`
     : "Desactivado";
 
-  function selectSource(kind: MusicSourceKind) {
-    if (kind === "webdav") {
-      setSettings({
-        ...settings,
-        sourceKind: "webdav",
-        host: settings.host || "192.168.1.106",
-        port: settings.port === "4533" ? "5005" : settings.port || "5005",
-        username: settings.username || "Viewer",
-        sharePath: settings.sharePath || "/Music",
-        useHttps: false,
-      });
-      if (!password) setPassword("Viewer");
-      return;
-    }
-    if (kind === "opensubsonic") {
-      setSettings({
-        ...settings,
-        sourceKind: "opensubsonic",
-        port: settings.port === "5005" ? "4533" : settings.port || "4533",
-      });
-      return;
-    }
-    setSettings({ ...settings, sourceKind: "mock" });
-  }
+  useEffect(() => {
+    if (settings.sourceKind === "webdav") return;
+    setSettings({
+      ...settings,
+      sourceKind: "webdav",
+      host: settings.host || "192.168.1.106",
+      port: settings.port === "4533" ? "5005" : settings.port || "5005",
+      username: settings.username || "Viewer",
+      sharePath: settings.sharePath,
+      useHttps: false,
+    });
+    if (!password) setPassword("Viewer");
+  }, [password, setPassword, setSettings, settings]);
 
-  const summary =
-    settings.sourceKind === "mock"
-      ? "Biblioteca de ejemplo"
-      : settings.sourceKind === "webdav"
-        ? `${settings.host}:${settings.port} · ${settings.sharePath || "/Music"}`
-        : `${settings.host}:${settings.port}`;
+  const localSummary = settings.localFolderUri
+    ? settings.localFolderName || "Carpeta del teléfono"
+    : "Ninguna";
+  const podcastLocalSummary = settings.podcastLocalFolderUri
+    ? settings.podcastLocalFolderName || "Carpeta del teléfono"
+    : settings.localFolderUri
+      ? `${settings.localFolderName || "Música"} / Podcasts`
+      : "Ninguna";
+  const videoLocalSummary = settings.videoLocalFolderUri
+    ? settings.videoLocalFolderName || "Carpeta del teléfono"
+    : "Ninguna";
+  const nasFeedback = feedback?.text;
+  const downloadFeedback = download.feedback && !downloadOpen ? download.feedback.text : null;
+  const mediaZone = zone === "focus" ? "music" : zone;
+  const zoneReady = offline.readyTracks.filter((item) => item.kind === mediaZone).length;
+  const offlineSummary = zoneReady
+    ? `${zoneReady} ${mediaZone === "podcast" ? (zoneReady === 1 ? "podcast" : "podcasts") : mediaZone === "video" ? (zoneReady === 1 ? "vídeo" : "vídeos") : zoneReady === 1 ? "canción" : "canciones"} · ${formatOfflineBytes(offline.readyTracks.filter((item) => item.kind === mediaZone).reduce((sum, item) => sum + item.localBytes, 0))}`
+    : "Nada en el catálogo";
+  const offlineHint = offline.progress.supported
+    ? null
+    : "Las copias se guardan en el teléfono";
+
+  const pathSummary = (host: string, port: string, path: string) =>
+    path ? `${host}:${port} · ${path}` : `${host}:${port} · Sin ruta`;
+  const musicSummary = pathSummary(settings.host, settings.port, settings.sharePath);
+  const podcastSummary = pathSummary(podcastSettings.host, podcastSettings.port, podcastSettings.sharePath);
+  const videoSummary = pathSummary(videoSettings.host, videoSettings.port, videoSettings.sharePath);
 
   return (
     <Screen>
-      <Text style={type.pageTitle}>Ajustes</Text>
-
-      <Text style={type.sectionTitle}>Fuente</Text>
-      <ScrollView
-        horizontal
-        nestedScrollEnabled
-        showsHorizontalScrollIndicator={false}
-        style={styles.tabsScroll}
-        contentContainerStyle={styles.tabs}
-      >
-        {SOURCE_TABS.map((item) => {
-          const active = settings.sourceKind === item.id;
-          return (
-            <Pressable
-              key={item.id}
-              onPress={() => selectSource(item.id)}
-              style={[styles.tab, active && styles.tabActive]}
-            >
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
-      <View style={styles.configBlock}>
-        <Pressable
-          onPress={() => {
-            triggerUiHaptic();
-            setConfigOpen(true);
-          }}
-          style={({ pressed }) => [styles.configBtn, { opacity: pressed ? 0.85 : 1 }]}
-        >
-          <View style={[styles.statusDot, { opacity: shareReady ? 1 : 0 }]} />
-          <View style={styles.configMeta}>
-            <Text style={styles.configTitle}>Configuración</Text>
-            <Text numberOfLines={1} style={styles.configSummary}>
-              {summary}
-            </Text>
-          </View>
-          <ChevronRight color={colors.muted} size={20} />
-        </Pressable>
-        <Pressable
-          disabled={!canSaveShare}
-          onPress={() => {
-            triggerUiHaptic();
-            void nas.saveShareConfig();
-          }}
-          style={({ pressed }) => [
-            styles.saveShareBtn,
-            { opacity: !canSaveShare ? 0.45 : pressed ? 0.85 : 1 },
-          ]}
-        >
-          <Text style={styles.saveShareLabel}>Guardar configuración</Text>
-        </Pressable>
+      <View style={styles.heading}>
+        <Text style={[type.pageTitle, styles.title]}>Ajustes</Text>
+        <ZoneSwitch />
       </View>
-      <Text style={[type.meta, styles.feedbackSlot, feedback ? { color: feedback.color } : null]}>
-        {feedback?.text ?? " "}
-      </Text>
 
-      <Text style={type.sectionTitle}>Descargas</Text>
-      <Pressable
-        onPress={() => {
-          triggerUiHaptic();
-          setDownloadOpen(true);
-        }}
-        style={({ pressed }) => [styles.configBtn, { opacity: pressed ? 0.85 : 1 }]}
-      >
-        <View style={[styles.statusDot, { opacity: download.settings.enabled ? 1 : 0 }]} />
-        <View style={styles.configMeta}>
-          <Text style={styles.configTitle}>yt-dlp</Text>
-          <Text numberOfLines={1} style={styles.configSummary}>
-            {downloadSummary}
-          </Text>
-        </View>
-        <ChevronRight color={colors.muted} size={20} />
-      </Pressable>
-      <Text
-        style={[
-          type.meta,
-          styles.feedbackSlot,
-          download.feedback && !downloadOpen ? { color: download.feedback.color } : null,
-        ]}
-      >
-        {download.feedback && !downloadOpen ? download.feedback.text : " "}
-      </Text>
+      <View style={styles.groups}>
+        {zone === "focus" ? (
+          <>
+            <SettingsGroup
+              label="Datos"
+              hint="Las tareas y proyectos viven en el teléfono. No se copian al NAS."
+            >
+              <SettingsRow
+                title="Proyectos"
+                summary={
+                  projects.length
+                    ? `${projects.length} ${projects.length === 1 ? "proyecto" : "proyectos"}`
+                    : "Solo la bandeja"
+                }
+                onPress={() => {
+                  triggerUiHaptic();
+                  router.push("/projects");
+                }}
+              />
+              <View style={styles.divider} />
+              <SettingsRow
+                title="Vaciar hechas"
+                summary="Borra las tareas marcadas como hechas"
+                onPress={() => {
+                  triggerUiHaptic();
+                  setClearOpen(true);
+                }}
+              />
+            </SettingsGroup>
+          </>
+        ) : null}
+
+        {zone === "music" ? (
+          <SettingsGroup label="Fuente" hint={nasFeedback} hintColor={feedback?.color}>
+            <SettingsRow
+              title="Carpeta compartida"
+              summary={musicSummary}
+              ready={shareReady}
+              showStatus
+              onPress={() => {
+                triggerUiHaptic();
+                setConfigOpen(true);
+              }}
+            />
+            <View style={styles.divider} />
+            <SettingsRow
+              title="Carpeta local"
+              summary={localSummary}
+              ready={Boolean(settings.localFolderUri)}
+              showStatus
+              onPress={() => {
+                triggerUiHaptic();
+                setLocalOpen(true);
+              }}
+            />
+          </SettingsGroup>
+        ) : null}
+
+        {zone === "podcast" ? (
+          <>
+            <SettingsGroup label="Fuente" hint={nasFeedback} hintColor={feedback?.color}>
+              <SettingsRow
+                title="Carpeta compartida"
+                summary={podcastSummary}
+                ready={shareReady}
+                showStatus
+                onPress={() => {
+                  triggerUiHaptic();
+                  setConfigOpen(true);
+                }}
+              />
+              <View style={styles.divider} />
+              <SettingsRow
+                title="Carpeta local"
+                summary={podcastLocalSummary}
+                ready={Boolean(settings.podcastLocalFolderUri || settings.localFolderUri)}
+                showStatus
+                onPress={() => {
+                  triggerUiHaptic();
+                  setLocalOpen(true);
+                }}
+              />
+            </SettingsGroup>
+          </>
+        ) : null}
+
+        {zone === "video" ? (
+          <SettingsGroup label="Fuente" hint={nasFeedback} hintColor={feedback?.color}>
+            <SettingsRow
+              title="Carpeta de vídeo"
+              summary={videoSummary}
+              ready={videoReady}
+              showStatus
+              onPress={() => {
+                triggerUiHaptic();
+                setConfigOpen(true);
+              }}
+            />
+            <View style={styles.divider} />
+            <SettingsRow
+              title="Carpeta local"
+              summary={videoLocalSummary}
+              ready={Boolean(settings.videoLocalFolderUri)}
+              showStatus
+              onPress={() => {
+                triggerUiHaptic();
+                setLocalOpen(true);
+              }}
+            />
+          </SettingsGroup>
+        ) : null}
+
+        {zone !== "focus" ? (
+          <>
+            <SettingsGroup label="Descargar" hint={downloadFeedback} hintColor={download.feedback?.color}>
+              <SettingsRow
+                title="yt-dlp"
+                summary={downloadSummary}
+                ready={download.settings.enabled}
+                onPress={() => {
+                  triggerUiHaptic();
+                  setDownloadOpen(true);
+                }}
+              />
+            </SettingsGroup>
+
+            <SettingsGroup label="Offline" hint={offlineHint}>
+              <SettingsRow
+                title={zone === "video" ? "Videoteca" : zone === "podcast" ? "Episodios" : "Música"}
+                summary={offlineSummary}
+                ready={zoneReady > 0}
+                showStatus
+                onPress={() => {
+                  triggerUiHaptic();
+                  setOfflineOpen(true);
+                }}
+              />
+            </SettingsGroup>
+          </>
+        ) : null}
+      </View>
 
       <SourceConfigSheet
         open={configOpen}
         onOpenChange={setConfigOpen}
-        settings={settings}
-        setSettings={setSettings}
+        settings={zone === "video" ? videoSettings : zone === "podcast" ? podcastSettings : settings}
+        setSettings={(next) =>
+          setSettings(
+            zone === "video"
+              ? applyVideoSourceSettings(settings, next)
+              : zone === "podcast"
+                ? applyPodcastSourceSettings(settings, next)
+                : next,
+          )
+        }
         password={password}
         setPassword={setPassword}
         feedback={nas.feedback}
         busy={nas.busy}
-        testConnection={nas.testConnection}
-        save={nas.save}
+        testConnection={
+          zone === "video"
+            ? nas.testVideoConnection
+            : zone === "podcast"
+              ? nas.testPodcastConnection
+              : nas.testConnection
+        }
+        save={
+          zone === "video"
+            ? async () => {
+                await nas.persist();
+                await nas.testVideoConnection();
+              }
+            : nas.save
+        }
+        variant={zone === "video" ? "video" : zone === "podcast" ? "podcast" : "music"}
       />
-      <DownloadSheet open={downloadOpen} onOpenChange={setDownloadOpen} download={download} />
+      <LocalFolderSheet
+        open={localOpen}
+        onOpenChange={setLocalOpen}
+        settings={settings}
+        applyLocalFolder={nas.applyLocalFolder}
+        busy={nas.busy}
+        feedback={nas.feedback}
+        variant={zone === "video" ? "video" : zone === "podcast" ? "podcast" : "music"}
+      />
+      <DownloadSheet open={downloadOpen} onOpenChange={setDownloadOpen} download={download} zone={zone} />
+      <OfflineSheet open={offlineOpen} onOpenChange={setOfflineOpen} lockedKind={zone === "focus" ? "music" : zone} />
+      <ConfirmDialog
+        open={clearOpen}
+        title="Vaciar hechas"
+        message="Se borran las tareas en Hecho. No se pueden recuperar."
+        confirmLabel="Vaciar"
+        cancelLabel="Cancelar"
+        destructive
+        busy={clearBusy}
+        onCancel={() => {
+          if (!clearBusy) setClearOpen(false);
+        }}
+        onConfirm={() => {
+          setClearBusy(true);
+          void clearDone()
+            .then(() => setClearOpen(false))
+            .finally(() => setClearBusy(false));
+        }}
+      />
     </Screen>
   );
 }
 
+function SettingsGroup({
+  label,
+  hint,
+  hintColor,
+  children,
+}: {
+  label: string;
+  hint?: string | null;
+  hintColor?: string;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.group}>
+      <Text style={styles.groupLabel}>{label}</Text>
+      <View style={styles.card}>{children}</View>
+      {hint ? <Text style={[styles.hint, hintColor ? { color: hintColor } : null]}>{hint}</Text> : null}
+    </View>
+  );
+}
+
+function SettingsRow({
+  title,
+  summary,
+  ready,
+  showStatus,
+  onPress,
+}: {
+  title: string;
+  summary: string;
+  ready?: boolean;
+  showStatus?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.82 : 1 }]}>
+      <View style={styles.rowMeta}>
+        <View style={styles.rowTitleLine}>
+          <Text style={styles.rowTitle}>{title}</Text>
+          {ready || showStatus ? <StatusDot on={Boolean(ready)} /> : null}
+        </View>
+        <Text numberOfLines={1} style={styles.rowSummary}>
+          {summary}
+        </Text>
+      </View>
+      <ChevronRight color={colors.muted} size={18} />
+    </Pressable>
+  );
+}
+
+function StatusDot({ on }: { on: boolean }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!on) {
+      pulse.stopAnimation();
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: USE_NATIVE_DRIVER }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, useNativeDriver: USE_NATIVE_DRIVER }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [on, pulse]);
+
+  return (
+    <View style={styles.statusWrap} accessibilityLabel={on ? "Conectado" : "Sin conexión"}>
+      {on ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.statusRing,
+            {
+              opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
+              transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] }) }],
+            },
+          ]}
+        />
+      ) : null}
+      <View style={on ? styles.statusDot : styles.statusDotOff} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  tabsScroll: {
-    marginHorizontal: -layout.screenPad,
-    flexGrow: 0,
-  },
-  tabs: {
+  heading: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: layout.screenPad,
+    justifyContent: "space-between",
+    gap: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  tab: {
+  title: { flex: 1 },
+  groups: {
+    gap: 28,
+  },
+  group: {
+    gap: 10,
+  },
+  groupLabel: {
+    ...type.label,
+    paddingHorizontal: 2,
+  },
+  card: {
     borderWidth: 1,
     borderColor: colors.rule,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
     backgroundColor: colors.sheet,
-    flexShrink: 0,
+    borderRadius: 12,
+    overflow: "hidden",
   },
-  tabActive: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
-  },
-  tabLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.inkSoft },
-  tabLabelActive: { color: colors.void },
-  configBlock: { gap: 8 },
-  configBtn: {
+  row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: colors.rule,
-    backgroundColor: colors.sheet,
-    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  statusDot: {
-    width: 7,
-    height: 7,
+  rowMeta: {
+    flex: 1,
+    gap: 3,
+  },
+  rowTitleLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  rowTitle: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 16,
+    color: colors.ink,
+  },
+  rowSummary: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.muted,
+  },
+  statusWrap: {
+    width: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statusRing: {
+    position: "absolute",
+    width: 9,
+    height: 9,
     borderRadius: 999,
     backgroundColor: colors.ok,
   },
-  configMeta: { flex: 1, gap: 2 },
-  configTitle: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-  configSummary: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
-  saveShareBtn: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: colors.rule,
-    backgroundColor: colors.sheet,
-    borderRadius: 10,
+  statusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: colors.ok,
   },
-  saveShareLabel: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-  feedbackSlot: { minHeight: 18 },
+  statusDotOff: {
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    backgroundColor: colors.muted,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.rule,
+    marginLeft: 16,
+  },
+  hint: {
+    ...type.meta,
+    paddingHorizontal: 2,
+  },
 });

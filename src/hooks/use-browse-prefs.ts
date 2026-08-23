@@ -23,6 +23,10 @@ export const DEFAULT_BROWSE_PREFS: BrowsePrefs = {
 /** Survive tab remounts so grid/list doesn't flash to the default. */
 const prefsMemory = new Map<string, BrowsePrefs>();
 
+export function rememberBrowsePrefs(storageKey: string, prefs: BrowsePrefs): void {
+  prefsMemory.set(storageKey, prefs);
+}
+
 export function parseBrowsePrefs(raw: string | null): BrowsePrefs {
   if (!raw) return { ...DEFAULT_BROWSE_PREFS };
   try {

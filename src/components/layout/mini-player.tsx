@@ -27,6 +27,7 @@ const SWIPE_DOWN_VELOCITY = 550;
 const TAP_SLOP = 24;
 const LONG_PRESS_MS = 400;
 const PAN_SPRING = { damping: 22, stiffness: 280, mass: 0.85 };
+const HIDE_SPRING = { damping: 22, stiffness: 280, mass: 0.85 };
 
 function glassChrome() {
   return Platform.OS === "web"
@@ -35,7 +36,7 @@ function glassChrome() {
         WebkitBackdropFilter: "blur(14px)",
         boxShadow: "0 12px 40px rgba(0,0,0,0.45)",
       } as object)
-    : { elevation: 10 };
+    : { elevation: 24 };
 }
 
 export function MiniPlayerTrack({ track }: { track: Track }) {
@@ -229,9 +230,12 @@ export function MiniPlayer() {
   const progress = useRef(new Animated.Value(0)).current;
   const watching = isWatchRoute(pathname);
 
+  const revealDock = dock?.reveal;
+
   useEffect(() => {
     revealMiniPlayer();
-  }, [playNonce, revealMiniPlayer]);
+    revealDock?.();
+  }, [playNonce, revealDock, revealMiniPlayer]);
 
   useEffect(() => {
     if (!current) revealMiniPlayer();
@@ -239,19 +243,16 @@ export function MiniPlayer() {
 
   const visible =
     Boolean(current) &&
-    (dock?.visible ?? true) &&
     !nowPlayingOpen &&
     !miniPlayerDismissed &&
-    !watching;
-  const interactive = Boolean(current) && !miniPlayerDismissed && !nowPlayingOpen;
+    !watching &&
+    (dock?.visible ?? true);
   const hiddenOffset = layout.miniPlayerHeight + DOCK_HEIGHT + insets.bottom + 48;
 
   useEffect(() => {
     Animated.spring(progress, {
       toValue: visible ? 0 : 1,
-      damping: 22,
-      stiffness: 280,
-      mass: 0.85,
+      ...HIDE_SPRING,
       useNativeDriver: USE_NATIVE_DRIVER,
     }).start();
   }, [progress, visible]);
@@ -260,22 +261,21 @@ export function MiniPlayer() {
     inputRange: [0, 1],
     outputRange: [0, hiddenOffset],
   });
-  const opacity = progress.interpolate({
-    inputRange: [0, 0.55, 1],
-    outputRange: [1, 0, 0],
+  const scaleX = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0.78],
   });
 
   if (!current) return null;
 
   return (
     <Animated.View
-      pointerEvents={interactive ? "box-none" : "none"}
+      pointerEvents={visible ? "box-none" : "none"}
       style={[
         styles.host,
         {
           bottom: DOCK_HEIGHT + DOCK_MARGIN + insets.bottom + layout.miniPlayerGap,
-          opacity,
-          transform: [{ translateY }],
+          transform: [{ translateY }, { scaleX }],
         },
         Platform.OS === "web" ? ({ position: "fixed" } as object) : null,
       ]}
@@ -291,6 +291,7 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     zIndex: 35,
+    elevation: 24,
   },
   bar: {
     minHeight: layout.miniPlayerHeight,

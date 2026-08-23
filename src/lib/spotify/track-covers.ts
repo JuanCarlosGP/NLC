@@ -16,7 +16,7 @@ export function trackNeedsCover(track: ImportedTrack, playlistCover?: string | n
 }
 
 export function playlistNeedsCovers(playlist: Pick<ImportedPlaylist, "kind" | "coverUrl" | "tracks">): boolean {
-  if (playlist.kind === "album") return false;
+  if (playlist.kind === "album" || playlist.kind === "local") return false;
   return playlist.tracks.some((track) => trackNeedsCover(track, playlist.coverUrl));
 }
 

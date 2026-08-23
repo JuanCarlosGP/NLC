@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { getAlbum } from "@/lib/db/catalog";
+import { nasScanOk } from "@/lib/db/from-source";
+import { subscribeLibraryChanged } from "@/lib/library/cache";
 import type { AlbumDetail } from "@/lib/nas/types";
 import { useSettings } from "@/lib/settings/settings-context";
 
@@ -13,7 +16,14 @@ export function useAlbum(id: string | undefined) {
     setLoading(true);
     setError(null);
     try {
-      setAlbum(await source.getAlbum(id));
+      const online = await nasScanOk(source);
+      const local = await getAlbum(id, !online);
+      if (local) {
+        setAlbum(local);
+        return;
+      }
+      if (online) setAlbum(await source.getAlbum(id));
+      else throw new Error("Este álbum no está en el teléfono.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo abrir el álbum.");
     } finally {
@@ -24,6 +34,20 @@ export function useAlbum(id: string | undefined) {
   useEffect(() => {
     if (ready) void refresh();
   }, [ready, refresh]);
+
+  useEffect(() => {
+    return subscribeLibraryChanged((removedTrackId) => {
+      if (removedTrackId) {
+        setAlbum((current) =>
+          current
+            ? { ...current, tracks: current.tracks.filter((track) => track.id !== removedTrackId) }
+            : current,
+        );
+        return;
+      }
+      void refresh();
+    });
+  }, [refresh]);
 
   return { album, loading, error };
 }

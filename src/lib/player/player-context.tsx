@@ -16,9 +16,15 @@ import {
   type AudioPlayer,
 } from "expo-audio";
 import * as Haptics from "expo-haptics";
+import { getLocalUri } from "@/lib/db/catalog";
 import { pushRecent } from "@/lib/library/cache";
 import type { Track } from "@/lib/nas/types";
 import { useSettings } from "@/lib/settings/settings-context";
+import {
+  LOCK_SCREEN_OPTIONS,
+  lockScreenMetadata,
+  resolveLockScreenArtwork,
+} from "@/lib/player/lock-screen";
 import type { RepeatMode } from "@/lib/player/types";
 
 type PlayerSessionValue = {
@@ -32,6 +38,7 @@ type PlayerSessionValue = {
   repeat: RepeatMode;
   playNonce: number;
   playTracks: (tracks: Track[], startIndex?: number) => Promise<void>;
+  enqueueTracks: (tracks: Track[], where?: "next" | "end") => Promise<void>;
   skipQueue: (direction: 1 | -1) => Promise<void>;
   togglePlay: () => Promise<void>;
   pause: () => void;
@@ -92,6 +99,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const currentTimeRef = useRef(0);
   const playingRef = useRef(false);
   const loadedRef = useRef(false);
+  const lockScreenActiveRef = useRef(false);
+  const lockScreenGenRef = useRef(0);
 
   queueRef.current = queue;
   indexRef.current = index;
@@ -112,44 +121,74 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const applyLockScreen = useCallback(
+    (track: Track) => {
+      const metadata = lockScreenMetadata(track);
+      try {
+        if (lockScreenActiveRef.current) {
+          player.updateLockScreenMetadata(metadata);
+        } else {
+          player.setActiveForLockScreen(true, metadata, LOCK_SCREEN_OPTIONS);
+          lockScreenActiveRef.current = true;
+        }
+      } catch {
+        // Lock screen is best-effort on Expo Go / older expo-audio.
+      }
+      const trackId = track.id;
+      void resolveLockScreenArtwork(track).then((artworkUrl) => {
+        if (!artworkUrl || !lockScreenActiveRef.current) return;
+        if (queueRef.current[indexRef.current]?.id !== trackId) return;
+        try {
+          player.updateLockScreenMetadata(lockScreenMetadata(track, artworkUrl));
+        } catch {
+          // Artwork is optional; keep title/artist if the native update fails.
+        }
+      });
+    },
+    [player],
+  );
+
+  const clearLockScreen = useCallback(() => {
+    if (!lockScreenActiveRef.current) return;
+    try {
+      player.clearLockScreenControls();
+    } catch {
+      // Native session may already be gone.
+    }
+    lockScreenActiveRef.current = false;
+  }, [player]);
+
   const loadAndPlay = useCallback(
     async (track: Track) => {
-      const uri = await sourceRef.current.streamUrl(track.id);
+      const gen = ++lockScreenGenRef.current;
+      const localUri = Platform.OS === "web" ? null : await getLocalUri(track.id);
+      const source = localUri ? { uri: localUri } : await sourceRef.current.streamUrl(track.id);
+      if (gen !== lockScreenGenRef.current) return;
       try {
-        player.replace(uri);
+        player.replace(source);
         player.play();
       } catch (error) {
-        console.warn("No se pudo cargar el audio", error);
-        return;
+        if (localUri) {
+          try {
+            const remote = await sourceRef.current.streamUrl(track.id);
+            if (gen !== lockScreenGenRef.current) return;
+            player.replace(remote);
+            player.play();
+          } catch (fallbackError) {
+            console.warn("No se pudo cargar el audio", fallbackError);
+            return;
+          }
+        } else {
+          console.warn("No se pudo cargar el audio", error);
+          return;
+        }
       }
       void pushRecent(track);
       void ensureNotificationPermission();
-      try {
-        const cover =
-          track.artworkUrl ||
-          (track.coverId ? await sourceRef.current.coverUrl(track.coverId, 256) : null);
-        const lockPlayer = player as AudioPlayer & {
-          setActiveForLockScreen?: (
-            active: boolean,
-            metadata: {
-              title?: string;
-              artist?: string;
-              albumTitle?: string;
-              artworkUrl?: string;
-            },
-          ) => void;
-        };
-        lockPlayer.setActiveForLockScreen?.(true, {
-          title: track.title,
-          artist: track.artistName,
-          albumTitle: track.albumName,
-          artworkUrl: cover ?? undefined,
-        });
-      } catch {
-        // Lock screen metadata is best-effort on Expo Go / older expo-audio.
-      }
+      if (gen !== lockScreenGenRef.current) return;
+      applyLockScreen(track);
     },
-    [player],
+    [applyLockScreen, player],
   );
 
   const playTracks = useCallback(
@@ -166,6 +205,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       await loadAndPlay(ordered[nextIndex]);
     },
     [loadAndPlay, shuffle],
+  );
+
+  const enqueueTracks = useCallback(
+    async (tracks: Track[], where: "next" | "end" = "end") => {
+      if (!tracks.length) return;
+      const items = queueRef.current;
+      if (!items.length) {
+        await playTracks(tracks, 0);
+        return;
+      }
+      const currentIndex = indexRef.current;
+      setQueue(
+        where === "next"
+          ? [...items.slice(0, currentIndex + 1), ...tracks, ...items.slice(currentIndex + 1)]
+          : [...items, ...tracks],
+      );
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
+    [playTracks],
   );
 
   const pause = useCallback(() => {
@@ -281,6 +339,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       if (!nextQueue.length) {
         setIndex(0);
         pause();
+        clearLockScreen();
         return;
       }
 
@@ -293,8 +352,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
       setIndex(Math.max(0, currentIndex - removedBefore));
     },
-    [loadAndPlay, pause],
+    [clearLockScreen, loadAndPlay, pause],
   );
+
+  useEffect(() => {
+    type SkipEvent = { direction?: string };
+    const emitter = player as unknown as {
+      addListener: (event: string, listener: (event: SkipEvent) => void) => { remove: () => void };
+    };
+    const subscription = emitter.addListener("lockScreenSkip", (event) => {
+      if (event.direction === "next") void next();
+      else if (event.direction === "previous") void prev();
+    });
+    return () => subscription.remove();
+  }, [next, player, prev]);
+
+  useEffect(() => {
+    return () => {
+      lockScreenActiveRef.current = false;
+      try {
+        player.clearLockScreenControls();
+      } catch {
+        // Player already released.
+      }
+    };
+  }, [player]);
 
   useEffect(() => {
     if (!status.didJustFinish || finishingRef.current) return;
@@ -316,6 +398,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       repeat,
       playNonce,
       playTracks,
+      enqueueTracks,
       skipQueue,
       togglePlay,
       pause,
@@ -337,6 +420,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       repeat,
       playNonce,
       playTracks,
+      enqueueTracks,
       skipQueue,
       togglePlay,
       pause,

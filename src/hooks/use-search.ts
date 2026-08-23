@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { getRecents, searchCatalog } from "@/lib/db/catalog";
+import { nasScanOk } from "@/lib/db/from-source";
 import {
   hydrateTrackArtworkCache,
   subscribeTrackArtwork,
   withTracksArtwork,
 } from "@/lib/library/artwork-cache";
-import { loadLibraryCache, loadRecents } from "@/lib/library/cache";
+import { loadRecents, subscribeLibraryChanged } from "@/lib/library/cache";
 import type { SearchResults, Track } from "@/lib/nas/types";
 import { usePlayer } from "@/lib/player/player-context";
 import { useSettings } from "@/lib/settings/settings-context";
@@ -17,15 +19,29 @@ export function useSearch(query: string) {
   const [results, setResults] = useState<SearchResults>(empty);
   const [loading, setLoading] = useState(false);
   const [listTitle, setListTitle] = useState("Recientes");
+  const [libraryTick, setLibraryTick] = useState(0);
 
   useEffect(() => {
     void hydrateTrackArtworkCache();
-    return subscribeTrackArtwork(() => {
+    const offArt = subscribeTrackArtwork(() => {
       setResults((prev) => ({
         ...prev,
         tracks: withTracksArtwork(prev.tracks),
       }));
     });
+    const offLibrary = subscribeLibraryChanged((removedTrackId) => {
+      if (removedTrackId) {
+        setResults((prev) => ({
+          ...prev,
+          tracks: prev.tracks.filter((track) => track.id !== removedTrackId),
+        }));
+      }
+      setLibraryTick((value) => value + 1);
+    });
+    return () => {
+      offArt();
+      offLibrary();
+    };
   }, []);
 
   useEffect(() => {
@@ -34,91 +50,54 @@ export function useSearch(query: string) {
     let cancelled = false;
     void hydrateTrackArtworkCache();
 
-    if (!q) {
-      void (async () => {
-        setLoading(true);
-        setListTitle("Recientes");
-        try {
-          const [recentTracks, allTracks] = await Promise.all([
-            loadRecents(settings.sourceKind),
-            loadAllTracks(),
-          ]);
-          if (cancelled) return;
-          setResults({
-            artists: [],
-            albums: [],
-            tracks: withTracksArtwork(orderRecentsFirst(allTracks, recentTracks)),
-          });
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setListTitle("Canciones");
     const handle = setTimeout(() => {
       void (async () => {
+        const online = await nasScanOk(source);
+        if (cancelled) return;
+        const offlineOnly = !online;
+
+        if (!q) {
+          setLoading(true);
+          setListTitle("Recientes");
+          try {
+            const [recentTracks, all] = await Promise.all([
+              offlineOnly ? getRecents(true) : loadRecents(settings.sourceKind),
+              searchCatalog("*", offlineOnly),
+            ]);
+            if (cancelled) return;
+            setResults({
+              artists: [],
+              albums: [],
+              tracks: withTracksArtwork(orderRecentsFirst(all.tracks, recentTracks)),
+            });
+          } finally {
+            if (!cancelled) setLoading(false);
+          }
+          return;
+        }
+
+        setListTitle("Canciones");
         setLoading(true);
         try {
-          const cached = await loadLibraryCache();
-          const local: SearchResults = {
-            artists: cached?.artists.filter((item) => item.name.toLowerCase().includes(q.toLowerCase())) ?? [],
-            albums:
-              cached?.albums.filter(
-                (item) =>
-                  item.name.toLowerCase().includes(q.toLowerCase()) ||
-                  item.artistName.toLowerCase().includes(q.toLowerCase()),
-              ) ?? [],
-            tracks: [],
-          };
-          if (!cancelled) setResults(local);
-          const remote = await source.search(q);
+          const found = await searchCatalog(q, offlineOnly);
           if (!cancelled) {
             setResults({
-              artists: mergeById(local.artists, remote.artists),
-              albums: mergeById(local.albums, remote.albums),
-              tracks: withTracksArtwork(remote.tracks),
+              artists: found.artists,
+              albums: found.albums,
+              tracks: withTracksArtwork(found.tracks),
             });
           }
         } finally {
           if (!cancelled) setLoading(false);
         }
       })();
-    }, 220);
+    }, q ? 220 : 0);
 
     return () => {
       cancelled = true;
       clearTimeout(handle);
     };
-
-    async function loadAllTracks(): Promise<Track[]> {
-      try {
-        const searched = await source.search("*");
-        if (searched.tracks.length) return searched.tracks;
-      } catch {
-        // Fallback por álbumes.
-      }
-      const collected: Track[] = [];
-      const seen = new Set<string>();
-      try {
-        const albums = await source.getAlbums();
-        for (const album of albums) {
-          const albumTracks = await source.getTracks(album.id);
-          for (const track of albumTracks) {
-            if (seen.has(track.id)) continue;
-            seen.add(track.id);
-            collected.push(track);
-          }
-        }
-      } catch {
-        return collected;
-      }
-      return collected;
-    }
-  }, [playNonce, query, ready, settings.sourceKind, source]);
+  }, [libraryTick, playNonce, query, ready, settings.sourceKind, source]);
 
   return { results, loading, listTitle };
 }
@@ -134,10 +113,4 @@ function orderRecentsFirst(all: Track[], recents: Track[]): Track[] {
   }
   const rest = all.filter((track) => !recentIds.has(track.id));
   return [...heard, ...rest];
-}
-
-function mergeById<T extends { id: string }>(a: T[], b: T[]): T[] {
-  const map = new Map<string, T>();
-  for (const item of [...a, ...b]) map.set(item.id, item);
-  return [...map.values()];
 }

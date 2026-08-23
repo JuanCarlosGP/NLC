@@ -9,16 +9,23 @@ export function AlbumRow({
   coverUri,
   subtitle,
   onPress,
+  onLongPress,
 }: {
   album: Album;
   coverUri?: string | null;
   subtitle?: string;
   onPress: () => void;
+  onLongPress?: () => void;
 }) {
   const nasCover = useCoverUrl(coverUri ? null : album.coverId);
   const cover = coverUri ?? nasCover;
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.8 : 1 }]}>
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.8 : 1 }]}
+    >
       <Cover id={album.id} label={album.name} uri={cover} size={56} radius={3} />
       <View style={styles.meta}>
         <Text style={styles.name}>{album.name}</Text>

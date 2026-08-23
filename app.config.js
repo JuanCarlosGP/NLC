@@ -47,8 +47,16 @@ export default {
           recordAudioAndroid: false,
         },
       ],
+      "./plugins/with-media-skip-buttons.js",
       "expo-video",
+      [
+        "expo-screen-orientation",
+        {
+          initialOrientation: "PORTRAIT_UP",
+        },
+      ],
       "./plugins/with-lan-cleartext.js",
+      "expo-sqlite",
     ],
     web: {
       output: "server",

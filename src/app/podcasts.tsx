@@ -5,7 +5,9 @@ import { Mic } from "lucide-react-native";
 import { AlbumRow } from "@/components/library/album-row";
 import { TrackRow } from "@/components/library/track-row";
 import { Screen } from "@/components/ui/screen";
-import { isPodcastAlbum } from "@/lib/nas/webdav";
+import { getAlbum, getAlbums, getTracks } from "@/lib/db/catalog";
+import { nasScanOk } from "@/lib/db/from-source";
+import { albumHref } from "@/lib/library/href";
 import type { Album, Track } from "@/lib/nas/types";
 import { usePlayer } from "@/lib/player/player-context";
 import { useSettings } from "@/lib/settings/settings-context";
@@ -13,7 +15,7 @@ import { colors, fonts, type } from "@/lib/theme";
 
 export default function PodcastsScreen() {
   const router = useRouter();
-  const { source, ready } = useSettings();
+  const { source, ready, settings } = useSettings();
   const { playTracks, current } = usePlayer();
   const [albums, setAlbums] = useState<Album[]>([]);
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -24,12 +26,15 @@ export default function PodcastsScreen() {
     setLoading(true);
     setError(null);
     try {
-      const all = await source.getAlbums();
-      const podcasts = all.filter(isPodcastAlbum);
+      const offlineOnly = !(await nasScanOk(source));
+      const podcasts = await getAlbums({ home: "podcast", offlineOnly });
       setAlbums(podcasts);
       if (podcasts.length === 1) {
-        const detail = await source.getAlbum(podcasts[0]!.id);
-        setTracks(detail.tracks);
+        const detail = await getAlbum(podcasts[0]!.id, offlineOnly);
+        setTracks(detail?.tracks ?? []);
+      } else if (!podcasts.length) {
+        // yt-dlp dumps land as one file per album (podcast_episode), not as shows.
+        setTracks(await getTracks({ kind: "podcast", offlineOnly }));
       } else {
         setTracks([]);
       }
@@ -68,15 +73,16 @@ export default function PodcastsScreen() {
             ? "Cargando…"
             : episodeCount
               ? `${episodeCount} episodios`
-              : "Aún no hay episodios en Music/Podcasts"}
+              : `Aún no hay episodios en ${settings.podcastSharePath || "Music/Podcasts"}`}
         </Text>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      {!loading && !albums.length ? (
+      {!loading && !albums.length && !tracks.length ? (
         <Text style={type.body}>
-          Descarga un episodio en Ajustes → Podcasts (yt-dlp). Quedará en Music/Podcasts.
+          Descarga un episodio en Ajustes → Descargar. Quedará en{" "}
+          {settings.podcastSharePath || "Music/Podcasts"}.
         </Text>
       ) : null}
 
@@ -112,7 +118,7 @@ export default function PodcastsScreen() {
             key={album.id}
             album={album}
             subtitle="Podcast"
-            onPress={() => router.push(`/album/${album.id}`)}
+            onPress={() => router.push(albumHref(album.id))}
           />
         ))
       )}

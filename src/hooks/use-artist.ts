@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { getAlbums, getArtists } from "@/lib/db/catalog";
+import { nasScanOk } from "@/lib/db/from-source";
 import type { Album, Artist } from "@/lib/nas/types";
 import { useSettings } from "@/lib/settings/settings-context";
 
@@ -14,7 +16,11 @@ export function useArtist(id: string | undefined) {
     setLoading(true);
     setError(null);
     try {
-      const [artists, allAlbums] = await Promise.all([source.getArtists(), source.getAlbums()]);
+      const offlineOnly = !(await nasScanOk(source));
+      const [artists, allAlbums] = await Promise.all([
+        getArtists({ offlineOnly }),
+        getAlbums({ offlineOnly }),
+      ]);
       setArtist(artists.find((item) => item.id === id) ?? null);
       setAlbums(allAlbums.filter((item) => item.artistId === id));
     } catch (err) {

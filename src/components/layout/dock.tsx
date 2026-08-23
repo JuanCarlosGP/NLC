@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Home, Library, Search, Settings } from "lucide-react-native";
+import { Home, Library, MessageCircle, Search, Settings } from "lucide-react-native";
+import { useCursor } from "@/hooks/use-cursor";
 import { DOCK_HEIGHT, DOCK_MARGIN, useDock } from "@/lib/dock-context";
 import { webInteractiveStyle } from "@/lib/interactive";
 import { usePlayerUi } from "@/lib/player/player-ui-context";
@@ -56,6 +57,7 @@ function DockButton({
 function DockIcons() {
   const router = useRouter();
   const pathname = usePathname();
+  const { chatOpen, setChatOpen } = useCursor();
   const homeActive = isHomeRoute(pathname);
   const libraryActive =
     pathname.startsWith("/library") ||
@@ -88,6 +90,13 @@ function DockIcons() {
         <Search color={searchActive ? colors.ink : colors.muted} size={26} strokeWidth={1.75} />
       </DockButton>
       <DockButton
+        active={chatOpen}
+        label="Mensajes"
+        onPress={() => setChatOpen(true)}
+      >
+        <MessageCircle color={chatOpen ? colors.ink : colors.muted} size={26} strokeWidth={1.75} />
+      </DockButton>
+      <DockButton
         active={libraryActive}
         label="Biblioteca"
         onPress={() => {
@@ -118,7 +127,7 @@ function glassChrome() {
         WebkitBackdropFilter: "blur(14px)",
         boxShadow: "0 12px 40px rgba(0,0,0,0.45)",
       } as object)
-    : { elevation: 10 };
+    : { elevation: 24 };
 }
 
 export function Dock() {
@@ -183,21 +192,22 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: "center",
     zIndex: 40,
+    elevation: 24,
     paddingHorizontal: 20,
   },
   pill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 8,
     minHeight: DOCK_HEIGHT,
   },
   button: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     borderRadius: 999,
     borderWidth: 1,
     alignItems: "center",

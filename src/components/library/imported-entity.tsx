@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { runOnJS, useSharedValue } from "react-native-reanimated";
 import {
   ArrowDownCircle,
   CircleCheck,
@@ -7,14 +10,17 @@ import {
   Globe,
   Pause,
   Play,
+  Search,
   Shuffle,
   Trash2,
+  X,
 } from "lucide-react-native";
+import { SortablePlaylistTracks } from "@/components/library/sortable-playlist-tracks";
 import { Cover } from "@/components/ui/cover";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TintWash } from "@/components/ui/tint-wash";
+import { mergeDockOnScroll, useDock } from "@/lib/dock-context";
 import { useDownloadSettings } from "@/hooks/use-download-settings";
-import { useFavorites } from "@/lib/favorites/favorites-context";
 import { usePlayer } from "@/lib/player/player-context";
 import {
   downloadSearchQuery,
@@ -24,8 +30,9 @@ import {
 } from "@/lib/podcasts/downloader";
 import { matchedNasTracks } from "@/lib/spotify/match";
 import { useSpotify } from "@/lib/spotify/spotify-context";
-import { formatDurationMs, formatPlaylistDuration } from "@/lib/spotify/txt";
-import type { ImportedPlaylist, ImportedTrack } from "@/lib/spotify/types";
+import { formatPlaylistDuration } from "@/lib/spotify/txt";
+import type { ImportedPlaylist } from "@/lib/spotify/types";
+import { usePlaylistActions } from "@/lib/spotify/playlist-actions-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, coverTint, fonts, layout } from "@/lib/theme";
 
@@ -38,14 +45,36 @@ export function ImportedEntityView({
   onToggleLiked,
 }: {
   playlist: ImportedPlaylist;
-  onDelete?: () => void;
+  onDelete?: () => void | Promise<void>;
   onToggleLiked?: () => void;
 }) {
   const { playTracks, current, playing, togglePlay, shuffle, toggleShuffle } = usePlayer();
   const { settings, token, ready: downloadReady } = useDownloadSettings();
-  const { rematchPlaylist } = useSpotify();
+  const { rematchPlaylist, reorderPlaylistTracks } = useSpotify();
+  const { openPlaylistActions } = usePlaylistActions();
+  const dock = useDock();
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useSharedValue(0);
+  const viewportTop = useSharedValue(0);
+  const viewportHeight = useSharedValue(0);
+  const maxScroll = useSharedValue(0);
+  const [dragging, setDragging] = useState(false);
+  const scrollNative = useMemo(() => Gesture.Native(), []);
   const [visible, setVisible] = useState(PAGE);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<TextInput>(null);
+  const focusSearch = () => searchRef.current?.focus();
+  const searchTap = useMemo(
+    () =>
+      Gesture.Tap().onEnd(() => {
+        runOnJS(focusSearch)();
+      }),
+    [],
+  );
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [confirmSuccess, setConfirmSuccess] = useState(false);
   const [fetching, setFetching] = useState(false);
@@ -74,16 +103,18 @@ export function ImportedEntityView({
   }, [playlist.tracks]);
   const rematchTried = useRef<string | null>(null);
 
+  const local = playlist.kind === "local";
+
   // Re-link after NAS downloads / previous broken matches.
   useEffect(() => {
-    if (!missing.length) {
+    if (local || !missing.length) {
       rematchTried.current = null;
       return;
     }
     if (rematchTried.current === playlist.id) return;
     rematchTried.current = playlist.id;
     void rematchPlaylist(playlist.id);
-  }, [missing.length, playlist.id, rematchPlaylist]);
+  }, [local, missing.length, playlist.id, rematchPlaylist]);
   const liked = Boolean(playlist.liked);
   const totalMs = useMemo(
     () => playlist.tracks.reduce((sum, track) => sum + (track.durationMs || 0), 0),
@@ -191,14 +222,99 @@ export function ImportedEntityView({
     })();
   }
 
-  return (
-    <View style={styles.wrap}>
-      <TintWash id={playlist.id} from={tint} to={colors.void} style={styles.wash} />
+  const searching = Boolean(query.trim());
+  const filtered = useMemo(() => {
+    const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!tokens.length) return playlist.tracks;
+    return playlist.tracks.filter((track) => {
+      const blob = `${track.title} ${track.artistName} ${track.albumName}`.toLowerCase();
+      return tokens.every((token) => blob.includes(token));
+    });
+  }, [playlist.tracks, query]);
+  const shown = searching ? filtered : filtered.slice(0, visible);
 
+  function commitReorder(from: number, to: number) {
+    if (searching || from === to) return;
+    const nextShown = [...shown];
+    const [moved] = nextShown.splice(from, 1);
+    if (!moved) return;
+    nextShown.splice(to, 0, moved);
+    void reorderPlaylistTracks(playlist.id, [...nextShown, ...playlist.tracks.slice(visible)]);
+  }
+
+  return (
+    <View style={styles.page}>
+    <TintWash
+      id={playlist.id}
+      from={tint}
+      to={colors.void}
+      style={[styles.wash, { height: insets.top + 560 }]}
+    />
+    <GestureDetector gesture={scrollNative}>
+    <Animated.ScrollView
+      ref={scrollRef}
+      style={styles.page}
+      contentContainerStyle={[styles.pageContent, { paddingTop: insets.top + 8 }]}
+      scrollEnabled={!dragging}
+      keyboardShouldPersistTaps="always"
+      scrollEventThrottle={16}
+      showsVerticalScrollIndicator={false}
+      onScroll={mergeDockOnScroll(dock, (event) => {
+        scrollY.value = event.nativeEvent.contentOffset.y;
+      })}
+      onLayout={(event) => {
+        viewportHeight.value = event.nativeEvent.layout.height;
+        scrollRef.current?.measureInWindow((_x, y) => {
+          viewportTop.value = y;
+        });
+      }}
+      onContentSizeChange={(_w, height) => {
+        maxScroll.value = Math.max(0, height - viewportHeight.value);
+      }}
+    >
+    <View style={styles.wrap}>
+      <GestureDetector gesture={searchTap}>
+      <Pressable
+        accessibilityRole="search"
+        accessibilityLabel="Buscar canciones"
+        onPress={focusSearch}
+        style={styles.searchBox}
+      >
+        <Search size={16} color={colors.muted} strokeWidth={2} />
+        <TextInput
+          ref={searchRef}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Buscar canciones"
+          placeholderTextColor={colors.muted}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+          showSoftInputOnFocus
+          style={styles.searchInput}
+        />
+        {searching ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Borrar búsqueda"
+            hitSlop={8}
+            onPress={() => setQuery("")}
+          >
+            <X size={16} color={colors.inkSoft} strokeWidth={2} />
+          </Pressable>
+        ) : null}
+      </Pressable>
+      </GestureDetector>
       <View style={styles.coverWrap}>
-        <View style={styles.coverShadow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Opciones de la playlist"
+          delayLongPress={350}
+          onLongPress={() => openPlaylistActions(playlist)}
+          style={styles.coverShadow}
+        >
           <Cover id={playlist.id} label={playlist.name} uri={playlist.coverUrl} size={COVER} radius={6} />
-        </View>
+        </Pressable>
       </View>
 
       <Text style={styles.name}>{playlist.name}</Text>
@@ -209,7 +325,7 @@ export function ImportedEntityView({
           {[
             formatPlaylistDuration(totalMs),
             `${playlist.tracks.length} temas`,
-            `${playable.length} en NAS`,
+            local ? "NAS" : `${playable.length} en NAS`,
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -218,7 +334,6 @@ export function ImportedEntityView({
 
       <View style={styles.actionBar}>
         <View style={styles.actionLeft}>
-          <Cover id={`${playlist.id}-mini`} label={playlist.name} uri={playlist.coverUrl} size={28} radius={3} />
           <IconButton label={nasLabel} disabled={fetching} onPress={onNasPress}>
             {!missing.length && playable.length ? (
               <CircleCheck size={24} color={colors.ok} strokeWidth={1.75} />
@@ -238,7 +353,10 @@ export function ImportedEntityView({
             />
           </IconButton>
           {onDelete ? (
-            <IconButton label="Quitar playlist" onPress={onDelete}>
+            <IconButton
+              label="Quitar playlist"
+              onPress={() => setConfirmRemove(true)}
+            >
               <Trash2 size={20} color={colors.danger} strokeWidth={1.75} />
             </IconButton>
           ) : null}
@@ -270,29 +388,38 @@ export function ImportedEntityView({
 
       {fetchNote ? <Text style={styles.fetchNote}>{fetchNote}</Text> : null}
 
-      {playlist.tracks.slice(0, visible).map((track) => {
-        const local = track.matched;
-        return (
-          <PlaylistTrackRow
-            key={track.spotifyId}
-            track={track}
-            playlistCover={playlist.kind === "album" ? null : playlist.coverUrl}
-            active={current?.id === local?.id}
-            onPress={() => {
-              if (!local) return;
-              void playTracks(
-                playable,
-                Math.max(
-                  0,
-                  playable.findIndex((item) => item.id === local.id),
-                ),
-              );
-            }}
-          />
-        );
-      })}
+      {searching && !filtered.length ? (
+        <Text style={styles.fetchNote}>Nada en esta playlist para «{query.trim()}».</Text>
+      ) : null}
 
-      {visible < playlist.tracks.length ? (
+      <SortablePlaylistTracks
+        tracks={shown}
+        playlistId={playlist.id}
+        playlistCover={playlist.kind === "album" ? null : playlist.coverUrl}
+        currentId={current?.id}
+        scrollRef={scrollRef}
+        scrollY={scrollY}
+        viewportTop={viewportTop}
+        viewportHeight={viewportHeight}
+        maxScroll={maxScroll}
+        sortable={!searching}
+        onDragActiveChange={setDragging}
+        onPlay={(track) => {
+          const local = track.matched;
+          if (!local) return;
+          void playTracks(
+            playable,
+            Math.max(
+              0,
+              playable.findIndex((item) => item.id === local.id),
+            ),
+          );
+        }}
+        scrollNative={scrollNative}
+        onReorder={commitReorder}
+      />
+
+      {!searching && visible < playlist.tracks.length ? (
         <Pressable
           onPress={() => setVisible((count) => count + PAGE)}
           style={({ pressed }) => [styles.more, { opacity: pressed ? 0.8 : 1 }]}
@@ -300,6 +427,27 @@ export function ImportedEntityView({
           <Text style={styles.moreText}>Mostrar más ({playlist.tracks.length - visible} restantes)</Text>
         </Pressable>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Eliminar playlist"
+        message={`Se quitará «${playlist.name}» de la biblioteca. Los archivos del NAS no se borran.`}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        destructive
+        busy={removing}
+        onCancel={() => {
+          if (!removing) setConfirmRemove(false);
+        }}
+        onConfirm={() => {
+          if (!onDelete || removing) return;
+          setRemoving(true);
+          void Promise.resolve(onDelete()).finally(() => {
+            setRemoving(false);
+            setConfirmRemove(false);
+          });
+        }}
+      />
 
       <ConfirmDialog
         open={confirmOpen}
@@ -335,64 +483,9 @@ export function ImportedEntityView({
         onConfirm={() => setInfoOpen(false)}
       />
     </View>
-  );
-}
-
-function PlaylistTrackRow({
-  track,
-  playlistCover,
-  active,
-  onPress,
-}: {
-  track: ImportedTrack;
-  playlistCover: string | null;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const { isFavorite, toggleFavorite } = useFavorites();
-  const local = track.matched;
-  const liked = local ? isFavorite(local.id) : false;
-  const coverUri = playlistCover && track.coverUrl === playlistCover ? null : track.coverUrl;
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={!local}
-      style={({ pressed }) => [styles.row, { opacity: pressed && local ? 0.82 : local ? 1 : 0.55 }]}
-    >
-      <View style={styles.thumb}>
-        <Cover id={track.spotifyId} label={track.title} uri={coverUri} size={48} radius={4} />
-      </View>
-      <View style={styles.rowMeta}>
-        <Text numberOfLines={1} style={[styles.title, active && styles.active]}>
-          {track.title}
-        </Text>
-        <View style={styles.subRow}>
-          {local ? <CircleCheck size={13} color={colors.void} fill={colors.ok} strokeWidth={2.4} /> : null}
-          <Text numberOfLines={1} style={styles.sub}>
-            {track.artistName}
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.duration}>{formatDurationMs(track.durationMs)}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={liked ? "Quitar de favoritos" : "Añadir a favoritos"}
-        disabled={!local}
-        hitSlop={10}
-        onPress={() => {
-          if (!local) return;
-          triggerUiHaptic();
-          void toggleFavorite(local);
-        }}
-        style={[styles.heart, { opacity: local ? 1 : 0.35 }]}
-      >
-        <Heart
-          color={liked ? colors.accent : colors.muted}
-          fill={liked ? colors.accent : "transparent"}
-          size={16}
-        />
-      </Pressable>
-    </Pressable>
+    </Animated.ScrollView>
+    </GestureDetector>
+    </View>
   );
 }
 
@@ -425,13 +518,49 @@ function IconButton({
 }
 
 const styles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: "transparent" },
+  pageContent: { flexGrow: 1, paddingBottom: 8, paddingHorizontal: layout.screenPad },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderColor: colors.rule,
+    backgroundColor: colors.sheet,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    ...Platform.select({
+      web: { boxShadow: "0 10px 28px rgba(0,0,0,0.35)" } as object,
+      ios: {
+        shadowColor: "#000",
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 6 },
+      },
+      android: { elevation: 8 },
+      default: {},
+    }),
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.ink,
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    padding: 0,
+    ...Platform.select({
+      web: { outlineStyle: "none" } as object,
+      default: {},
+    }),
+  },
   wrap: { gap: 10, position: "relative" },
   wash: {
     position: "absolute",
-    top: -24,
-    left: -layout.screenPad,
-    right: -layout.screenPad,
-    height: 520,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 560,
+    zIndex: 0,
   },
   coverWrap: { alignItems: "center", paddingTop: 22, paddingBottom: 10 },
   coverShadow: {
@@ -487,31 +616,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   playIcon: { marginLeft: 3 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 8,
-  },
-  thumb: { width: 48, height: 48 },
-  rowMeta: { flex: 1, gap: 3 },
-  title: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-  active: { color: colors.accent },
-  subRow: { flexDirection: "row", alignItems: "center", gap: 3 },
-  sub: { flex: 1, fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
-  duration: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.muted,
-    minWidth: 36,
-    textAlign: "right",
-  },
-  heart: {
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   more: {
     alignItems: "center",
     paddingVertical: 12,

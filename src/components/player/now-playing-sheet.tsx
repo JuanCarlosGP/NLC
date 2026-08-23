@@ -11,6 +11,7 @@ import { useTrackArtwork } from "@/hooks/use-cover-url";
 import { useNowPlaying } from "@/hooks/use-now-playing";
 import { useFavorites } from "@/lib/favorites/favorites-context";
 import { clearLibraryCache, removeRecent } from "@/lib/library/cache";
+import { useDock } from "@/lib/dock-context";
 import { usePlayerUi } from "@/lib/player/player-ui-context";
 import { useSettings } from "@/lib/settings/settings-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -18,11 +19,15 @@ import { colors, fonts, type } from "@/lib/theme";
 
 export function NowPlayingSheet() {
   const { nowPlayingOpen, setNowPlayingOpen } = usePlayerUi();
+  const dock = useDock();
 
   return (
     <BottomSheet
       open={nowPlayingOpen}
-      onOpenChange={setNowPlayingOpen}
+      onOpenChange={(open) => {
+        setNowPlayingOpen(open);
+        if (!open) dock?.reveal();
+      }}
       accessibilityCloseLabel="Cerrar reproductor"
       viewportRatio={0.88}
     >
@@ -71,7 +76,7 @@ function NowPlayingBody() {
     const willEmpty = queue.every((track) => track.id === trackId);
     try {
       await source.deleteTrack(trackId);
-      await Promise.all([removeFavorite(trackId), removeRecent(trackId), clearLibraryCache()]);
+      await Promise.all([removeFavorite(trackId), removeRecent(trackId), clearLibraryCache(trackId)]);
       setConfirmOpen(false);
       await removeTrackFromQueue(trackId);
       setFeedback("Eliminado.");
@@ -80,7 +85,7 @@ function NowPlayingBody() {
       // File already missing: still purge local lists.
       const message = err instanceof Error ? err.message : "";
       if (/ya no existe|not found|404/i.test(message)) {
-        await Promise.all([removeFavorite(trackId), removeRecent(trackId), clearLibraryCache()]);
+        await Promise.all([removeFavorite(trackId), removeRecent(trackId), clearLibraryCache(trackId)]);
         setConfirmOpen(false);
         await removeTrackFromQueue(trackId);
         setFeedback("Quitado (ya no estaba en el NAS).");

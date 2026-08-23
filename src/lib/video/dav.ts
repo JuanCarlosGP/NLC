@@ -1,12 +1,13 @@
 import { Platform } from "react-native";
 import type { NasSettings } from "@/lib/settings/storage";
-import { nasBaseUrl } from "@/lib/settings/storage";
+import { nasBaseUrl, videoSourceSettings } from "@/lib/settings/storage";
 import type { PlayableSource } from "@/lib/nas/types";
 import {
   PROPFIND_BODY,
   basicAuthHeader,
   parseHtmlIndex,
   parsePropfind,
+  toWebDavPath,
   type WebDavEntry,
 } from "@/lib/nas/webdav";
 
@@ -42,10 +43,11 @@ function webNasUri(nasUrl: string): string {
 }
 
 export function createVideoDavClient(settings: NasSettings, password: string) {
-  const auth = basicAuthHeader(settings.username.trim(), password);
+  const conn = videoSourceSettings(settings);
+  const auth = basicAuthHeader(conn.username.trim(), password);
 
   function absolute(path: string): string {
-    return `${nasBaseUrl(settings)}${encodeDavPath(path)}`;
+    return `${nasBaseUrl(conn)}${encodeDavPath(toWebDavPath(path) || path)}`;
   }
 
   async function davFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -65,7 +67,8 @@ export function createVideoDavClient(settings: NasSettings, password: string) {
   }
 
   async function listDir(path: string): Promise<WebDavEntry[]> {
-    const dirPath = path.endsWith("/") ? path : `${path}/`;
+    const davPath = toWebDavPath(path) || path;
+    const dirPath = davPath.endsWith("/") ? davPath : `${davPath}/`;
     if (Platform.OS !== "web") {
       try {
         const propfind = await davFetch(dirPath, {
@@ -79,7 +82,7 @@ export function createVideoDavClient(settings: NasSettings, password: string) {
         if (propfind.ok) {
           const entries = parsePropfind(await propfind.text()).filter((entry) => {
             const normalized = entry.path.replace(/\/+$/, "") || "/";
-            const self = path.replace(/\/+$/, "") || "/";
+            const self = davPath.replace(/\/+$/, "") || "/";
             return normalized !== self;
           });
           if (entries.length) return entries;
@@ -95,12 +98,12 @@ export function createVideoDavClient(settings: NasSettings, password: string) {
     if (!listed.ok) {
       if (listed.status === 404) {
         throw new Error(
-          `No se encuentra «${path.replace(/\/+$/, "") || "/"}» en el NAS. Comprueba que el share /Popcorn esté accesible por WebDAV.`,
+          `No se encuentra «${path.replace(/\/+$/, "") || "/"}» en el NAS. Comprueba la carpeta de vídeo en Ajustes.`,
         );
       }
       throw new Error(`El NAS respondió HTTP ${listed.status}.`);
     }
-    return parseHtmlIndex(listedBody, path.replace(/\/+$/, "") || "/");
+    return parseHtmlIndex(listedBody, davPath.replace(/\/+$/, "") || "/");
   }
 
   function playable(path: string): PlayableSource {

@@ -1,6 +1,8 @@
 import type { Track } from "@/lib/nas/types";
 import type { SpotifyEntityKind } from "@/lib/spotify/parse-url";
 
+export type PlaylistKind = SpotifyEntityKind | "local";
+
 export type ImportedTrack = {
   spotifyId: string;
   title: string;
@@ -13,7 +15,7 @@ export type ImportedTrack = {
 
 export type ImportedPlaylist = {
   id: string;
-  kind: SpotifyEntityKind;
+  kind: PlaylistKind;
   name: string;
   ownerName: string;
   coverUrl: string | null;

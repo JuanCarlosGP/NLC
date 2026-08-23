@@ -18,7 +18,7 @@ type SettingsContextValue = {
   source: MusicSource;
   setSettings: (next: NasSettings) => void;
   setPassword: (next: string) => void;
-  persist: () => Promise<void>;
+  persist: (next?: NasSettings) => Promise<void>;
   reloadSource: () => void;
 };
 
@@ -49,10 +49,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [ready, settings, password, sourceKey],
   );
 
-  const persist = useCallback(async () => {
-    await Promise.all([saveNasSettings(settings), saveNasPassword(password)]);
-    setSourceKey((value) => value + 1);
-  }, [settings, password]);
+  const persist = useCallback(
+    async (next?: NasSettings) => {
+      if (next) setSettings(next);
+      await Promise.all([saveNasSettings(next ?? settings), saveNasPassword(password)]);
+      setSourceKey((value) => value + 1);
+    },
+    [settings, password],
+  );
 
   const reloadSource = useCallback(() => {
     setSourceKey((value) => value + 1);

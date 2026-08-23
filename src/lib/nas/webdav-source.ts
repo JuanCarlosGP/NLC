@@ -11,18 +11,27 @@ import type {
   SearchResults,
   Track,
 } from "@/lib/nas/types";
+import { replaceLibrary } from "@/lib/db/catalog";
 import {
   PROPFIND_BODY,
   basicAuthHeader,
   buildIndex,
   isAudioFile,
   isCoverFile,
-  normalizeSharePath,
+  isImageFile,
+  isPathInside,
+  isPodcastAlbum,
+  isPodcastTrack,
+  sidecarCoverPath,
+  sidecarKeys,
+  toWebDavPath,
   parseHtmlIndex,
   parsePropfind,
+  setPodcastRootHint,
   type WebDavEntry,
   type WebDavIndex,
 } from "@/lib/nas/webdav";
+import { requestOfflineSync } from "@/lib/offline/downloader";
 
 const WEB_NAS_GET = ["/api/nas-files", "/api/spotify-embed"];
 const WEB_NAS_POST = ["/api/nas-files", "/api/spotify-embed"];
@@ -73,6 +82,45 @@ function webNasUri(nasUrl: string, extra?: Record<string, string>): string {
   return `/api/spotify-embed?${qs.toString()}`;
 }
 
+const nativeCoverCache = new Map<string, string>();
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  if (typeof btoa === "function") return btoa(binary);
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 3) {
+    const a = bytes[i] ?? 0;
+    const b = bytes[i + 1] ?? 0;
+    const c = bytes[i + 2] ?? 0;
+    const n = (a << 16) | (b << 8) | c;
+    out += chars[(n >> 18) & 63];
+    out += chars[(n >> 12) & 63];
+    out += i + 1 < bytes.length ? chars[(n >> 6) & 63] : "=";
+    out += i + 2 < bytes.length ? chars[n & 63] : "=";
+  }
+  return out;
+}
+
+async function nativeCoverDataUri(nasUrl: string, auth: string): Promise<string | null> {
+  const cached = nativeCoverCache.get(nasUrl);
+  if (cached) return cached;
+  const response = await fetch(nasUrl, { headers: { Authorization: auth } });
+  if (!response.ok) return null;
+  const bytes = await response.arrayBuffer();
+  if (!bytes.byteLength) return null;
+  const type = (response.headers.get("content-type") ?? "image/jpeg").split(";")[0]!.trim();
+  if (!type.startsWith("image/")) return null;
+  const uri = `data:${type};base64,${arrayBufferToBase64(bytes)}`;
+  nativeCoverCache.set(nasUrl, uri);
+  return uri;
+}
+
 function isLanHttpUrl(raw: string): boolean {
   try {
     const url = new URL(raw);
@@ -96,11 +144,11 @@ function encodeDavPath(path: string): string {
 }
 
 function createDavTransport(settings: NasSettings, password: string) {
-  const rootPath = normalizeSharePath(settings.sharePath || "/Music");
+  const rootPath = toWebDavPath(settings.sharePath);
   const auth = basicAuthHeader(settings.username.trim(), password);
 
   function absolute(path: string): string {
-    return `${nasBaseUrl(settings)}${encodeDavPath(path)}`;
+    return `${nasBaseUrl(settings)}${encodeDavPath(toWebDavPath(path) || path)}`;
   }
 
   async function davFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -124,7 +172,7 @@ function createDavTransport(settings: NasSettings, password: string) {
 
 export async function probeWebDav(settings: NasSettings, password: string): Promise<boolean> {
   try {
-    if (!settings.host.trim() || !settings.username.trim() || !password) return false;
+    if (!settings.host.trim() || !settings.username.trim() || !settings.sharePath.trim() || !password) return false;
     if (!isLanHttpUrl(nasBaseUrl(settings))) return false;
     const { rootPath, davFetch } = createDavTransport(settings, password);
     const listed = await davFetch(rootPath.endsWith("/") ? rootPath : `${rootPath}/`);
@@ -132,6 +180,47 @@ export async function probeWebDav(settings: NasSettings, password: string): Prom
   } catch {
     return false;
   }
+}
+
+function throwIfDavWriteFailed(response: Response, body: string, action: string): void {
+  let proxyError = "";
+  try {
+    const parsed = JSON.parse(body) as { error?: string };
+    if (parsed.error) proxyError = parsed.error;
+  } catch {
+    // HTML or empty WebDAV body.
+  }
+  if (response.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+  if (response.status === 403) {
+    throw new Error(
+      "El usuario no tiene permiso de escritura en esa carpeta. Revisa la ruta y los permisos del usuario.",
+    );
+  }
+  if (response.status === 404) throw new Error("No existe la carpeta de la compartición. Revisa la ruta.");
+  if (response.status === 405) {
+    throw new Error(`El NAS no permite ${action} por WebDAV con esta cuenta.`);
+  }
+  if (!response.ok && response.status !== 201 && response.status !== 204) {
+    throw new Error(proxyError || `El NAS respondió HTTP ${response.status} al ${action}.`);
+  }
+}
+
+export async function getWebDavText(
+  settings: NasSettings,
+  password: string,
+  path: string,
+): Promise<string> {
+  const { davFetch } = createDavTransport(settings, password);
+  const response = await davFetch(path, { method: "GET" });
+  const body = await response.text();
+  if (response.status === 404) {
+    throw new Error("No hay configuración guardada en la carpeta.");
+  }
+  if (response.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+  if (!response.ok) {
+    throw new Error(`El NAS respondió HTTP ${response.status} al leer el archivo.`);
+  }
+  return body;
 }
 
 export async function putWebDavText(
@@ -150,26 +239,27 @@ export async function putWebDavText(
     body: text,
   });
   const body = await response.text();
-  let proxyError = "";
-  try {
-    const parsed = JSON.parse(body) as { error?: string };
-    if (parsed.error) proxyError = parsed.error;
-  } catch {
-    // HTML or empty WebDAV body.
-  }
-  if (response.status === 401) throw new Error("Usuario o contraseña incorrectos.");
-  if (response.status === 403) {
-    throw new Error(
-      "El usuario no tiene permiso de escritura en esa carpeta. En el NAS, dale a Viewer permiso de escritura sobre /Music.",
-    );
-  }
-  if (response.status === 404) throw new Error("No existe la carpeta de la compartición. Revisa la ruta.");
-  if (response.status === 405) {
-    throw new Error("El NAS no permite crear archivos por WebDAV con esta cuenta.");
-  }
-  if (!response.ok) {
-    throw new Error(proxyError || `El NAS respondió HTTP ${response.status} al guardar el archivo.`);
-  }
+  throwIfDavWriteFailed(response, body, "guardar el archivo");
+}
+
+export async function putWebDavBytes(
+  settings: NasSettings,
+  password: string,
+  path: string,
+  bytes: ArrayBuffer,
+  contentType: string,
+): Promise<void> {
+  const { davFetch } = createDavTransport(settings, password);
+  const response = await davFetch(path, {
+    method: "PUT",
+    headers: {
+      "Content-Type": contentType || "image/jpeg",
+      Overwrite: "T",
+    },
+    body: bytes as unknown as BodyInit,
+  });
+  const body = await response.text();
+  throwIfDavWriteFailed(response, body, "guardar la carátula");
 }
 
 export async function deleteWebDavFile(
@@ -190,7 +280,7 @@ export async function deleteWebDavFile(
   if (response.status === 401) throw new Error("Usuario o contraseña incorrectos.");
   if (response.status === 403) {
     throw new Error(
-      "El usuario no tiene permiso de escritura en esa carpeta. En el NAS, dale a Viewer permiso de escritura sobre /Music.",
+      "El usuario no tiene permiso de escritura en esa carpeta. Revisa la ruta y los permisos del usuario.",
     );
   }
   // Already gone — treat as success so the app can purge recents/favorites.
@@ -204,8 +294,28 @@ export async function deleteWebDavFile(
   }
 }
 
+export async function moveWebDavPath(
+  settings: NasSettings,
+  password: string,
+  from: string,
+  to: string,
+): Promise<void> {
+  const { davFetch, absolute } = createDavTransport(settings, password);
+  const response = await davFetch(from, {
+    method: "MOVE",
+    headers: {
+      Destination: absolute(to),
+      Overwrite: "F",
+    },
+  });
+  const body = await response.text();
+  throwIfDavWriteFailed(response, body, "renombrar");
+}
+
 export function createWebDavSource(settings: NasSettings, password: string): MusicSource {
   const { rootPath, auth, absolute, davFetch } = createDavTransport(settings, password);
+  const podcastRoot = toWebDavPath(settings.podcastSharePath);
+  setPodcastRootHint(podcastRoot);
   let index: WebDavIndex | null = null;
   let scanPromise: Promise<WebDavIndex> | null = null;
 
@@ -222,7 +332,8 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
   }
 
   async function listDir(path: string): Promise<WebDavEntry[]> {
-    const dirPath = path.endsWith("/") ? path : `${path}/`;
+    const davPath = toWebDavPath(path) || path;
+    const dirPath = davPath.endsWith("/") ? davPath : `${davPath}/`;
     if (Platform.OS !== "web") {
       try {
         const propfind = await davFetch(dirPath, {
@@ -236,7 +347,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
         if (propfind.ok) {
           const entries = parsePropfind(await propfind.text()).filter((entry) => {
             const normalized = entry.path.replace(/\/+$/, "") || "/";
-            const self = path.replace(/\/+$/, "") || "/";
+            const self = davPath.replace(/\/+$/, "") || "/";
             return normalized !== self;
           });
           if (entries.length) return entries;
@@ -255,12 +366,12 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
       }
       if (listed.status === 404) {
         throw new Error(
-          `No existe «${path.replace(/\/+$/, "") || "/"}» en el servidor. Prueba /Music (el nombre de la compartición, no /volume1/…).`,
+          `No existe «${path.replace(/\/+$/, "") || "/"}» en el servidor. Usa la ruta de File Station, por ejemplo /volume1/Music.`,
         );
       }
       throw new Error(`El NAS respondió HTTP ${listed.status}.`);
     }
-    return parseHtmlIndex(listedBody, path.replace(/\/+$/, "") || "/");
+    return parseHtmlIndex(listedBody, davPath.replace(/\/+$/, "") || "/");
   }
 
   async function scan(): Promise<WebDavIndex> {
@@ -269,7 +380,10 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
     scanPromise = (async () => {
       const files: WebDavEntry[] = [];
       const covers = new Map<string, string>();
+      const sidecars = new Map<string, string>();
+      if (!rootPath) throw new Error("Falta la ruta absoluta de la carpeta de música.");
       const queue = [rootPath];
+      if (podcastRoot && !isPathInside(rootPath, podcastRoot)) queue.push(podcastRoot);
       const seen = new Set<string>();
       let dirs = 0;
 
@@ -296,11 +410,27 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
             if (!covers.has(parent)) covers.set(parent, entry.path);
             continue;
           }
+          if (isImageFile(entry.name)) {
+            for (const key of sidecarKeys(entry.path)) {
+              if (!sidecars.has(key)) sidecars.set(key, entry.path);
+            }
+            continue;
+          }
           if (isAudioFile(entry.name)) files.push(entry);
         }
       }
 
-      const next = buildIndex(rootPath, files, covers);
+      const next = buildIndex(rootPath, files, covers, sidecars, podcastRoot);
+      const sizes = new Map<string, number>();
+      for (const file of files) {
+        if (file.size && file.size > 0) sizes.set(file.path, file.size);
+      }
+      try {
+        await replaceLibrary(next, sizes);
+        requestOfflineSync();
+      } catch (error) {
+        console.warn("No se pudo guardar el catálogo", error);
+      }
       index = next;
       return next;
     })();
@@ -328,6 +458,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
     async ping(): Promise<PingResult> {
       try {
         if (!settings.host.trim()) return { ok: false, message: "Falta la IP del servidor." };
+        if (!rootPath) return { ok: false, message: "Falta la ruta absoluta de la carpeta." };
         if (!settings.username.trim() && !password) {
           return { ok: false, message: "Faltan el usuario y la contraseña." };
         }
@@ -348,9 +479,11 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
         }
         index = null;
         const library = await scan();
+        const musicTracks = library.tracks.filter((track) => !isPodcastTrack(track));
+        const musicAlbums = library.albums.filter((album) => !isPodcastAlbum(album));
         return {
           ok: true,
-          message: `Hay conexión. ${library.tracks.length} canciones en ${library.albums.length} álbumes.`,
+          message: `Hay conexión. ${musicTracks.length} canciones en ${musicAlbums.length} álbumes.`,
           serverName: "Carpeta compartida",
         };
       } catch (error) {
@@ -410,12 +543,9 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
         return webNasUri(nasUrl, { a: token });
       }
       try {
-        const url = new URL(nasUrl);
-        url.username = settings.username.trim();
-        url.password = password;
-        return url.toString();
+        return await nativeCoverDataUri(nasUrl, auth);
       } catch {
-        return nasUrl;
+        return null;
       }
     },
 
@@ -424,6 +554,48 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
       await deleteWebDavFile(settings, password, trackId);
       index = null;
       scanPromise = null;
+    },
+
+    async ensureCoverSidecar(trackId: string, imageUrl: string): Promise<string | null> {
+      if (Platform.OS === "web") return null;
+      if (!trackId.startsWith("/") || !imageUrl.trim()) return null;
+      if (
+        isPodcastTrack({
+          id: trackId,
+          albumId: "",
+          albumName: "",
+          artistName: "",
+        })
+      ) {
+        return null;
+      }
+      const dest = sidecarCoverPath(trackId, "jpg");
+      const existing = await davFetch(dest, { method: "HEAD" });
+      if (existing.ok) return dest;
+      if (existing.status !== 404 && existing.status !== 405) {
+        const probe = await davFetch(dest, { method: "GET" });
+        if (probe.ok) return dest;
+      }
+      const image = await fetch(imageUrl.trim());
+      if (!image.ok) return null;
+      const type = (image.headers.get("content-type") ?? "image/jpeg").split(";")[0]!.trim();
+      if (!type.startsWith("image/")) return null;
+      const bytes = await image.arrayBuffer();
+      if (!bytes.byteLength || bytes.byteLength > 2_500_000) return null;
+      const response = await davFetch(dest, {
+        method: "PUT",
+        headers: {
+          "Content-Type": type.includes("png") ? "image/png" : "image/jpeg",
+          Overwrite: "F",
+        },
+        body: bytes as unknown as BodyInit,
+      });
+      const body = await response.text();
+      if (response.status === 412 || response.status === 409) return dest;
+      throwIfDavWriteFailed(response, body, "guardar la carátula");
+      index = null;
+      scanPromise = null;
+      return dest;
     },
   };
 }

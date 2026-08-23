@@ -133,7 +133,9 @@ export function DownloadSettingsProvider({ children }: { children: ReactNode }) 
               ? " · podcast"
               : current.resolvedKind === "song"
                 ? " · canción"
-                : "";
+                : current.resolvedKind === "video"
+                  ? " · vídeo"
+                  : "";
           setFeedback({ text: `${jobStatusLabel(current.status)}${kindHint}`, color: colors.inkSoft });
         }
 
@@ -143,7 +145,9 @@ export function DownloadSettingsProvider({ children }: { children: ReactNode }) 
               ? "Music/Canciones"
               : current.resolvedKind === "podcast"
                 ? "Music/Podcasts"
-                : "el NAS";
+                : current.resolvedKind === "video"
+                  ? "Popcorn/movies"
+                  : "el NAS";
           setFeedback({
             text: current.filename
               ? `Guardado en ${where}: ${current.filename}. Refresca la biblioteca.`

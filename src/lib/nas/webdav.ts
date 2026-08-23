@@ -5,6 +5,7 @@ export type WebDavEntry = {
   name: string;
   dir: boolean;
   size?: number;
+  uri?: string;
 };
 
 export type WebDavIndex = {
@@ -16,6 +17,7 @@ export type WebDavIndex = {
 };
 
 const AUDIO_EXT = new Set(["mp3", "m4a", "m4b", "flac", "ogg", "opus", "wav", "aac", "wma", "aiff", "aif"]);
+const IMAGE_EXT = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
 const COVER_NAMES = new Set([
   "cover.jpg",
   "cover.jpeg",
@@ -41,10 +43,31 @@ const PROPFIND_BODY = `<?xml version="1.0" encoding="utf-8"?>
 </d:propfind>`;
 
 export function normalizeSharePath(path: string): string {
-  let trimmed = path.trim() || "/Music";
-  trimmed = trimmed.replace(/^\/volume\d+\//i, "/");
+  const trimmed = path.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      return normalizeSharePath(decodeURI(new URL(trimmed).pathname));
+    } catch {
+      // keep the raw value below
+    }
+  }
   const withSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
   return withSlash.replace(/\/+$/, "") || "/";
+}
+
+export function isPathInside(parent: string, child: string): boolean {
+  const a = normalizeSharePath(parent);
+  const b = normalizeSharePath(child);
+  if (!a || !b) return false;
+  return b === a || b.startsWith(`${a}/`);
+}
+
+/** File Station shows /volume1/Music; Synology WebDAV usually serves that share as /Music. */
+export function toWebDavPath(path: string): string {
+  const normalized = normalizeSharePath(path);
+  if (!normalized) return "";
+  return normalized.replace(/^\/volume\d+(?=\/|$)/i, "") || "/";
 }
 
 export function joinPath(base: string, child: string): string {
@@ -72,6 +95,28 @@ export function isAudioFile(name: string): boolean {
 
 export function isCoverFile(name: string): boolean {
   return COVER_NAMES.has(name.toLowerCase());
+}
+
+export function isImageFile(name: string): boolean {
+  return IMAGE_EXT.has(extOf(name));
+}
+
+/** `/Music/Podcasts/foo.mp3` → `/music/podcasts/foo` */
+export function fileStemKey(path: string): string {
+  return path.replace(/\.[^.]+$/, "").toLowerCase();
+}
+
+/** `.../tema.mp3` → `.../tema.jpg` (or png/webp). */
+export function sidecarCoverPath(audioPath: string, ext = "jpg"): string {
+  return `${audioPath.replace(/\.[^.]+$/, "")}.${ext.replace(/^\./, "")}`;
+}
+
+/** yt-dlp may write `foo.jpg` or `foo.mp3.jpg` next to `foo.mp3`. */
+export function sidecarKeys(imagePath: string): string[] {
+  const stem = fileStemKey(imagePath);
+  const keys = [stem];
+  if (AUDIO_EXT.has(extOf(stem))) keys.push(fileStemKey(stem));
+  return keys;
 }
 
 export function parseHtmlIndex(html: string, basePath: string): WebDavEntry[] {
@@ -199,6 +244,12 @@ function parseYear(albumName: string): number | null {
   return year || null;
 }
 
+let podcastRootHint = "";
+
+export function setPodcastRootHint(path: string): void {
+  podcastRootHint = normalizeSharePath(path);
+}
+
 /** Top-level Music/Podcasts/… — not a music artist. */
 export function isPodcastFolderName(name: string): boolean {
   return name.trim().toLowerCase() === "podcasts";
@@ -216,8 +267,14 @@ export function isPodcastArtist(artist: Pick<Artist, "id" | "name">): boolean {
   return isPodcastFolderName(artist.name) || /^artist:podcasts$/i.test(artist.id);
 }
 
-export function isPodcastTrack(track: Pick<Track, "albumId" | "albumName" | "artistName">): boolean {
-  return isPodcastAlbum({ id: track.albumId, name: track.albumName, artistName: track.artistName });
+export function isPodcastTrack(
+  track: Pick<Track, "albumId" | "albumName" | "artistName"> & { id?: string },
+): boolean {
+  return (
+    isPodcastAlbum({ id: track.albumId, name: track.albumName, artistName: track.artistName }) ||
+    /(?:^|\/)podcasts(?:\/|$)/i.test(track.id ?? "") ||
+    Boolean(podcastRootHint && track.id && isPathInside(podcastRootHint, track.id))
+  );
 }
 
 /** Top-level Music/Canciones/… — yt-dlp songs bucket. */
@@ -226,33 +283,40 @@ export function isSongsFolderName(name: string): boolean {
 }
 
 export function isSongsAlbum(album: Pick<Album, "id" | "name" | "artistName">): boolean {
-  const name = album.name.trim().toLowerCase();
-  return (
-    isSongsFolderName(album.artistName) ||
-    isSongsFolderName(album.name) ||
-    name === "singles" ||
-    /(?:^|\/)canciones(?:\/|$)/i.test(album.id) ||
-    /\/singles$/i.test(album.id)
-  );
+  // Only the old synthetic dump bucket. Per-artist albums from Music/Canciones must show in Álbumes.
+  return album.id === "album:canciones" || isSongsFolderName(album.artistName);
+}
+
+/** Music/Canciones grouped per artist — loose files, not a real album. */
+export function isLooseSongsAlbum(album: Pick<Album, "id" | "name" | "artistName" | "trackCount">): boolean {
+  return isSongsAlbum(album) || isSongsFolderName(album.name);
 }
 
 export function isSongsArtist(artist: Pick<Artist, "id" | "name">): boolean {
   return isSongsFolderName(artist.name) || /^artist:canciones$/i.test(artist.id);
 }
 
-export function buildIndex(rootPath: string, files: WebDavEntry[], covers: Map<string, string>): WebDavIndex {
+export function buildIndex(
+  rootPath: string,
+  files: WebDavEntry[],
+  covers: Map<string, string>,
+  sidecars: Map<string, string> = new Map(),
+  podcastRoot = "",
+): WebDavIndex {
   const albumMap = new Map<string, AlbumDetail>();
   const artistMap = new Map<string, Artist>();
   const tracks: Track[] = [];
 
   for (const file of files) {
     if (!isAudioFile(file.name)) continue;
-    const relative = file.path.slice(rootPath.length).replace(/^\/+/, "");
+    const dedicatedPodcast = Boolean(podcastRoot && isPathInside(podcastRoot, file.path));
+    const fileRoot = dedicatedPodcast ? podcastRoot : rootPath;
+    const relative = file.path.slice(fileRoot.length).replace(/^\/+/, "");
     const parts = relative.split("/").filter(Boolean);
     if (!parts.length) continue;
     const filename = parts.at(-1) ?? file.name;
-    const parentDir = file.path.replace(/\/[^/]+$/, "") || rootPath;
-    const podcastTree = isPodcastFolderName(parts[0] ?? "");
+    const parentDir = file.path.replace(/\/[^/]+$/, "") || fileRoot;
+    const podcastTree = dedicatedPodcast || isPodcastFolderName(parts[0] ?? "");
     const songsTree = isSongsFolderName(parts[0] ?? "");
     const parsed = parseTrackName(filename);
     let title = parsed.title;
@@ -262,9 +326,16 @@ export function buildIndex(rootPath: string, files: WebDavEntry[], covers: Map<s
 
     if (podcastTree) {
       artistName = "Podcasts";
-      albumName = parts.length >= 3 ? (parts[1] ?? "Podcasts") : "Podcasts";
+      // Dedicated root Show/ep.mp3, or Music/Podcasts/Show/ep.mp3, or a flat dump of episodes.
+      albumName = dedicatedPodcast
+        ? parts.length >= 2
+          ? (parts[0] ?? "Podcasts")
+          : "Podcasts"
+        : parts.length >= 3
+          ? (parts[1] ?? "Podcasts")
+          : "Podcasts";
     } else if (songsTree) {
-      // Flat Music/Canciones — one bucket, real artist only on the track.
+      // Music/Canciones dump: one álbum per parsed artist so Álbumes/Artistas aren't empty.
       const split = splitArtistTitle(title);
       artistName = split.artist;
       title = split.title;
@@ -277,14 +348,17 @@ export function buildIndex(rootPath: string, files: WebDavEntry[], covers: Map<s
       albumName = parts[0] ?? albumName;
     }
 
-    const artistId = `artist:${artistName}`;
-    const albumId = songsTree ? "album:canciones" : `album:${artistName}/${albumName}`;
-    const albumArtistId = songsTree ? "artist:canciones" : artistId;
-    const albumArtistName = songsTree ? "Canciones" : artistName;
-    const coverPath = covers.get(parentDir) ?? covers.get(`${parentDir}`) ?? null;
+    const artistId = `artist:${artistName.replace(/[\\/]/g, "|")}`;
+    const albumId = `album:${artistName.replace(/[\\/]/g, "|")}::${albumName.replace(/[\\/]/g, "|")}`;
+    const albumArtistId = artistId;
+    const albumArtistName = artistName;
+    const sidecar = sidecars.get(fileStemKey(file.path)) ?? null;
+    const folderCover = covers.get(parentDir) ?? null;
+    const flatDump = (podcastTree && parts.length < 3) || songsTree;
+    // Podcasts/dumps: only the file's own sidecar. Never a shared folder cover.jpg.
+    const coverPath = sidecar ?? (podcastTree || flatDump ? null : folderCover);
 
-    // Don't invent artists/albums for the flat Canciones dump (same idea as podcasts).
-    if (!podcastTree && !songsTree && !artistMap.has(artistId)) {
+    if (!podcastTree && !artistMap.has(artistId)) {
       artistMap.set(artistId, { id: artistId, name: artistName, albumCount: 0, coverId: coverPath });
     }
     let album = albumMap.get(albumId);
@@ -305,7 +379,7 @@ export function buildIndex(rootPath: string, files: WebDavEntry[], covers: Map<s
     }
 
     const item: Track = {
-      id: file.path,
+      id: file.uri ?? file.path,
       title,
       albumId,
       albumName,
@@ -314,7 +388,7 @@ export function buildIndex(rootPath: string, files: WebDavEntry[], covers: Map<s
       durationMs: 0,
       track,
       contentType: mimeFor(filename),
-      coverId: coverPath ?? album.coverId ?? null,
+      coverId: podcastTree ? coverPath : coverPath ?? (flatDump ? null : album.coverId) ?? null,
     };
     album.tracks.push(item);
     album.trackCount = album.tracks.length;

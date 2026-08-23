@@ -23,7 +23,7 @@ const DEFAULT_VIEWPORT_RATIO = 0.75;
 /** Below MiniPlayer (35) and Dock (40) so chrome stays visible/tappable. */
 const OVERLAY_Z_INDEX = 30;
 
-function resolveBottomInset(inset: number): number {
+export function resolveBottomInset(inset: number): number {
   if (inset > 0) return inset;
   return Platform.select({ ios: 34, android: 24, default: 0 }) ?? 0;
 }
@@ -39,6 +39,8 @@ export function BottomSheet({
   accessibilityCloseLabel = "Cerrar",
   sheetBackgroundColor,
   viewportRatio = DEFAULT_VIEWPORT_RATIO,
+  expandable = false,
+  expandedRatio = 0.92,
   presentation = "modal",
   reserveBottom = 0,
 }: {
@@ -48,6 +50,9 @@ export function BottomSheet({
   accessibilityCloseLabel?: string;
   sheetBackgroundColor?: string;
   viewportRatio?: number;
+  /** Swipe up from the collapsed height to grow the sheet. */
+  expandable?: boolean;
+  expandedRatio?: number;
   presentation?: "modal" | "overlay";
   /** Extra space above the bottom edge (e.g. dock + mini player). */
   reserveBottom?: number;
@@ -57,8 +62,10 @@ export function BottomSheet({
   const { height: windowHeight } = useWindowDimensions();
   const layoutHeight =
     Platform.OS === "web" ? windowHeight : Math.max(windowHeight - insets.top, 0);
+  const [expanded, setExpanded] = useState(false);
   const chrome = Math.max(0, reserveBottom);
-  const viewportCap = layoutHeight * viewportRatio;
+  const ratio = expandable && expanded ? expandedRatio : viewportRatio;
+  const viewportCap = layoutHeight * ratio;
   const available = Math.max(layoutHeight - chrome, 200);
   const maxSheetHeight = Math.min(viewportCap, available) + (chrome > 0 ? 0 : bottomInset);
   const slideDistance = maxSheetHeight + 48;
@@ -95,6 +102,13 @@ export function BottomSheet({
     },
     onDismissSettled: () => settleCloseRef.current(),
     enabled: mounted && open,
+    expandEnabled: expandable && !expanded,
+    onExpand: expandable
+      ? () => {
+          triggerUiHaptic();
+          setExpanded(true);
+        }
+      : undefined,
   });
 
   settleCloseRef.current = () => {
@@ -111,6 +125,10 @@ export function BottomSheet({
     });
     return () => sub.remove();
   }, [open, onOpenChange]);
+
+  useEffect(() => {
+    if (open) setExpanded(false);
+  }, [open]);
 
   useLayoutEffect(() => {
     if (!mounted) return;
@@ -134,7 +152,7 @@ export function BottomSheet({
 
   const handle = (
     <View
-      accessibilityLabel="Arrastrar para cerrar"
+      accessibilityLabel={expandable ? "Arrastrar para ampliar o cerrar" : "Arrastrar para cerrar"}
       accessibilityRole="adjustable"
       collapsable={false}
       {...(Platform.OS === "web" ? ({ "data-sheet-drag-handle": "true" } as object) : null)}

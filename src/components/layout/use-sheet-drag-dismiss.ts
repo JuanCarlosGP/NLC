@@ -23,6 +23,10 @@ type SheetDragDismissOptions = {
   closeMs?: number;
   openFadeMs?: number;
   onDismissSettled?: () => void;
+  onExpand?: () => void;
+  expandEnabled?: boolean;
+  expandDistance?: number;
+  expandVelocity?: number;
 };
 
 type DragPointerState = {
@@ -55,8 +59,17 @@ function finishSheetDrag(
   closeMs: SharedValue<number>,
   notifyDismiss: () => void,
   notifySettled: () => void,
+  expandEnabled: SharedValue<number>,
+  expandDistance: SharedValue<number>,
+  expandVelocity: SharedValue<number>,
+  notifyExpand: () => void,
 ) {
   "worklet";
+  if (expandEnabled.value && (dy <= -expandDistance.value || velocityY < -expandVelocity.value)) {
+    dragY.value = withSpring(0, SPRING_BACK);
+    runOnJS(notifyExpand)();
+    return;
+  }
   const fastFling = velocityY > dismissVelocity.value || velocityY > 0.35;
   if (dy <= dismissDistance.value && !fastFling) {
     dragY.value = withSpring(0, SPRING_BACK);
@@ -107,6 +120,10 @@ export function useSheetDragDismiss({
   closeMs = 200,
   openFadeMs = 180,
   onDismissSettled,
+  onExpand,
+  expandEnabled = false,
+  expandDistance = 48,
+  expandVelocity = 0.45,
 }: SheetDragDismissOptions) {
   const slide = useSharedValue(dismissTravel);
   const dragY = useSharedValue(0);
@@ -119,9 +136,13 @@ export function useSheetDragDismiss({
   const dismissVelocitySV = useSharedValue(dismissVelocity);
   const dismissTravelSV = useSharedValue(dismissTravel);
   const closeMsSV = useSharedValue(closeMs);
+  const expandEnabledSV = useSharedValue(expandEnabled ? 1 : 0);
+  const expandDistanceSV = useSharedValue(expandDistance);
+  const expandVelocitySV = useSharedValue(expandVelocity);
 
   const onDismissRef = useRef(onDismiss);
   const onDismissSettledRef = useRef(onDismissSettled);
+  const onExpandRef = useRef(onExpand);
   const closeFinishedRef = useRef<() => void>(() => {});
   const scrollOffsetRef = useRef(0);
   const [scrollLocked, setScrollLocked] = useState(false);
@@ -129,13 +150,18 @@ export function useSheetDragDismiss({
 
   onDismissRef.current = onDismiss;
   onDismissSettledRef.current = onDismissSettled;
+  onExpandRef.current = onExpand;
   dismissDistanceSV.value = dismissDistance;
   dismissVelocitySV.value = dismissVelocity;
   dismissTravelSV.value = dismissTravel;
   closeMsSV.value = closeMs;
+  expandEnabledSV.value = expandEnabled && onExpand ? 1 : 0;
+  expandDistanceSV.value = expandDistance;
+  expandVelocitySV.value = expandVelocity;
 
   const notifyDismiss = useCallback(() => onDismissRef.current(), []);
   const notifySettled = useCallback(() => onDismissSettledRef.current?.(), []);
+  const notifyExpand = useCallback(() => onExpandRef.current?.(), []);
   const notifyCloseFinished = useCallback(() => closeFinishedRef.current(), []);
   const jsLockScroll = useCallback(() => setScrollLocked(true), []);
   const jsUnlockScroll = useCallback(() => setScrollLocked(false), []);
@@ -214,16 +240,24 @@ export function useSheetDragDismiss({
         closeMsSV,
         notifyDismiss,
         notifySettled,
+        expandEnabledSV,
+        expandDistanceSV,
+        expandVelocitySV,
+        notifyExpand,
       );
     },
     [
       closeMsSV,
+      expandDistanceSV,
+      expandEnabledSV,
+      expandVelocitySV,
       dismissDistanceSV,
       dismissTravelSV,
       dismissVelocitySV,
       dragY,
       fade,
       notifyDismiss,
+      notifyExpand,
       notifySettled,
       slide,
     ],
@@ -265,6 +299,10 @@ export function useSheetDragDismiss({
           closeMsSV,
           notifyDismiss,
           notifySettled,
+          expandEnabledSV,
+          expandDistanceSV,
+          expandVelocitySV,
+          notifyExpand,
         );
       });
 
@@ -324,6 +362,10 @@ export function useSheetDragDismiss({
           closeMsSV,
           notifyDismiss,
           notifySettled,
+          expandEnabledSV,
+          expandDistanceSV,
+          expandVelocitySV,
+          notifyExpand,
         );
       });
 
@@ -342,10 +384,14 @@ export function useSheetDragDismiss({
     dismissVelocitySV,
     dragY,
     enabled,
+    expandDistanceSV,
+    expandEnabledSV,
+    expandVelocitySV,
     fade,
     jsLockScroll,
     jsUnlockScroll,
     notifyDismiss,
+    notifyExpand,
     notifySettled,
     scrollY,
     slide,

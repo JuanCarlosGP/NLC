@@ -3,19 +3,24 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { TrackRow } from "@/components/library/track-row";
 import { Cover } from "@/components/ui/cover";
 import { Screen } from "@/components/ui/screen";
+import { artistHref, libraryParamId } from "@/lib/library/href";
 import { useAlbum } from "@/hooks/use-album";
+import { useExitingList } from "@/hooks/use-exiting-list";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import { isPodcastAlbum } from "@/lib/nas/webdav";
 import { usePlayer } from "@/lib/player/player-context";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function AlbumScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
+  const id = libraryParamId(rawId);
   const router = useRouter();
   const { album, loading, error } = useAlbum(id);
   const { playTracks, current } = usePlayer();
-  const cover = useCoverUrl(album?.coverId);
+  const albumTracks = album?.tracks ?? [];
+  const { items: visibleTracks, isExiting } = useExitingList(albumTracks);
   const podcast = album ? isPodcastAlbum(album) : false;
+  const cover = useCoverUrl(album?.coverId);
 
   return (
     <Screen>
@@ -29,7 +34,7 @@ export default function AlbumScreen() {
             {podcast ? (
               <Text style={type.body}>Podcast</Text>
             ) : (
-              <Pressable onPress={() => router.push(`/artist/${album.artistId}`)}>
+              <Pressable onPress={() => router.push(artistHref(album.artistId))}>
                 <Text style={type.body}>{album.artistName}</Text>
               </Pressable>
             )}
@@ -52,13 +57,19 @@ export default function AlbumScreen() {
               <Text style={styles.ghostText}>Aleatorio</Text>
             </Pressable>
           </View>
-          {album.tracks.map((track, index) => (
+          {visibleTracks.map((track, index) => (
             <TrackRow
               key={track.id}
               track={track}
               index={track.track ?? index + 1}
               active={current?.id === track.id}
-              onPress={() => void playTracks(album.tracks, index)}
+              exiting={isExiting(track.id)}
+              onPress={() => {
+                if (isExiting(track.id)) return;
+                const playIndex = album.tracks.findIndex((item) => item.id === track.id);
+                if (playIndex < 0) return;
+                void playTracks(album.tracks, playIndex);
+              }}
             />
           ))}
         </>

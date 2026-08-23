@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { AlbumRow } from "@/components/library/album-row";
 import { Cover } from "@/components/ui/cover";
 import { Screen } from "@/components/ui/screen";
+import { albumHref, libraryParamId } from "@/lib/library/href";
 import { useArtist } from "@/hooks/use-artist";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import { usePlayer } from "@/lib/player/player-context";
@@ -10,7 +11,8 @@ import { useSettings } from "@/lib/settings/settings-context";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function ArtistScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
+  const id = libraryParamId(rawId);
   const router = useRouter();
   const { source } = useSettings();
   const { artist, albums, loading, error, name } = useArtist(id);
@@ -48,9 +50,13 @@ export default function ArtistScreen() {
           <Text style={styles.ghostText}>Álbumes</Text>
         </Pressable>
       </View>
-      {albums.map((album) => (
-        <AlbumRow key={album.id} album={album} onPress={() => router.push(`/album/${album.id}`)} />
-      ))}
+      {albums.length ? (
+        albums.map((album) => (
+          <AlbumRow key={album.id} album={album} onPress={() => router.push(albumHref(album.id))} />
+        ))
+      ) : loading ? null : (
+        <Text style={type.body}>Este artista aún no tiene álbumes.</Text>
+      )}
     </Screen>
   );
 }

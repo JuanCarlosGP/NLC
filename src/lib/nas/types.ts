@@ -46,7 +46,7 @@ export type PingResult = {
   version?: string;
 };
 
-export type MusicSourceKind = "mock" | "opensubsonic" | "webdav";
+export type MusicSourceKind = "mock" | "opensubsonic" | "webdav" | "local";
 
 export type PlayableSource = string | { uri: string; headers?: Record<string, string> };
 
@@ -62,4 +62,6 @@ export interface MusicSource {
   coverUrl(id: string, size?: number): Promise<string | null>;
   /** Permanently remove a track file (WebDAV). Optional on other sources. */
   deleteTrack?(trackId: string): Promise<void>;
+  /** Write a sidecar image next to a WebDAV audio file. Returns the NAS path or null. */
+  ensureCoverSidecar?(trackId: string, imageUrl: string): Promise<string | null>;
 }

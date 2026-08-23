@@ -6,23 +6,37 @@ import {
 import { matchImportedTracks } from "@/lib/spotify/match";
 import { parseSpotifyUrl } from "@/lib/spotify/parse-url";
 import { fetchPublicSpotifyEntity } from "@/lib/spotify/public-playlist";
+import { parseYoutubeMusicUrl } from "@/lib/youtube/parse-url";
+import { fetchPublicYoutubeMusic } from "@/lib/youtube/public-playlist";
 import {
+  addTracksToImportedPlaylist,
   loadImportedPlaylists,
   removeImportedPlaylist,
+  removeTrackFromImportedPlaylist,
+  reorderImportedPlaylistTracks,
   toggleImportedPlaylistLiked,
   upsertImportedPlaylist,
 } from "@/lib/spotify/playlist-store";
+import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
 import { useSettings } from "@/lib/settings/settings-context";
+import { persistPlaylistCovers } from "@/lib/library/persist-covers";
 import { applyCoverMap, loadTrackCoverMap, playlistNeedsCovers, trackNeedsCover } from "@/lib/spotify/track-covers";
-import type { ImportedPlaylist } from "@/lib/spotify/types";
+import type { Track } from "@/lib/nas/types";
+import { getTrackArtworkUrl } from "@/lib/library/artwork-cache";
+import type { ImportedPlaylist, ImportedTrack } from "@/lib/spotify/types";
 
 type SpotifyContextValue = {
   playlists: ImportedPlaylist[];
   importPlaylistUrl: (url: string) => Promise<ImportedPlaylist>;
+  createLocalPlaylist: (name: string, tracks: Track[]) => Promise<ImportedPlaylist>;
+  addTracksToPlaylist: (playlistId: string, tracks: Track[]) => Promise<void>;
+  removeTrackFromPlaylist: (playlistId: string, trackId: string) => Promise<void>;
+  reorderPlaylistTracks: (playlistId: string, tracks: ImportedTrack[]) => Promise<void>;
   hydratePlaylistCovers: (playlist: ImportedPlaylist) => Promise<void>;
   deletePlaylist: (id: string) => Promise<void>;
   togglePlaylistLiked: (id: string) => Promise<void>;
   rematchPlaylist: (id: string) => Promise<void>;
+  reloadPlaylists: () => Promise<void>;
 };
 
 const SpotifyContext = createContext<SpotifyContextValue | null>(null);
@@ -42,7 +56,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
       const stored = await loadImportedPlaylists();
       if (cancelled) return;
       setPlaylists(stored.map(withKind));
-      void syncArtworkFromPlaylists(stored);
+      void syncArtworkFromPlaylists(stored).then(() => persistPlaylistCovers(source, stored));
     })().catch(() => {
       if (!cancelled) setPlaylists([]);
     });
@@ -53,11 +67,14 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
 
   const importPlaylistUrl = useCallback(
     async (url: string) => {
-      const parsed = parseSpotifyUrl(url);
-      if (!parsed) {
-        throw new Error("Pega un enlace de playlist, álbum o canción de Spotify.");
+      const youtube = parseYoutubeMusicUrl(url);
+      const parsed = youtube ? null : parseSpotifyUrl(url);
+      if (!youtube && !parsed) {
+        throw new Error("Pega un enlace de Spotify o de YouTube Music.");
       }
-      const publicEntity = await fetchPublicSpotifyEntity(parsed.kind, parsed.id);
+      const publicEntity = youtube
+        ? await fetchPublicYoutubeMusic(url, youtube)
+        : await fetchPublicSpotifyEntity(parsed!.kind, parsed!.id);
       const playlist: ImportedPlaylist = {
         ...publicEntity,
         importedAt: Date.now(),
@@ -69,7 +86,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
           const updated = { ...playlist, tracks };
           const stored = await upsertImportedPlaylist(updated);
           setPlaylists(stored.map(withKind));
-          void syncArtworkFromPlaylists(stored);
+          void syncArtworkFromPlaylists(stored).then(() => persistPlaylistCovers(source, stored));
         })
         .catch(() => {
           // Se muestra igual; las coincidencias con el NAS se pueden reintentar luego.
@@ -78,6 +95,50 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
     },
     [source],
   );
+
+  const createLocalPlaylist = useCallback(async (name: string, tracks: Track[]) => {
+    const title = name.trim();
+    if (!title) throw new Error("Ponle un nombre a la playlist.");
+    const picked = tracks.filter(Boolean);
+    if (!picked.length) throw new Error("Elige al menos una canción del NAS.");
+    const imported = picked.map((track) => ({
+      spotifyId: track.id,
+      title: track.title,
+      artistName: track.artistName,
+      albumName: track.albumName,
+      durationMs: track.durationMs,
+      coverUrl: track.artworkUrl || getTrackArtworkUrl(track.id) || null,
+      matched: track,
+    }));
+    const playlist: ImportedPlaylist = {
+      id: `local-${Date.now()}`,
+      kind: "local",
+      name: title,
+      ownerName: "NAS",
+      coverUrl: imported.find((track) => track.coverUrl)?.coverUrl ?? null,
+      spotifyUrl: "",
+      importedAt: Date.now(),
+      tracks: imported,
+    };
+    const stored = await upsertImportedPlaylist(playlist);
+    setPlaylists(stored.map(withKind));
+    return playlist;
+  }, []);
+
+  const addTracksToPlaylist = useCallback(async (playlistId: string, tracks: Track[]) => {
+    const stored = await addTracksToImportedPlaylist(playlistId, tracks);
+    setPlaylists(stored.map(withKind));
+  }, []);
+
+  const removeTrackFromPlaylist = useCallback(async (playlistId: string, trackId: string) => {
+    const stored = await removeTrackFromImportedPlaylist(playlistId, trackId);
+    setPlaylists(stored.map(withKind));
+  }, []);
+
+  const reorderPlaylistTracks = useCallback(async (playlistId: string, tracks: ImportedTrack[]) => {
+    const stored = await reorderImportedPlaylistTracks(playlistId, tracks);
+    setPlaylists(stored.map(withKind));
+  }, []);
 
   const hydratingCovers = useRef(new Set<string>());
 
@@ -94,7 +155,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
       const updated = { ...latest, tracks: applyCoverMap(latest.tracks, covers) };
       const stored = await upsertImportedPlaylist(updated);
       setPlaylists(stored.map(withKind));
-      void syncArtworkFromPlaylists(stored);
+      void syncArtworkFromPlaylists(stored).then(() => persistPlaylistCovers(source, stored));
     } finally {
       hydratingCovers.current.delete(playlist.id);
     }
@@ -110,6 +171,13 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
     setPlaylists(next.map(withKind));
   }, []);
 
+  const reloadPlaylists = useCallback(async () => {
+    const stored = await loadImportedPlaylists();
+    setPlaylists(stored.map(withKind));
+  }, []);
+
+  useEffect(() => subscribeAssistantMutations(() => { void reloadPlaylists(); }), [reloadPlaylists]);
+
   const rematchPlaylist = useCallback(
     async (id: string) => {
       // WebDAV keeps an in-memory index; refresh so new Canciones files are visible.
@@ -117,12 +185,12 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
         await source.ping();
       }
       const current = (await loadImportedPlaylists()).find((item) => item.id === id);
-      if (!current) return;
+      if (!current || current.kind === "local") return;
       const cleared = current.tracks.map((track) => ({ ...track, matched: null }));
       const tracks = await matchImportedTracks(source, cleared);
       const stored = await upsertImportedPlaylist({ ...current, tracks });
       setPlaylists(stored.map(withKind));
-      void syncArtworkFromPlaylists(stored);
+      void syncArtworkFromPlaylists(stored).then(() => persistPlaylistCovers(source, stored));
     },
     [source],
   );
@@ -131,12 +199,17 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
     () => ({
       playlists,
       importPlaylistUrl,
+      createLocalPlaylist,
+      addTracksToPlaylist,
+      removeTrackFromPlaylist,
+      reorderPlaylistTracks,
       hydratePlaylistCovers,
       deletePlaylist,
       togglePlaylistLiked,
       rematchPlaylist,
+      reloadPlaylists,
     }),
-    [deletePlaylist, hydratePlaylistCovers, importPlaylistUrl, playlists, rematchPlaylist, togglePlaylistLiked],
+    [addTracksToPlaylist, createLocalPlaylist, deletePlaylist, hydratePlaylistCovers, importPlaylistUrl, playlists, reloadPlaylists, rematchPlaylist, removeTrackFromPlaylist, reorderPlaylistTracks, togglePlaylistLiked],
   );
 
   return <SpotifyContext.Provider value={value}>{children}</SpotifyContext.Provider>;

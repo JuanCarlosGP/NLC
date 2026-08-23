@@ -4,17 +4,30 @@ import {
   hydrateTrackArtworkCache,
   subscribeTrackArtwork,
 } from "@/lib/library/artwork-cache";
+import { isPodcastTrack } from "@/lib/nas/webdav";
 import { useSettings } from "@/lib/settings/settings-context";
 
 /** Prefer track.artworkUrl, then Spotify→NAS artwork cache, then NAS coverId. */
 export function useTrackArtwork(track?: {
   id?: string;
+  albumId?: string;
+  albumName?: string;
+  artistName?: string;
   coverId?: string | null;
   artworkUrl?: string | null;
 } | null): string | null {
   const { source } = useSettings();
+  const podcast = Boolean(
+    track &&
+      isPodcastTrack({
+        id: track.id,
+        albumId: track.albumId ?? "",
+        albumName: track.albumName ?? "",
+        artistName: track.artistName ?? "",
+      }),
+  );
   const [uri, setUri] = useState<string | null>(
-    track?.artworkUrl || (track?.id ? getTrackArtworkUrl(track.id) : null),
+    podcast ? null : track?.artworkUrl || (track?.id ? getTrackArtworkUrl(track.id) : null),
   );
   const [cacheTick, setCacheTick] = useState(0);
 
@@ -25,6 +38,18 @@ export function useTrackArtwork(track?: {
 
   useEffect(() => {
     let cancelled = false;
+    if (podcast) {
+      if (!track?.coverId) {
+        setUri(null);
+        return;
+      }
+      void source.coverUrl(track.coverId).then((next) => {
+        if (!cancelled) setUri(next);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
     const cached = track?.id ? getTrackArtworkUrl(track.id) : null;
     const remote = track?.artworkUrl || cached || null;
     if (remote) {
@@ -41,7 +66,7 @@ export function useTrackArtwork(track?: {
     return () => {
       cancelled = true;
     };
-  }, [cacheTick, source, track?.artworkUrl, track?.coverId, track?.id]);
+  }, [cacheTick, podcast, source, track?.artworkUrl, track?.coverId, track?.id]);
 
   return uri;
 }

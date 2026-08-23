@@ -7,11 +7,13 @@ export function AlbumTile({
   coverUri,
   subtitle,
   onPress,
+  onLongPress,
 }: {
   album: Album;
   coverUri?: string | null;
   subtitle?: string;
   onPress: () => void;
+  onLongPress?: () => void;
 }) {
   const nasCover = useCoverUrl(coverUri ? null : album.coverId);
   return (
@@ -21,6 +23,7 @@ export function AlbumTile({
       subtitle={subtitle ?? album.artistName}
       uri={coverUri ?? nasCover}
       onPress={onPress}
+      onLongPress={onLongPress}
     />
   );
 }

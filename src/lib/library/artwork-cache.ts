@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Track } from "@/lib/nas/types";
+import { isPodcastTrack } from "@/lib/nas/webdav";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
 
 const KEY = "snd.track-meta.v2";
@@ -36,6 +37,10 @@ export function getTrackDurationMs(trackId: string): number {
 }
 
 export function withTrackArtwork<T extends Track>(track: T): T {
+  if (isPodcastTrack(track)) {
+    if (!track.artworkUrl) return track;
+    return { ...track, artworkUrl: null };
+  }
   const meta = memory[track.id];
   if (!meta) return track;
   const artworkUrl = track.artworkUrl || meta.artworkUrl || null;

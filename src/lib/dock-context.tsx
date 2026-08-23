@@ -66,15 +66,17 @@ export function DockProvider({
     [enabled],
   );
 
+  const reveal = useCallback(() => setVisible(true), []);
+
   const value = useMemo(
     () => ({
       enabled,
       visible,
       reservedBottom,
       handleScroll,
-      reveal: () => setVisible(true),
+      reveal,
     }),
-    [enabled, handleScroll, reservedBottom, visible],
+    [enabled, handleScroll, reservedBottom, reveal, visible],
   );
 
   return <DockContext.Provider value={value}>{children}</DockContext.Provider>;

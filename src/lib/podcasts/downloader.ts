@@ -4,8 +4,8 @@ import {
 } from "@/lib/podcasts/download-settings";
 
 export type DownloadJobStatus = "queued" | "running" | "done" | "error";
-export type DownloadMediaKind = "podcast" | "song" | "auto";
-export type DownloadResolvedKind = "podcast" | "song";
+export type DownloadMediaKind = "podcast" | "song" | "video" | "auto";
+export type DownloadResolvedKind = "podcast" | "song" | "video";
 
 export type DownloadJob = {
   id: string;
@@ -26,6 +26,7 @@ export type DownloadHealth = {
   ok: boolean;
   podcastDir?: string;
   songDir?: string;
+  videoDir?: string;
   downloadDir?: string;
   ytDlp?: string;
 };

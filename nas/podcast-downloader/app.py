@@ -27,6 +27,9 @@ SONG_DIR = Path(_song_raw).resolve()
 # Never dump songs at the Music root (avoids channel/artist folders like GatoTemas).
 if LIBRARY_DIR and SONG_DIR == LIBRARY_DIR:
     SONG_DIR = (LIBRARY_DIR / "Canciones").resolve()
+_video_raw = os.environ.get("VIDEO_DIR")
+VIDEO_DIR = Path(_video_raw).resolve() if _video_raw else None
+VIDEO_MOVIES_DIR = (VIDEO_DIR / "movies").resolve() if VIDEO_DIR else None
 AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "").strip()
 BIND_HOST = os.environ.get("BIND_HOST", "0.0.0.0")
 BIND_PORT = int(os.environ.get("BIND_PORT", "8091"))
@@ -38,8 +41,8 @@ SEARCH_RESULTS = int(os.environ.get("SEARCH_RESULTS", "8"))
 DURATION_HARD_MAX = float(os.environ.get("DURATION_HARD_MAX", "45"))
 
 JobStatus = Literal["queued", "running", "done", "error"]
-MediaKind = Literal["podcast", "song", "auto"]
-ResolvedKind = Literal["podcast", "song"]
+MediaKind = Literal["podcast", "song", "video", "auto"]
+ResolvedKind = Literal["podcast", "song", "video"]
 
 app = FastAPI(title="SND media downloader", version="1.2.1")
 app.add_middleware(
@@ -104,6 +107,7 @@ class HealthResponse(BaseModel):
     ok: bool = True
     podcastDir: str
     songDir: str
+    videoDir: str | None = None
     ytDlp: str
 
 
@@ -175,6 +179,41 @@ def _append_log(job_id: str, line: str) -> None:
                 job["eta"] = match.group("eta")
 
 
+_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def _find_sidecar(directory: Path, stems: list[str]) -> Path | None:
+    wanted = {stem.lower() for stem in stems if stem}
+    matches: list[Path] = []
+    for path in directory.iterdir():
+        if not path.is_file() or path.suffix.lower() not in _IMAGE_SUFFIXES:
+            continue
+        name = path.name.lower()
+        stem = path.stem.lower()
+        if stem in wanted or any(token and token in name for token in wanted):
+            matches.append(path)
+    if not matches:
+        return None
+    matches.sort(key=lambda item: item.stat().st_mtime, reverse=True)
+    return matches[0]
+
+
+def _align_sidecar(audio: Path, *stems: str) -> Path | None:
+    """Make the thumbnail share the audio basename: Episode.mp3 + Episode.jpg."""
+    desired = audio.with_suffix(".jpg")
+    if desired.is_file():
+        return desired
+    found = _find_sidecar(audio.parent, [audio.stem, *stems])
+    if not found:
+        return None
+    if found.resolve() == desired.resolve():
+        return desired
+    if desired.exists():
+        return desired
+    found.rename(desired)
+    return desired
+
+
 def _find_output(directory: Path, video_id: str) -> Path | None:
     matches = sorted(
         [
@@ -193,7 +232,18 @@ def _find_output(directory: Path, video_id: str) -> Path | None:
         if key in seen:
             continue
         seen.add(key)
-        if path.is_file() and path.suffix.lower() in {".mp3", ".m4a", ".opus", ".ogg", ".webm"}:
+        if path.is_file() and path.suffix.lower() in {
+            ".mp3",
+            ".m4a",
+            ".opus",
+            ".ogg",
+            ".webm",
+            ".mp4",
+            ".mkv",
+            ".m4v",
+            ".avi",
+            ".mov",
+        }:
             return path
     return None
 
@@ -355,6 +405,8 @@ def _resolve_kind(requested: MediaKind, duration: float | None) -> ResolvedKind:
         return "podcast"
     if requested == "song":
         return "song"
+    if requested == "video":
+        return "video"
     if duration is not None and duration >= PODCAST_MIN_SECONDS:
         return "podcast"
     return "song"
@@ -370,6 +422,8 @@ def _run_download(
     _append_log(job_id, "Resolviendo metadatos…")
     PODCAST_DIR.mkdir(parents=True, exist_ok=True)
     SONG_DIR.mkdir(parents=True, exist_ok=True)
+    if VIDEO_MOVIES_DIR:
+        VIDEO_MOVIES_DIR.mkdir(parents=True, exist_ok=True)
 
     expected_sec = (duration_ms / 1000.0) if duration_ms and duration_ms > 0 else None
     url = source
@@ -426,31 +480,59 @@ def _run_download(
     _update_job(job_id, resolvedKind=resolved)
     _append_log(job_id, f"Tipo: {resolved}")
 
-    # Flat folders only: Music/Podcasts and Music/Canciones (no channel/artist subdirs).
+    # Flat folders: Music/Podcasts, Music/Canciones, Popcorn/movies.
     if resolved == "podcast":
         target_dir = PODCAST_DIR
+        outtmpl = str(target_dir / f"{_safe_filename(title)[:100]}.%(ext)s")
+    elif resolved == "video":
+        if not VIDEO_MOVIES_DIR:
+            _update_job(job_id, status="error", error="Falta VIDEO_DIR en el contenedor (monta /volume1/Popcorn).")
+            return
+        target_dir = VIDEO_MOVIES_DIR
+        target_dir.mkdir(parents=True, exist_ok=True)
         outtmpl = str(target_dir / f"{_safe_filename(title)[:100]}.%(ext)s")
     else:
         target_dir = SONG_DIR
         target_dir.mkdir(parents=True, exist_ok=True)
         outtmpl = str(target_dir / f"{_safe_filename(title)[:100]}.%(ext)s")
 
-    cmd = [
-        "yt-dlp",
-        "-f",
-        "bestaudio/best",
-        "-x",
-        "--audio-format",
-        "mp3",
-        "--audio-quality",
-        "192",
-        "--no-playlist",
-        "--restrict-filenames",
-        "--newline",
-        "-o",
-        outtmpl,
-        url,
-    ]
+    if resolved == "video":
+        cmd = [
+            "yt-dlp",
+            "-f",
+            "bv*+ba/b",
+            "--merge-output-format",
+            "mp4",
+            "--no-playlist",
+            "--restrict-filenames",
+            "--write-thumbnail",
+            "--convert-thumbnails",
+            "jpg",
+            "--newline",
+            "-o",
+            outtmpl,
+            url,
+        ]
+    else:
+        cmd = [
+            "yt-dlp",
+            "-f",
+            "bestaudio/best",
+            "-x",
+            "--audio-format",
+            "mp3",
+            "--audio-quality",
+            "192",
+            "--no-playlist",
+            "--restrict-filenames",
+            "--write-thumbnail",
+            "--convert-thumbnails",
+            "jpg",
+            "--newline",
+            "-o",
+            outtmpl,
+            url,
+        ]
     _append_log(job_id, "Descargando con yt-dlp…")
 
     try:
@@ -472,12 +554,22 @@ def _run_download(
             target_dir, _safe_filename(title)[:100]
         )
         if not path:
-            raise RuntimeError("Descarga terminó pero no hay archivo de audio.")
+            raise RuntimeError(
+                "Descarga terminó pero no hay archivo de vídeo."
+                if resolved == "video"
+                else "Descarga terminó pero no hay archivo de audio."
+            )
 
         desired = target_dir / f"{_safe_filename(title)[:100]}{path.suffix.lower()}"
         if path.resolve() != desired.resolve() and not desired.exists():
             path = path.rename(desired)
             _append_log(job_id, f"Renombrado: {path.name}")
+
+        cover = _align_sidecar(path, video_id, _safe_filename(title)[:100])
+        if cover:
+            _append_log(job_id, f"Carátula: {cover.name}")
+        else:
+            _append_log(job_id, "Sin carátula (yt-dlp no trajo miniatura).")
 
         _append_log(job_id, f"Listo: {path.name}")
         _update_job(
@@ -516,6 +608,7 @@ def health() -> HealthResponse:
         ok=True,
         podcastDir=str(PODCAST_DIR),
         songDir=str(SONG_DIR),
+        videoDir=str(VIDEO_MOVIES_DIR) if VIDEO_MOVIES_DIR else None,
         ytDlp=_yt_dlp_version(),
     )
 
@@ -568,4 +661,6 @@ if __name__ == "__main__":
 
     PODCAST_DIR.mkdir(parents=True, exist_ok=True)
     SONG_DIR.mkdir(parents=True, exist_ok=True)
+    if VIDEO_MOVIES_DIR:
+        VIDEO_MOVIES_DIR.mkdir(parents=True, exist_ok=True)
     uvicorn.run(app, host=BIND_HOST, port=BIND_PORT, log_level="info")

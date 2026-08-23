@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ArrowUpDown, Clapperboard, LayoutGrid, List, Mic, Music2 } from "lucide-react-native";
+import { ArrowUpDown, LayoutGrid, List } from "lucide-react-native";
+import { FocusHome } from "@/components/productivity/focus-home";
+import { ZoneSwitch } from "@/components/layout/zone-switch";
 import { HomeListSkeleton, HomeShortcutBone } from "@/components/home/home-skeleton";
 import { ShortcutCard } from "@/components/home/shortcut-card";
 import { AlbumRow } from "@/components/library/album-row";
@@ -10,18 +12,22 @@ import { LibrarySortSheet, librarySortLabel } from "@/components/library/library
 import { LibraryTile } from "@/components/library/library-tile";
 import { TrackRow } from "@/components/library/track-row";
 import { Screen } from "@/components/ui/screen";
+import { ContinueWatching } from "@/components/video/continue-watching";
+import { albumHref } from "@/lib/library/href";
 import { useTrackArtwork } from "@/hooks/use-cover-url";
 import { useBrowsePrefs } from "@/hooks/use-browse-prefs";
+import { useExitingList } from "@/hooks/use-exiting-list";
 import { useHome } from "@/hooks/use-home";
 import type { Track } from "@/lib/nas/types";
-import { isPodcastFolderName, isPodcastTrack } from "@/lib/nas/webdav";
+import { isPodcastFolderName, isPodcastTrack, isSongsFolderName } from "@/lib/nas/webdav";
 import { usePlayer } from "@/lib/player/player-context";
+import { useTrackActions } from "@/lib/player/track-actions-context";
+import { usePlaylistActions } from "@/lib/spotify/playlist-actions-context";
 import { useSpotify } from "@/lib/spotify/spotify-context";
 import { colors, fonts, type } from "@/lib/theme";
+import { useZone } from "@/lib/zone/zone-context";
 
 const SHORTCUT_SLOTS = 8;
-
-type HomeScope = "music" | "podcast" | "video";
 
 function isGenericPodcastBucket(name: string): boolean {
   return isPodcastFolderName(name);
@@ -31,13 +37,15 @@ export default function HomeScreen() {
   const router = useRouter();
   const { recents, musicAlbums, podcastAlbums, loading, error, refresh } = useHome();
   const { playlists } = useSpotify();
+  const { openPlaylistActions } = usePlaylistActions();
   const { playTracks } = usePlayer();
-  const [scope, setScope] = useState<HomeScope>("music");
+  const { zone } = useZone();
   const [sortOpen, setSortOpen] = useState(false);
   const { sort, viewMode, setSort, setViewMode, ready: browseReady } = useBrowsePrefs("snd.home.browse.v1");
   const grid = viewMode === "grid";
-  const podcast = scope === "podcast";
-  const video = scope === "video";
+  const podcast = zone === "podcast";
+  const video = zone === "video";
+  const focus = zone === "focus";
   const albums = podcast ? podcastAlbums : musicAlbums;
 
   useFocusEffect(
@@ -66,14 +74,23 @@ export default function HomeScreen() {
       music?: boolean;
       video?: boolean;
       onPress: () => void;
+      onLongPress?: () => void;
     }[] = video
       ? [
           {
-            key: "onepiece",
-            id: "onepiece",
-            title: "One Piece",
+            key: "videos",
+            id: "videos",
+            title: "Vídeos",
             video: true,
-            onPress: () => router.push("/video/onepiece"),
+            onPress: () => router.push("/videos"),
+          },
+          {
+            key: "favorites-video",
+            id: "favorites-video",
+            title: "Favoritos vídeo",
+            liked: true,
+            video: true,
+            onPress: () => router.push({ pathname: "/favorites", params: { kind: "video" } }),
           },
         ]
       : podcast
@@ -121,27 +138,26 @@ export default function HomeScreen() {
           title: playlist.name,
           uri: playlist.coverUrl,
           onPress: () => router.push(`/imported/${playlist.id}`),
+          onLongPress: () => openPlaylistActions(playlist),
         });
       }
     }
 
-    if (!video) {
+    if (!video && !podcast) {
       for (const album of albums) {
         if (items.length >= SHORTCUT_SLOTS) break;
-        if (podcast && isGenericPodcastBucket(album.name)) continue;
         items.push({
           key: `album-${album.id}`,
           id: album.id,
           title: album.name,
           coverId: album.coverId,
-          podcast,
-          onPress: () => router.push(`/album/${album.id}`),
+          onPress: () => router.push(albumHref(album.id)),
         });
       }
     }
 
     return items;
-  }, [albums, playlists, podcast, router, video]);
+  }, [albums, openPlaylistActions, playlists, podcast, router, video]);
 
   const showSkeleton = !video && loading && albums.length === 0 && scopedRecents.length === 0;
   const gridAlbumIds = new Set(
@@ -150,6 +166,7 @@ export default function HomeScreen() {
   const moreAlbums = albums.filter((album) => {
     if (gridAlbumIds.has(album.id)) return false;
     if (podcast && isGenericPodcastBucket(album.name)) return false;
+    if (!podcast && isSongsFolderName(album.name)) return false;
     return true;
   });
 
@@ -161,51 +178,32 @@ export default function HomeScreen() {
     }
     return next;
   }, [scopedRecents, sort]);
+  const homeTracks = useMemo(() => sortedRecents.slice(0, 6), [sortedRecents]);
+  const { items: visibleHomeTracks, isExiting } = useExitingList(homeTracks);
 
   const sortedAlbums = useMemo(() => {
-    const next = [...moreAlbums];
+    const recentAlbumIds = new Set(sortedRecents.map((track) => track.albumId));
+    const recentTitles = new Set(sortedRecents.map((track) => track.title.trim().toLowerCase()));
+    const next = moreAlbums.filter((album) => {
+      if (recentAlbumIds.has(album.id)) return false;
+      if (podcast && recentTitles.has(album.name.trim().toLowerCase())) return false;
+      return true;
+    });
     if (sort === "alpha") next.sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
     else if (sort === "creator") {
       next.sort((a, b) => a.artistName.localeCompare(b.artistName, "es", { sensitivity: "base" }));
     } else if (sort === "added") next.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
     return next;
-  }, [moreAlbums, sort]);
+  }, [moreAlbums, podcast, sort, sortedRecents]);
+
+  if (focus) return <FocusHome />;
 
   return (
     <>
       <Screen>
         <View style={styles.hero}>
           <Text style={[type.pageTitle, styles.title]}>SND</Text>
-          <View style={styles.switch}>
-            <Pressable
-              accessibilityLabel="Música"
-              accessibilityState={{ selected: scope === "music" }}
-              onPress={() => setScope("music")}
-              style={[styles.switchBtn, scope === "music" && styles.switchBtnActive]}
-            >
-              <Music2 size={16} color={scope === "music" ? colors.void : colors.inkSoft} strokeWidth={1.9} />
-            </Pressable>
-            <Pressable
-              accessibilityLabel="Podcasts"
-              accessibilityState={{ selected: scope === "podcast" }}
-              onPress={() => setScope("podcast")}
-              style={[styles.switchBtn, scope === "podcast" && styles.switchBtnActive]}
-            >
-              <Mic size={16} color={scope === "podcast" ? colors.void : colors.inkSoft} strokeWidth={1.9} />
-            </Pressable>
-            <Pressable
-              accessibilityLabel="Vídeo"
-              accessibilityState={{ selected: scope === "video" }}
-              onPress={() => setScope("video")}
-              style={[styles.switchBtn, scope === "video" && styles.switchBtnActive]}
-            >
-              <Clapperboard
-                size={16}
-                color={scope === "video" ? colors.void : colors.inkSoft}
-                strokeWidth={1.9}
-              />
-            </Pressable>
-          </View>
+          <ZoneSwitch />
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -223,6 +221,7 @@ export default function HomeScreen() {
               music={item.music}
               video={item.video}
               onPress={item.onPress}
+              onLongPress={item.onLongPress}
             />
           ))}
           {showSkeleton
@@ -231,6 +230,8 @@ export default function HomeScreen() {
               ))
             : null}
         </View>
+
+        {video ? <ContinueWatching /> : null}
 
         {showSkeleton ? <HomeListSkeleton grid={grid} /> : null}
 
@@ -270,23 +271,29 @@ export default function HomeScreen() {
                   <AlbumTile
                     album={album}
                     subtitle={podcast ? "Podcast" : `Álbum · ${album.artistName}`}
-                    onPress={() => router.push(`/album/${album.id}`)}
+                    onPress={() => router.push(albumHref(album.id))}
                   />
                 </View>
               ))}
             </View>
           ) : (
             <View>
-              {sortedRecents.slice(0, 6).map((track, index) => (
+              {visibleHomeTracks.map((track, index) => (
                 <TrackRow
                   key={track.id}
                   track={track}
                   index={index + 1}
-                  onPress={() => void playTracks(sortedRecents, index)}
+                  exiting={isExiting(track.id)}
+                  onPress={() => {
+                    if (isExiting(track.id)) return;
+                    const playIndex = sortedRecents.findIndex((item) => item.id === track.id);
+                    if (playIndex < 0) return;
+                    void playTracks(sortedRecents, playIndex);
+                  }}
                 />
               ))}
               {sortedAlbums.map((album) => (
-                <AlbumRow key={album.id} album={album} onPress={() => router.push(`/album/${album.id}`)} />
+                <AlbumRow key={album.id} album={album} onPress={() => router.push(albumHref(album.id))} />
               ))}
             </View>
           )
@@ -299,6 +306,7 @@ export default function HomeScreen() {
 
 function HomeTrackTile({ track, onPress }: { track: Track; onPress: () => void }) {
   const cover = useTrackArtwork(track);
+  const { openTrackActions } = useTrackActions();
   return (
     <LibraryTile
       id={track.id}
@@ -306,6 +314,7 @@ function HomeTrackTile({ track, onPress }: { track: Track; onPress: () => void }
       subtitle={track.artistName}
       uri={cover}
       onPress={onPress}
+      onLongPress={() => openTrackActions(track)}
     />
   );
 }
@@ -320,25 +329,6 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   title: { flex: 1 },
-  switch: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.rule,
-    borderRadius: 999,
-    backgroundColor: colors.sheet,
-    padding: 3,
-  },
-  switchBtn: {
-    width: 36,
-    height: 32,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  switchBtnActive: {
-    backgroundColor: colors.ink,
-  },
   sortBar: {
     flexDirection: "row",
     alignItems: "center",

@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ImportedEntityView } from "@/components/library/imported-entity";
 import { Screen } from "@/components/ui/screen";
 import { useSpotify } from "@/lib/spotify/spotify-context";
-import { type } from "@/lib/theme";
+import { layout, type } from "@/lib/theme";
 
 export default function ImportedPlaylistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,24 +25,23 @@ export default function ImportedPlaylistScreen() {
 
   if (!playlist) {
     return (
-      <Screen scroll={false}>
-        <Text style={type.meta}>Cargando playlist…</Text>
+      <Screen scroll={false} flush>
+        <Text style={[type.meta, { paddingHorizontal: layout.screenPad, paddingTop: 12 }]}>Cargando playlist…</Text>
       </Screen>
     );
   }
 
   return (
-    <Screen>
+    <Screen scroll={false} flush>
       <ImportedEntityView
         playlist={playlist}
         onToggleLiked={() => {
           void togglePlaylistLiked(playlist.id);
         }}
-        onDelete={() => {
-          void deletePlaylist(playlist.id).then(() => {
-            if (router.canGoBack()) router.back();
-            else router.replace("/library");
-          });
+        onDelete={async () => {
+          await deletePlaylist(playlist.id);
+          if (router.canGoBack()) router.back();
+          else router.replace("/library");
         }}
       />
     </Screen>
