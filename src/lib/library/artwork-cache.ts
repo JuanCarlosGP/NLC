@@ -3,8 +3,8 @@ import type { Track } from "@/lib/nas/types";
 import { isPodcastTrack } from "@/lib/nas/webdav";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
 
-const KEY = "snd.track-meta.v2";
-const LEGACY_ARTWORK_KEY = "snd.track-artwork.v1";
+const KEY = "nlc.track-meta.v2";
+const LEGACY_ARTWORK_KEY = "nlc.track-artwork.v1";
 
 type TrackMeta = {
   artworkUrl?: string;

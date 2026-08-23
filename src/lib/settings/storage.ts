@@ -4,9 +4,9 @@ import type { MusicSourceKind } from "@/lib/nas/types";
 import { joinPath } from "@/lib/nas/webdav";
 import { deleteSecret, getSecret, setSecret } from "@/lib/settings/secret-store";
 
-const SETTINGS_KEY = "snd.settings.v1";
+const SETTINGS_KEY = "nlc.settings.v1";
 const SETTINGS_META_KEY = "nas_settings";
-const PASSWORD_KEY = "snd.nas.password";
+const PASSWORD_KEY = "nlc.nas.password";
 
 export type NasSettings = {
   sourceKind: MusicSourceKind;

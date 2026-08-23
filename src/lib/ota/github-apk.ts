@@ -1,9 +1,9 @@
 const GITHUB_RELEASE =
-  "https://api.github.com/repos/JuanCarlosGP/SND/releases/tags/apk";
-const GITHUB_LATEST = "https://api.github.com/repos/JuanCarlosGP/SND/releases/latest";
+  "https://api.github.com/repos/JuanCarlosGP/NLC/releases/tags/apk";
+const GITHUB_LATEST = "https://api.github.com/repos/JuanCarlosGP/NLC/releases/latest";
 
 export const GITHUB_APK_DOWNLOAD =
-  "https://github.com/JuanCarlosGP/SND/releases/latest/download/SND.apk";
+  "https://github.com/JuanCarlosGP/NLC/releases/latest/download/NLC.apk";
 
 export type RemoteApk = {
   version: string;
@@ -38,7 +38,7 @@ function parseRelease(payload: {
   body?: string | null;
 }): RemoteApk | null {
   const title = `${payload.name ?? ""} ${payload.tag_name ?? ""} ${payload.body ?? ""}`;
-  const named = title.match(/SND\s+(\d+\.\d+\.\d+)\s+\((\d+)\)/i);
+  const named = title.match(/(?:NLC|SND)\s+(\d+\.\d+\.\d+)\s+\((\d+)\)/i);
   if (named) {
     return { version: named[1]!, versionCode: Number(named[2]), notes: payload.body?.trim() ?? "" };
   }

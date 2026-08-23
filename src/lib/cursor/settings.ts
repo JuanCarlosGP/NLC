@@ -7,9 +7,9 @@ export type CursorChatMessage = {
   text: string;
 };
 
-const API_KEY = "snd.cursor.api-key";
-const AGENT_ID_KEY = "snd.cursor.agent-id";
-const MESSAGES_KEY = "snd.cursor.messages.v1";
+const API_KEY = "nlc.cursor.api-key";
+const AGENT_ID_KEY = "nlc.cursor.agent-id";
+const MESSAGES_KEY = "nlc.cursor.messages.v1";
 
 export async function loadCursorApiKey(): Promise<string> {
   try {

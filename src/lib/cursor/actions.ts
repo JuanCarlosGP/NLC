@@ -61,7 +61,7 @@ export type AssistantRuntime = {
 
 export type ActionResult = { ok: boolean; message: string };
 
-const ACTION_BLOCK = /\[\[\[SND\]\]\]([\s\S]*?)\[\[\[\/SND\]\]\]/g;
+const ACTION_BLOCK = /\[\[\[(?:NLC|SND)\]\]\]([\s\S]*?)\[\[\[\/(?:NLC|SND)\]\]\]/g;
 
 function normalize(value: string): string {
   return value
@@ -210,9 +210,9 @@ export function extractAssistantActions(reply: string): { actions: AssistantActi
       // ignore malformed blocks
     }
   }
-  visible = visible.replace(/```(?:json|snd)?\s*\{[\s\S]*?"actions"[\s\S]*?\}\s*```/gi, (block) => {
+  visible = visible.replace(/```(?:json|nlc|snd)?\s*\{[\s\S]*?"actions"[\s\S]*?\}\s*```/gi, (block) => {
     try {
-      const json = block.replace(/```(?:json|snd)?/gi, "").replace(/```/g, "").trim();
+      const json = block.replace(/```(?:json|nlc|snd)?/gi, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(json) as { actions?: AssistantAction[] };
       if (Array.isArray(parsed.actions)) actions.push(...parsed.actions);
     } catch {

@@ -25,7 +25,7 @@ import { colors, fonts, type } from "@/lib/theme";
 const YTDLP_COMPOSE = `services:
   podcast-downloader:
     image: python:3.12-slim
-    container_name: snd-podcast-downloader
+    container_name: nlc-podcast-downloader
     working_dir: /app
     restart: unless-stopped
     ports:
@@ -40,7 +40,7 @@ const YTDLP_COMPOSE = `services:
       AUTH_TOKEN: ""
       MAX_WORKERS: "2"
     volumes:
-      - /volume1/Music/snd-downloader-app:/app
+      - /volume1/Music/nlc-downloader-app:/app
       - /volume1/Music:/library
       - /volume1/Popcorn:/video
     command:
@@ -299,7 +299,7 @@ const HELP_STEPS = [
   },
   {
     title: "App del downloader",
-    body: "Copia nas/podcast-downloader a /volume1/Music/snd-downloader-app (app.py y requirements.txt).",
+    body: "Copia nas/podcast-downloader a /volume1/Music/nlc-downloader-app (app.py y requirements.txt).",
   },
   {
     title: "Compose",
@@ -310,8 +310,8 @@ const HELP_STEPS = [
     body: "Arranca el stack y espera a que instale ffmpeg y yt-dlp.",
   },
   {
-    title: "Conectar SND",
-    body: "Abre http://IP-DEL-NAS:8091/health. En SND usa esa IP, puerto 8091 y el mismo AUTH_TOKEN (vacío si no hay token).",
+    title: "Conectar NLC",
+    body: "Abre http://IP-DEL-NAS:8091/health. En NLC usa esa IP, puerto 8091 y el mismo AUTH_TOKEN (vacío si no hay token).",
   },
 ] as const;
 

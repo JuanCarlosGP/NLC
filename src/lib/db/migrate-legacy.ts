@@ -4,10 +4,10 @@ import type { Track } from "@/lib/nas/types";
 import { isPodcastTrack } from "@/lib/nas/webdav";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
 
-const FLAG = "snd.catalog.migrated.v1";
-const RECENTS_KEY = "snd.recents.v1";
-const FAVORITES_KEY = "snd.favorites.v1";
-const PLAYLISTS_KEY = "snd.imported-playlists.v1";
+const FLAG = "nlc.catalog.migrated.v1";
+const RECENTS_KEY = "nlc.recents.v1";
+const FAVORITES_KEY = "nlc.favorites.v1";
+const PLAYLISTS_KEY = "nlc.imported-playlists.v1";
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {

@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { deleteSecret, getSecret, setSecret } from "@/lib/settings/secret-store";
 
-const CLIENT_ID_KEY = "snd.spotify.client-id";
-const TOKENS_KEY = "snd.spotify.tokens";
+const CLIENT_ID_KEY = "nlc.spotify.client-id";
+const TOKENS_KEY = "nlc.spotify.tokens";
 
 export type SpotifyTokens = {
   accessToken: string;

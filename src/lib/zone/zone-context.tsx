@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type AppZone = "music" | "podcast" | "video" | "focus";
 
-const ZONE_KEY = "snd.app.zone.v1";
+const ZONE_KEY = "nlc.app.zone.v1";
 
 type ZoneContextValue = {
   zone: AppZone;

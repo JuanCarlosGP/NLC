@@ -3,8 +3,8 @@ import { getWebDavText, putWebDavText } from "@/lib/nas/webdav-source";
 import { joinPath } from "@/lib/nas/webdav";
 import type { NasSettings } from "@/lib/settings/storage";
 
-export const PUSH_TOKENS_FILENAME = "snd-push-tokens.json";
-const LOCAL_TOKEN_KEY = "snd.ota.push-token";
+export const PUSH_TOKENS_FILENAME = "nlc-push-tokens.json";
+const LOCAL_TOKEN_KEY = "nlc.ota.push-token";
 
 export type PushTokenRecord = {
   token: string;

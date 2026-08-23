@@ -3,7 +3,7 @@ import { encodeVideoPath } from "@/lib/video/catalog";
 import { seriesFromPath } from "@/lib/video/browse";
 import type { VideoActionsTarget } from "@/lib/video/video-actions-context";
 
-const KEY = "snd.video.likes.v1";
+const KEY = "nlc.video.likes.v1";
 
 export type VideoFavorite = {
   id: string;

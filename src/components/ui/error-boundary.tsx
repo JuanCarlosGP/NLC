@@ -13,14 +13,14 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("SND crash", error, info.componentStack);
+    console.error("NLC crash", error, info.componentStack);
   }
 
   render() {
     if (!this.state.error) return this.props.children;
     return (
       <View style={styles.fill}>
-        <Text style={styles.title}>SND no pudo abrir</Text>
+        <Text style={styles.title}>NLC no pudo abrir</Text>
         <Text style={styles.body}>Copia este texto y lo vemos. No es el NAS: falló al arrancar.</Text>
         <ScrollView style={styles.box} contentContainerStyle={styles.boxInner}>
           <Text selectable style={styles.stack}>

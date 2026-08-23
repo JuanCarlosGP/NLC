@@ -169,7 +169,7 @@ export const mockSource: MusicSource = {
     return {
       ok: true,
       message: "Biblioteca de ejemplo lista (sin NAS).",
-      serverName: "SND mock",
+      serverName: "NLC mock",
       version: "0.1.0",
     };
   },

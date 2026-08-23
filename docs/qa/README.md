@@ -1,24 +1,24 @@
-# QA SND
+# QA NLC
 
-Mapa de trabajo del equipo. No es un backlog de historias: SND ya existe. Aquí medimos cobertura, reportamos fallos y asignamos arreglos.
+Mapa de trabajo del equipo. No es un backlog de historias: NLC ya existe. Aquí medimos cobertura, reportamos fallos y asignamos arreglos.
 
 | Archivo | Para qué sirve |
 | --- | --- |
 | [cobertura.md](cobertura.md) | Qué flujos se han probado (QA1 y QA2) |
 | [hallazgos.md](hallazgos.md) | Fallos abiertos / en curso / cerrados |
-| [plantilla-hallazgo.md](plantilla-hallazgo.md) | Cómo se pega un hallazgo en el canal SND |
+| [plantilla-hallazgo.md](plantilla-hallazgo.md) | Cómo se pega un hallazgo en el canal NLC |
 
 ## Equipo
 
-- **SND PM**: prioriza, asigna a DEV, mantiene estos archivos.
+- **NLC PM**: prioriza, asigna a DEV, mantiene estos archivos.
 - **QA Manual 1** y **QA Manual 2**: prueban toda la app. Cada fix lo revisan los dos, por separado. No tocan código.
-- **DEV 1**: implementa solo lo que asigna el PM. Cuando termina, lo dice en el canal SND.
+- **DEV 1**: implementa solo lo que asigna el PM. Cuando termina, lo dice en el canal NLC.
 
 ## Flujo
 
-1. QA prueba en el Nothing Phone (Expo Go hoy; APK `app.snd.player` cuando exista).
+1. QA prueba en el Nothing Phone (Expo Go hoy; APK `app.nlc.player` cuando exista).
 2. Marca la fila en `cobertura.md`: `-` / `ok` / `fallo`.
-3. Si hay fallo, lo publica en el canal SND con la plantilla y añade una fila en `hallazgos.md` (id `SND-xxx`).
+3. Si hay fallo, lo publica en el canal NLC con la plantilla y añade una fila en `hallazgos.md` (id `SND-xxx`).
 4. PM prioriza y asigna a DEV 1 en el canal.
 5. DEV termina y lo comenta en el canal. No cierra el hallazgo.
 6. QA1 y QA2 se asignan la revisión. Si ambos dan ok, PM cierra en `hallazgos.md` y la cobertura vuelve a `ok`.

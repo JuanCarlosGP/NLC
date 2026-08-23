@@ -1,5 +1,5 @@
 /**
- * Re-applies SND lock-screen next/previous buttons if `npm install` resets expo-audio.
+ * Re-applies NLC lock-screen next/previous buttons if `npm install` resets expo-audio.
  * Full patch also lives in node_modules/expo-audio (search SND_MEDIA_SKIP).
  */
 const fs = require("fs");

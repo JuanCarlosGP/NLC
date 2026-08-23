@@ -39,7 +39,7 @@ export async function createEmptyImportedPlaylist(name: string): Promise<Importe
     id: `local-${Date.now()}`,
     kind: "local",
     name: trimmed,
-    ownerName: "SND",
+    ownerName: "NLC",
     coverUrl: null,
     spotifyUrl: "",
     importedAt: Date.now(),

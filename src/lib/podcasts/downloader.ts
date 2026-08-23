@@ -52,7 +52,7 @@ async function readError(response: Response): Promise<string> {
       const msg = first.msg || "Error de validación";
       // Old downloader only accepted `url` — new app sends `query` (+ duration).
       if (/field required/i.test(msg) && (!loc || loc === "url")) {
-        return "El downloader del NAS está desactualizado. Reinicia el contenedor snd-podcast-downloader en Container Manager.";
+        return "El downloader del NAS está desactualizado. Reinicia el contenedor nlc-podcast-downloader en Container Manager.";
       }
       return loc ? `${loc}: ${msg}` : msg;
     }

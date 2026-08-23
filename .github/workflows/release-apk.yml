@@ -86,16 +86,17 @@ jobs:
           }
           fs.writeFileSync("apk-url.txt", url);
           NODE
-          curl -L --fail --output SND.apk "$(cat apk-url.txt)"
+          curl -L --fail --output NLC.apk "$(cat apk-url.txt)"
 
       - name: Publish rolling GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/publish-github-apk.mjs SND.apk "${{ steps.bump.outputs.version }}" "${{ steps.bump.outputs.versionCode }}" "${{ inputs.notes }}"
+        run: node scripts/publish-github-apk.mjs NLC.apk "${{ steps.bump.outputs.version }}" "${{ steps.bump.outputs.versionCode }}" "${{ inputs.notes }}"
 
       - name: Notify devices
         env:
           EXPO_PUSH_TOKENS: ${{ secrets.EXPO_PUSH_TOKENS }}
+          NLC_NAS_PASSWORD: ${{ secrets.NLC_NAS_PASSWORD }}
           SND_NAS_PASSWORD: ${{ secrets.SND_NAS_PASSWORD }}
         run: node scripts/notify-ota.mjs apk
         continue-on-error: true

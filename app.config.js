@@ -2,15 +2,15 @@ const pkg = require("./package.json");
 const fs = require("fs");
 const path = require("path");
 
-const EAS_PROJECT_ID = "1015393c-2e99-4548-8336-a256a97dbecc";
+const EAS_PROJECT_ID = "eaae8e25-f5ae-48b4-9ca5-1023d77701f7";
 const googleServices = fs.existsSync(path.join(__dirname, "google-services.json"))
   ? "./google-services.json"
   : undefined;
 
 export default {
   expo: {
-    name: "SND",
-    slug: "snd",
+    name: "NLC",
+    slug: "nlc",
     version: pkg.version,
     runtimeVersion: {
       policy: "appVersion",
@@ -20,14 +20,14 @@ export default {
       fallbackToCacheTimeout: 0,
       checkAutomatically: "ON_ERROR_RECOVERY",
     },
-    scheme: "snd",
+    scheme: "nlc",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "dark",
     newArchEnabled: true,
     android: {
-      package: "app.snd.player",
-      versionCode: 3,
+      package: "app.nlc.player",
+      versionCode: 4,
       softwareKeyboardLayoutMode: "resize",
       usesCleartextTraffic: true,
       adaptiveIcon: {
@@ -93,8 +93,8 @@ export default {
       eas: {
         projectId: EAS_PROJECT_ID,
       },
-      githubReleases: "https://github.com/JuanCarlosGP/SND/releases/latest",
-      githubApk: "https://github.com/JuanCarlosGP/SND/releases/latest/download/SND.apk",
+      githubReleases: "https://github.com/JuanCarlosGP/NLC/releases/latest",
+      githubApk: "https://github.com/JuanCarlosGP/NLC/releases/latest/download/NLC.apk",
     },
   },
 };

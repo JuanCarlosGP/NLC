@@ -2,7 +2,7 @@ import { openDatabaseAsync } from "expo-sqlite";
 import { SCHEMA_SQL } from "@/lib/db/schema";
 import type { CatalogDb } from "@/lib/db/types";
 
-const DB_NAME = "snd-catalog.db";
+const DB_NAME = "nlc-catalog.db";
 const SCHEMA_VERSION = "2";
 
 let opened: Promise<CatalogDb> | null = null;

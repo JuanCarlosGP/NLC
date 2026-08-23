@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const KEY = "snd.video.watch.v2";
-const LEGACY_KEY = "snd.video.watch.v1";
+const KEY = "nlc.video.watch.v2";
+const LEGACY_KEY = "nlc.video.watch.v1";
 const MAX_SERIES = 12;
 
 export type VideoWatchEntry = {

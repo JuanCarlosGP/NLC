@@ -64,7 +64,7 @@ const MUSIC_HELP = [
 const PODCAST_HELP = [
   {
     title: "Carpeta raíz",
-    body: "Elige la carpeta de episodios. Si no eliges una, SND usa Podcasts/ dentro de la carpeta local de música.",
+    body: "Elige la carpeta de episodios. Si no eliges una, NLC usa Podcasts/ dentro de la carpeta local de música.",
   },
   {
     title: "Programas",

@@ -57,5 +57,5 @@ export function isApkNotification(data: Record<string, unknown> | undefined | nu
   return flag === true || flag === "true" || flag === "1" || flag === 1;
 }
 
-export const GITHUB_APK_URL = "https://github.com/JuanCarlosGP/SND/releases/latest/download/SND.apk";
-export const GITHUB_RELEASES_URL = "https://github.com/JuanCarlosGP/SND/releases/latest";
+export const GITHUB_APK_URL = "https://github.com/JuanCarlosGP/NLC/releases/latest/download/NLC.apk";
+export const GITHUB_RELEASES_URL = "https://github.com/JuanCarlosGP/NLC/releases/latest";

@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { deleteSecret, getSecret, setSecret } from "@/lib/settings/secret-store";
 
-const SETTINGS_KEY = "snd.download.settings.v1";
-const TOKEN_KEY = "snd.download.token";
+const SETTINGS_KEY = "nlc.download.settings.v1";
+const TOKEN_KEY = "nlc.download.token";
 
 export type DownloadSettings = {
   host: string;

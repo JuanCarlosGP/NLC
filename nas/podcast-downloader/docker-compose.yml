@@ -1,10 +1,10 @@
-# SND podcast downloader (yt-dlp) for Ugreen NAS / any Docker host.
+# NLC podcast downloader (yt-dlp) for Ugreen NAS / any Docker host.
 # Adjust the downloads volume to your Music share, then deploy in Container Manager.
 services:
   podcast-downloader:
     build: .
-    image: snd-podcast-downloader:latest
-    container_name: snd-podcast-downloader
+    image: nlc-podcast-downloader:latest
+    container_name: nlc-podcast-downloader
     restart: unless-stopped
     ports:
       - "8091:8091"
@@ -12,7 +12,7 @@ services:
       DOWNLOAD_DIR: /downloads
       BIND_HOST: 0.0.0.0
       BIND_PORT: "8091"
-      # Optional. Leave empty = no token needed in SND. Set e.g. snd-local to require it.
+      # Optional. Leave empty = no token needed in NLC. Set e.g. nlc-local to require it.
       AUTH_TOKEN: ""
       MAX_WORKERS: "2"
     volumes:

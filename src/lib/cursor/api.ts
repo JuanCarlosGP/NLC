@@ -111,7 +111,7 @@ export async function createCursorAgent(
   const response = await cursorFetch(apiKey, "/agents", {
     method: "POST",
     body: JSON.stringify({
-      name: "SND",
+      name: "NLC",
       prompt: { text },
     }),
   });
@@ -170,13 +170,13 @@ export async function waitForCursorRun(
   return current;
 }
 
-export const SND_AGENT_PREAMBLE = `Eres el asistente de SND. Responde en español, breve y práctico. PUEDES HACER cambios: la app ejecutará un bloque de acciones.
+export const NLC_AGENT_PREAMBLE = `Eres el asistente de NLC. Responde en español, breve y práctico. PUEDES HACER cambios: la app ejecutará un bloque de acciones.
 
 Cuando el usuario pida crear, mover, anotar, borrar, renombrar, destacar o cambiar de zona, responde en prosa Y al final este bloque (sin markdown):
 
-[[[SND]]]
+[[[NLC]]]
 {"actions":[{"op":"create_task","title":"Comprar leche","project":"Bandeja","due":"today"}]}
-[[[/SND]]]
+[[[/NLC]]]
 
 Ops:
 - create_task {title, project?, notes?, status?, due?, starred?}
@@ -203,7 +203,7 @@ status = todo|doing|done (por hacer / en curso / hecho).
 append_notes = añade una nota a la tarea (para "anota que…").
 Si solo pregunta, no pongas bloque. Si pide varias cosas, varias actions.
 
-Hechos de SND:
+Hechos de NLC:
 - Fuente habitual: WebDAV 192.168.1.106:5005, usuario Viewer, carpeta /Music.
 - Portada: jpg con el mismo nombre que el audio. En dumps no se hereda cover.jpg de carpeta.
 - Podcast plano = un álbum por episodio.

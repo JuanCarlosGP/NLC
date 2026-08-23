@@ -1,6 +1,6 @@
-# Hallazgos SND
+# Hallazgos NLC
 
-Índice. El reporte completo se publica en el canal SND con la [plantilla](plantilla-hallazgo.md).
+Índice. El reporte completo se publica en el canal NLC con la [plantilla](plantilla-hallazgo.md).
 
 Estados: `abierto` · `asignado` · `en revisión` · `cerrado` · `wontfix`
 

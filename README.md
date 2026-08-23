@@ -1,8 +1,8 @@
-# SND
+# NLC
 
 Reproductor Android de código abierto para **tu** biblioteca en un NAS de la LAN (música, podcasts, vídeo). No es un clon de Spotify: no hay cuentas cloud, radio, amigos ni Play Store.
 
-**[Descargar la última APK](https://github.com/JuanCarlosGP/SND/releases/latest/download/SND.apk)** · [código en GitHub](https://github.com/JuanCarlosGP/SND)
+**[Descargar la última APK](https://github.com/JuanCarlosGP/NLC/releases/latest/download/NLC.apk)** · [código en GitHub](https://github.com/JuanCarlosGP/NLC)
 
 En Releases **solo vive esa APK**. Cada rebuild nativo la sustituye; el historial de código sigue en `main`.
 
@@ -38,7 +38,7 @@ Perfil EAS `github`: APK interna, canal `production`.
 En el PC (con `gh` y `eas` logueados):
 
 ```powershell
-$env:SND_NAS_PASSWORD = "Viewer"
+$env:NLC_NAS_PASSWORD = "Viewer"
 npm run apk:release
 ```
 
@@ -46,12 +46,12 @@ Por defecto sube el patch (`0.1.0` → `0.1.1`) y el `versionCode`. También: `n
 
 En GitHub Actions: **Actions → Release APK → Run workflow**. Secret necesario: `EXPO_TOKEN` ([expo.dev](https://expo.dev/accounts/[account]/settings/access-tokens)).
 
-La release fija `apk` se reescribe: un solo archivo `SND.apk`.
+La release fija `apk` se reescribe: un solo archivo `NLC.apk`.
 
 ## OTA (JS, sin reinstalar)
 
 ```powershell
-$env:SND_NAS_PASSWORD = "Viewer"
+$env:NLC_NAS_PASSWORD = "Viewer"
 npm run update:production
 ```
 
@@ -74,7 +74,7 @@ services:
 ```
 
 2. Abre `http://192.168.1.106:4533`, crea el usuario admin y espera al primer scan.
-3. En SND → Ajustes: fuente **Navidrome**, host `192.168.1.106`, puerto `4533`, usuario y contraseña. **Probar conexión** y **Guardar**.
+3. En NLC → Ajustes: fuente **Navidrome**, host `192.168.1.106`, puerto `4533`, usuario y contraseña. **Probar conexión** y **Guardar**.
 
 Si el ping falla: el teléfono y el NAS deben estar en la misma LAN; Navidrome debe escuchar en `0.0.0.0:4533` (no solo localhost); HTTP en claro está permitido en la app para rangos LAN.
 
@@ -83,7 +83,7 @@ Si el ping falla: el teléfono y el NAS deben estar en la misma LAN; Navidrome d
 - Streaming HTTP, sin descargar la librería al móvil (MVP).
 - Reproductor: `expo-audio` (Expo 54). Cubre foreground, y en un development/EAS build puede mostrar controles de lock screen con `setActiveForLockScreen`.
 - Formatos: mp3, m4a, ogg suelen ir bien. **FLAC** depende del decodificador del dispositivo (ExoPlayer). Si un teléfono no lo reproduce, usa calidad 320 kbps en Ajustes (transcode en Navidrome) o convierte ese álbum; no bloquea el resto de la app.
-- **Podcasts / yt-dlp:** el APK no embebe yt-dlp. Corre en Docker en el NAS (ver [`nas/podcast-downloader/README.md`](nas/podcast-downloader/README.md)). En SND → Ajustes → **Podcasts (yt-dlp)** configuras host `192.168.1.106`, puerto `8091` y el mismo token que `AUTH_TOKEN` del compose. Las descargas van a `Music/Podcasts`; refresca la biblioteca para reproducirlas. No descarga audio de Spotify.
+- **Podcasts / yt-dlp:** el APK no embebe yt-dlp. Corre en Docker en el NAS (ver [`nas/podcast-downloader/README.md`](nas/podcast-downloader/README.md)). En NLC → Ajustes → **Podcasts (yt-dlp)** configuras host `192.168.1.106`, puerto `8091` y el mismo token que `AUTH_TOKEN` del compose. Las descargas van a `Music/Podcasts`; refresca la biblioteca para reproducirlas. No descarga audio de Spotify.
 
 ## Stack
 

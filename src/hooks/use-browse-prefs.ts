@@ -4,9 +4,9 @@ import type { LibrarySort } from "@/components/library/library-sort-sheet";
 
 export type BrowseViewMode = "list" | "grid";
 
-export const HOME_BROWSE_KEY = "snd.home.browse.v1";
-export const LIBRARY_BROWSE_KEY = "snd.library.browse.v1";
-export const LIBRARY_TAB_KEY = "snd.library.tab.v1";
+export const HOME_BROWSE_KEY = "nlc.home.browse.v1";
+export const LIBRARY_BROWSE_KEY = "nlc.library.browse.v1";
+export const LIBRARY_TAB_KEY = "nlc.library.tab.v1";
 
 const SORTS: LibrarySort[] = ["recents", "added", "alpha", "creator"];
 

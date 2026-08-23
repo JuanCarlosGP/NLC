@@ -9,7 +9,7 @@ import {
 } from "react";
 import { colors } from "@/lib/theme";
 import {
-  SND_AGENT_PREAMBLE,
+  NLC_AGENT_PREAMBLE,
   createCursorAgent,
   createCursorRun,
   isTerminalRun,
@@ -139,7 +139,7 @@ export function CursorProvider({ children }: { children: ReactNode }) {
 
       try {
         const snapshot = await buildAssistantSnapshot(zone).catch(() => "Estado no disponible.");
-        const prompt = `${SND_AGENT_PREAMBLE}\n\nEstado actual de la app:\n${snapshot}\n\nMensaje del usuario:\n${text}`;
+        const prompt = `${NLC_AGENT_PREAMBLE}\n\nEstado actual de la app:\n${snapshot}\n\nMensaje del usuario:\n${text}`;
         let nextAgent = agentId;
         let runId = "";
         if (!nextAgent) {

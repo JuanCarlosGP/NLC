@@ -53,7 +53,7 @@ const UTILITIES: { id: string; label: string; hint: string; draft: string }[] = 
     label: "Carátula de canción",
     hint: "Jpg con el mismo nombre que el audio",
     draft:
-      "La canción «título» no tiene carátula. En SND la portada es un jpg al lado del mp3, mismo nombre. ¿Qué archivo pongo y en qué carpeta?",
+      "La canción «título» no tiene carátula. En NLC la portada es un jpg al lado del mp3, mismo nombre. ¿Qué archivo pongo y en qué carpeta?",
   },
   {
     id: "cover-podcast",
@@ -95,7 +95,7 @@ const UTILITIES: { id: string; label: string; hint: string; draft: string }[] = 
     label: "Playlist de Spotify",
     hint: "Importar y matchear contra el NAS",
     draft:
-      "Quiero importar esta playlist: «URL». SND no reproduce Spotify: la matchea con lo que hay en /Music. ¿Pasos en Biblioteca → +?",
+      "Quiero importar esta playlist: «URL». NLC no reproduce Spotify: la matchea con lo que hay en /Music. ¿Pasos en Biblioteca → +?",
   },
   {
     id: "onepiece",
@@ -184,7 +184,7 @@ function ChatSheetBody() {
       <View style={[styles.header, { borderBottomColor: colors.rule }]}>
         <View style={styles.headerText}>
           <Text style={styles.title}>Mensajes</Text>
-          <Text style={styles.description}>Agente SND · Cursor</Text>
+          <Text style={styles.description}>Agente NLC · Cursor</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable

@@ -6,7 +6,7 @@ const NETWORK_SECURITY_CONFIG = `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
     <!--
       Android no admite rangos CIDR en <domain>.
-      SND es un reproductor personal contra un NAS en LAN (HTTP en claro).
+      NLC es un reproductor personal contra un NAS en LAN (HTTP en claro).
       Se permite cleartext a nivel de app; el dominio del NAS queda explícito.
     -->
     <base-config cleartextTrafficPermitted="true">

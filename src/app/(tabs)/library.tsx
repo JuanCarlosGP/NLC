@@ -118,7 +118,7 @@ export default function LibraryScreen() {
   const { openPlaylistActions } = usePlaylistActions();
   const [importOpen, setImportOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
-  const { sort, viewMode, setSort, setViewMode, ready: browseReady } = useBrowsePrefs("snd.library.browse.v1");
+  const { sort, viewMode, setSort, setViewMode, ready: browseReady } = useBrowsePrefs("nlc.library.browse.v1");
   const grid = viewMode === "grid";
 
   useFocusEffect(

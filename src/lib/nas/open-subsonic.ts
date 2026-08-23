@@ -82,7 +82,7 @@ export function createOpenSubsonicSource(
   settings: NasSettings,
   password: string,
 ): MusicSource {
-  const client = "snd";
+  const client = "nlc";
   const apiVersion = "1.16.1";
 
   function authQuery(): string {

@@ -1,4 +1,4 @@
-# Docs SND
+# Docs NLC
 
 Cerebro del producto. Lo que hace la app, no cómo está implementada.
 
@@ -14,6 +14,6 @@ Cerebro del producto. Lo que hace la app, no cómo está implementada.
 - **QA Manual 1** redacta pantallas y flujos en la primera pasada (lo que ve en el teléfono).
 - **QA Manual 2** revisa esa doc con criterio propio. Si el texto no cuadra con la app, lo corrige. Si el comportamiento no tiene sentido, abre hallazgo, no “documenta el bug”.
 - **DEV 1** no rellena esto. Si un arreglo cambia una pantalla, lo dice en el canal y QA actualiza.
-- **SND PM** mantiene el índice y cierra contradicciones.
+- **NLC PM** mantiene el índice y cierra contradicciones.
 
 Hoy la fuente de verdad es lo que corre en Expo Go en el Nothing Phone. Si README del repo y esta carpeta discrepan, gana lo que hace la app y se abre hallazgo.

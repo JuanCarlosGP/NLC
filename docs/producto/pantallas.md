@@ -10,7 +10,7 @@ Entorno de esta pasada: Expo Go · Nothing Phone A063 · fuente **Carpeta compar
 
 Estado: borrador QA1
 
-- Qué es: arranque. Logo SND, conmutador Música / Podcasts / Vídeo, atajos y Recientes.
+- Qué es: arranque. Logo NLC, conmutador Música / Podcasts / Vídeo, atajos y Recientes.
 - Acciones: cambiar modo; abrir atajo; ordenar Recientes (sheet Recientes / alfabético / creador); grid o lista; tap en tile de Recientes reproduce esa pista (no abre álbum).
 - Navega a: Música (`/music`), Favoritos música/podcast, playlist importada (`/imported/...`), Podcasts, One Piece, y a veces álbum si el atajo es un álbum.
 - Rarezas: el tercer atajo de música es la playlist liked `🌠` (Spotify, autor JcMDFK), no un álbum. En vídeo no hay Recientes. El FAB Refresh/Dev Menu es de Expo Go, no de la app.

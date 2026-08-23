@@ -1,4 +1,4 @@
-"""Minimal yt-dlp HTTP API for SND downloads on the LAN."""
+"""Minimal yt-dlp HTTP API for NLC downloads on the LAN."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ JobStatus = Literal["queued", "running", "done", "error"]
 MediaKind = Literal["podcast", "song", "video", "auto"]
 ResolvedKind = Literal["podcast", "song", "video"]
 
-app = FastAPI(title="SND media downloader", version="1.2.1")
+app = FastAPI(title="NLC media downloader", version="1.2.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

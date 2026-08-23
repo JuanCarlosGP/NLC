@@ -1,10 +1,10 @@
-# Cobertura SND
+# Cobertura NLC
 
 Estado por flujo. Dos columnas porque cada pasada la hacen QA1 y QA2 por separado.
 
 Leyenda: `-` no probado · `ok` · `fallo` (poner el id `SND-xxx`).
 
-Actualizar este archivo al terminar una pasada. El detalle del fallo va a [hallazgos.md](hallazgos.md) y al canal SND.
+Actualizar este archivo al terminar una pasada. El detalle del fallo va a [hallazgos.md](hallazgos.md) y al canal NLC.
 
 Entorno de esta pasada: Expo Go · Nothing Phone A063 · Carpeta compartida `192.168.1.106:5005` `/Music` (no Navidrome)
 

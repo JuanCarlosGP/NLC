@@ -41,7 +41,7 @@ export function FocusHome() {
   return (
     <Screen>
       <View style={styles.hero}>
-        <Text style={[type.pageTitle, styles.title]}>SND</Text>
+        <Text style={[type.pageTitle, styles.title]}>NLC</Text>
         <ZoneSwitch />
       </View>
 

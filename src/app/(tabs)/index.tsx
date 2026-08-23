@@ -41,7 +41,7 @@ export default function HomeScreen() {
   const { playTracks } = usePlayer();
   const { zone } = useZone();
   const [sortOpen, setSortOpen] = useState(false);
-  const { sort, viewMode, setSort, setViewMode, ready: browseReady } = useBrowsePrefs("snd.home.browse.v1");
+  const { sort, viewMode, setSort, setViewMode, ready: browseReady } = useBrowsePrefs("nlc.home.browse.v1");
   const grid = viewMode === "grid";
   const podcast = zone === "podcast";
   const video = zone === "video";
@@ -202,7 +202,7 @@ export default function HomeScreen() {
     <>
       <Screen>
         <View style={styles.hero}>
-          <Text style={[type.pageTitle, styles.title]}>SND</Text>
+          <Text style={[type.pageTitle, styles.title]}>NLC</Text>
           <ZoneSwitch />
         </View>
 
