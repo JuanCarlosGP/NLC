@@ -31,6 +31,7 @@ import { VideoActionsProvider } from "@/lib/video/video-actions-context";
 import { OfflineProvider } from "@/lib/offline/offline-context";
 import { SettingsProvider } from "@/lib/settings/settings-context";
 import { ProductivityProvider } from "@/lib/productivity/productivity-context";
+import { RemindersProvider } from "@/lib/reminders/reminders-context";
 import { TaskActionsProvider } from "@/lib/productivity/task-actions-context";
 import { ZoneProvider } from "@/lib/zone/zone-context";
 import { TaskActionsSheet } from "@/components/productivity/task-actions-sheet";
@@ -77,6 +78,7 @@ export default function RootLayout() {
         <OtaBootstrap />
         <ZoneProvider>
         <ProductivityProvider>
+        <RemindersProvider>
         <TaskActionsProvider>
         <OfflineProvider>
         <DownloadSettingsProvider>
@@ -117,6 +119,7 @@ export default function RootLayout() {
                       <Stack.Screen name="task/[id]" />
                       <Stack.Screen name="focus/today" />
                       <Stack.Screen name="focus/inbox" />
+                      <Stack.Screen name="focus/reminders" />
                       <Stack.Screen name="projects" />
                       <Stack.Screen name="project/[id]" />
                       <Stack.Screen name="now-playing" />
@@ -143,6 +146,7 @@ export default function RootLayout() {
         </DownloadSettingsProvider>
         </OfflineProvider>
         </TaskActionsProvider>
+        </RemindersProvider>
         </ProductivityProvider>
         </ZoneProvider>
       </SettingsProvider>

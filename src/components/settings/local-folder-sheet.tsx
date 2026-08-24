@@ -19,56 +19,29 @@ import type { NasSettings } from "@/lib/settings/storage";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
-const MUSIC_FOLDER_TREE = `Música/
-  Artista/
-    Álbum/
-      01 Tema.mp3
-      cover.jpg
-  Canciones/
-    Artista - Tema.mp3`;
-
-const PODCAST_FOLDER_TREE = `Podcasts/
-  Programa/
-    Episodio.mp3`;
-
-const VIDEO_FOLDER_TREE = `Vídeo/
-  series/
-    Nombre/
-      temporada o episodios
-  movies/
-    Película.mp4`;
-
 const MUSIC_HELP = [
   {
-    title: "Carpeta raíz",
-    body: "Elige la carpeta de música: artistas, álbumes y Canciones. Los episodios tienen su propia carpeta en Podcasts.",
-  },
-  {
     title: "Álbumes",
-    body: "Artista/Álbum/01 Tema.mp3. El número al inicio ordena las pistas. El año entre paréntesis en el álbum se usa si está.",
+    body: "Artista / Álbum / pista. El número al inicio ordena las pistas. El año entre paréntesis en el álbum se usa si está.",
   },
   {
-    title: "Canciones sueltas",
-    body: "Carpeta Canciones con “Artista - Título.mp3”, o Artista/tema.mp3 si no hay álbum.",
+    title: "Temas sueltos",
+    body: "Archivos en la raíz o en una carpeta de artista, sin subcarpeta de álbum.",
   },
   {
     title: "Portadas",
-    body: "cover.jpg o folder.jpg en la carpeta del álbum. También vale una imagen con el mismo nombre que el audio.",
+    body: "cover.jpg o folder.jpg junto al álbum. También vale una imagen con el mismo nombre que el audio.",
   },
   {
     title: "Audio",
-    body: "mp3, m4a, m4b, flac, ogg, opus, wav, aac, wma, aiff. El resto se ignora. Se mezcla con el NAS; no se vuelve a copiar.",
+    body: "mp3, m4a, m4b, flac, ogg, opus, wav, aac, wma, aiff. El resto se ignora. Se mezcla con el NAS.",
   },
 ] as const;
 
 const PODCAST_HELP = [
   {
-    title: "Carpeta raíz",
-    body: "Elige la carpeta de episodios. Si no eliges una, NLC usa Podcasts/ dentro de la carpeta local de música.",
-  },
-  {
     title: "Programas",
-    body: "Programa/episodio.mp3. Si los dejas sueltos, cada archivo es un episodio aparte.",
+    body: "Una carpeta por programa, con los episodios dentro. Si los dejas sueltos, cada archivo es un episodio.",
   },
   {
     title: "Audio",
@@ -78,20 +51,16 @@ const PODCAST_HELP = [
 
 const VIDEO_HELP = [
   {
-    title: "Carpeta raíz",
-    body: "Elige la carpeta que hace de videoteca: la que contiene series/ y movies/. No una película suelta.",
-  },
-  {
     title: "Series",
-    body: "series/Nombre/… con temporadas, sagas o episodios planos. One Piece y el resto caben igual.",
+    body: "Una carpeta por serie, con temporadas o episodios dentro.",
   },
   {
     title: "Películas",
-    body: "movies/Película.mp4, o una carpeta por título si hay extras.",
+    body: "Archivos sueltos, o una carpeta por título si hay extras.",
   },
   {
     title: "Vídeo",
-    body: "mp4, mkv, m4v, webm, avi, mov. Se guarda aparte de la carpeta de música.",
+    body: "mp4, mkv, m4v, webm, avi, mov. Se mezcla con el NAS.",
   },
 ] as const;
 
@@ -188,11 +157,7 @@ export function LocalFolderSheet({
               <Text style={styles.hint}>
                 {Platform.OS === "web"
                   ? "En el PC se usa hasta recargar. En el teléfono queda guardada."
-                  : variant === "video"
-                    ? "Entra en la videoteca junto al NAS. Organízala como series/ y movies/."
-                    : variant === "podcast"
-                      ? "Solo episodios. Si está vacía, se usan los Podcasts/ de la carpeta de música."
-                      : "Solo música. Los episodios van en la carpeta local de Podcasts."}
+                  : "Se mezcla con lo que ya hay en el NAS. Cada apartado usa su propia carpeta."}
               </Text>
             </View>
             <View style={styles.actions}>
@@ -237,9 +202,8 @@ function LocalFolderHelpDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  variant?: "music" | "video";
+  variant?: "music" | "podcast" | "video";
 }) {
-  const tree = variant === "video" ? VIDEO_FOLDER_TREE : variant === "podcast" ? PODCAST_FOLDER_TREE : MUSIC_FOLDER_TREE;
   const steps = variant === "video" ? VIDEO_HELP : variant === "podcast" ? PODCAST_HELP : MUSIC_HELP;
   const { height: windowHeight } = useWindowDimensions();
   const cardMaxHeight = Math.round(windowHeight * 0.9);
@@ -269,13 +233,6 @@ function LocalFolderHelpDialog({
               bounces={false}
               overScrollMode="never"
             >
-              <View style={styles.helpTree}>
-                <Text style={styles.helpTreeLabel}>Estructura</Text>
-                <Text selectable={Platform.OS === "web"} style={styles.helpCode}>
-                  {tree}
-                </Text>
-              </View>
-
               <View style={styles.helpSteps}>
                 {steps.map((step, index) => (
                   <View key={step.title} style={styles.helpStep}>
@@ -417,29 +374,6 @@ const styles = StyleSheet.create({
     minHeight: 0,
   },
   helpBody: { gap: 16, paddingBottom: 8 },
-  helpTree: {
-    borderWidth: 1,
-    borderColor: colors.rule,
-    backgroundColor: colors.void,
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  helpTreeLabel: {
-    ...type.label,
-    letterSpacing: 0.4,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.rule,
-  },
-  helpCode: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    lineHeight: 18,
-    color: colors.inkSoft,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
   helpSteps: { gap: 12 },
   helpStep: {
     flexDirection: "row",

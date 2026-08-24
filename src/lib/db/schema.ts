@@ -105,4 +105,18 @@ CREATE TABLE IF NOT EXISTS prod_tasks (
 
 CREATE INDEX IF NOT EXISTS prod_tasks_project ON prod_tasks(project_id);
 CREATE INDEX IF NOT EXISTS prod_tasks_status ON prod_tasks(status);
-`;
+
+CREATE TABLE IF NOT EXISTS prod_reminders (
+  id TEXT PRIMARY KEY NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  hour INTEGER NOT NULL,
+  minute INTEGER NOT NULL,
+  frequency TEXT NOT NULL,
+  weekday INTEGER,
+  once_at INTEGER,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+`

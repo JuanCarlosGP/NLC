@@ -80,6 +80,7 @@ export function LadybugMark() {
 
   return (
     <View accessibilityRole="image" accessibilityLabel="NLC" style={styles.hit}>
+      <View pointerEvents="none" style={styles.ground} />
       <View style={styles.window}>
         <Image
           source={SHEET}
@@ -103,12 +104,23 @@ export function LadybugMark() {
 const styles = StyleSheet.create({
   hit: {
     width: WIN_W,
-    height: WIN_H,
+    height: WIN_H + 2,
+    alignItems: "center",
   },
   window: {
     width: WIN_W,
     height: WIN_H,
     overflow: "hidden",
+    zIndex: 1,
+  },
+  ground: {
+    position: "absolute",
+    bottom: SHOW - 2,
+    width: WIN_W - 4,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: "#4F8F4A",
+    opacity: 0.5,
   },
   sheet: {
     position: "absolute",

@@ -9,6 +9,9 @@ import {
 } from "react-native";
 import { USE_NATIVE_DRIVER } from "@/lib/use-native-driver";
 
+/** Wait for visualViewport to stop bouncing (keyboard + scroll-into-view). */
+const WEB_SETTLE_MS = 120;
+
 export function useKeyboardBottomOverlap(enabled: boolean) {
   const { height: windowHeight } = useWindowDimensions();
   const [overlap, setOverlap] = useState(0);
@@ -49,17 +52,34 @@ export function useKeyboardBottomOverlap(enabled: boolean) {
     if (Platform.OS === "web") {
       const vv = typeof window !== "undefined" ? window.visualViewport : null;
       if (!vv) return;
-      const update = () => {
-        const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-        const next = covered < 40 ? 0 : Math.round(covered);
+      let settle: ReturnType<typeof setTimeout> | null = null;
+      let last = 0;
+
+      const commit = (next: number) => {
+        if (next === last) return;
+        last = next;
         setOverlap(next);
         lift.stopAnimation();
         lift.setValue(next);
+      };
+
+      const update = () => {
+        // Ignore offsetTop: the browser also pans the focused input, which
+        // made the sheet jump up then down before settling.
+        const covered = Math.max(0, window.innerHeight - vv.height);
+        const next = covered < 40 ? 0 : Math.round(covered);
+        if (settle) clearTimeout(settle);
+        if (next === 0) {
+          commit(0);
+          return;
+        }
+        settle = setTimeout(() => commit(next), WEB_SETTLE_MS);
       };
       update();
       vv.addEventListener("resize", update);
       vv.addEventListener("scroll", update);
       return () => {
+        if (settle) clearTimeout(settle);
         vv.removeEventListener("resize", update);
         vv.removeEventListener("scroll", update);
       };

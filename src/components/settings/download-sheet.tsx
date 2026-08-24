@@ -295,15 +295,15 @@ async function copyCompose(): Promise<void> {
 const HELP_STEPS = [
   {
     title: "Carpetas",
-    body: "Crea Music/Canciones, Music/Podcasts y Popcorn/movies en el NAS.",
+    body: "En el NAS, elige (o crea) las carpetas donde irán canciones, podcasts y vídeos.",
   },
   {
     title: "App del downloader",
-    body: "Copia nas/podcast-downloader a /volume1/Music/nlc-downloader-app (app.py y requirements.txt).",
+    body: "Copia nas/podcast-downloader a una carpeta del NAS (app.py y requirements.txt).",
   },
   {
     title: "Compose",
-    body: "En Container Manager pega el YAML. Cambia /volume1/Music y /volume1/Popcorn si tus volúmenes son otros.",
+    body: "En Container Manager pega el YAML y ajusta los volúmenes a esas carpetas.",
   },
   {
     title: "Desplegar",
@@ -396,9 +396,6 @@ function DownloadHelpDialog({ open, onClose }: { open: boolean; onClose: () => v
                     </Text>
                   </Pressable>
                 </View>
-                <Text selectable={Platform.OS === "web"} style={styles.helpCode}>
-                  {YTDLP_COMPOSE.trimEnd()}
-                </Text>
               </View>
             </ScrollView>
 
@@ -581,8 +578,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.rule,
   },
   helpComposeLabel: {
     ...type.label,
@@ -599,14 +594,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.sansMedium,
     fontSize: 13,
     color: colors.inkSoft,
-  },
-  helpCode: {
-    fontFamily: fonts.sans,
-    fontSize: 11,
-    lineHeight: 16,
-    color: colors.inkSoft,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
   },
   helpDone: {
     alignItems: "center",

@@ -2,8 +2,9 @@ const GITHUB_RELEASE =
   "https://api.github.com/repos/JuanCarlosGP/NLC/releases/tags/apk";
 const GITHUB_LATEST = "https://api.github.com/repos/JuanCarlosGP/NLC/releases/latest";
 
+/** Direct asset URL. `/releases/latest/download/` often 500s on large APKs. */
 export const GITHUB_APK_DOWNLOAD =
-  "https://github.com/JuanCarlosGP/NLC/releases/latest/download/NLC.apk";
+  "https://github.com/JuanCarlosGP/NLC/releases/download/apk/NLC.apk";
 
 export type RemoteApk = {
   version: string;

@@ -65,6 +65,12 @@ export function FocusHome() {
           focus="projects"
           onPress={() => router.push("/projects")}
         />
+        <ShortcutCard
+          id="focus-reminders"
+          title="Recordatorios"
+          focus="reminders"
+          onPress={() => router.push("/focus/reminders")}
+        />
       </View>
 
       {doing.length ? (

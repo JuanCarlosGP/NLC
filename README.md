@@ -2,7 +2,7 @@
 
 Reproductor Android de código abierto para **tu** biblioteca en un NAS de la LAN (música, podcasts, vídeo). No es un clon de Spotify: no hay cuentas cloud, radio, amigos ni Play Store.
 
-**[Descargar la última APK](https://github.com/JuanCarlosGP/NLC/releases/latest/download/NLC.apk)** · [código en GitHub](https://github.com/JuanCarlosGP/NLC)
+**[Descargar la última APK](https://github.com/JuanCarlosGP/NLC/releases/download/apk/NLC.apk)** · [código en GitHub](https://github.com/JuanCarlosGP/NLC)
 
 En Releases **solo vive esa APK**. Cada rebuild nativo la sustituye; el historial de código sigue en `main`.
 

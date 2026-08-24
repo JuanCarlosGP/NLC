@@ -42,6 +42,7 @@ export default {
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "android.permission.WAKE_LOCK",
         "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.REQUEST_INSTALL_PACKAGES",
       ],
       blockedPermissions: ["android.permission.RECORD_AUDIO"],
@@ -97,7 +98,7 @@ export default {
         projectId: EAS_PROJECT_ID,
       },
       githubReleases: "https://github.com/JuanCarlosGP/NLC/releases/latest",
-      githubApk: "https://github.com/JuanCarlosGP/NLC/releases/latest/download/NLC.apk",
+      githubApk: "https://github.com/JuanCarlosGP/NLC/releases/download/apk/NLC.apk",
     },
   },
 };

@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { CalendarDays, Clapperboard, FolderKanban, Heart, Inbox, Mic, Music2 } from "lucide-react-native";
+import { CalendarDays, Clapperboard, FolderKanban, Heart, Inbox, Bell, Mic, Music2 } from "lucide-react-native";
 import { Cover } from "@/components/ui/cover";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
@@ -26,7 +26,7 @@ export function ShortcutCard({
   podcast?: boolean;
   music?: boolean;
   video?: boolean;
-  focus?: "today" | "inbox" | "projects";
+  focus?: "today" | "inbox" | "projects" | "reminders";
   onPress: () => void;
   onLongPress?: () => void;
 }) {
@@ -86,6 +86,12 @@ export function ShortcutCard({
     art = (
       <View style={[styles.badge, styles.focusProjects]}>
         <FolderKanban color={colors.accent} size={22} strokeWidth={1.8} />
+      </View>
+    );
+  } else if (focus === "reminders") {
+    art = (
+      <View style={[styles.badge, styles.focusReminders]}>
+        <Bell color={colors.accent} size={22} strokeWidth={1.8} />
       </View>
     );
   } else {
@@ -154,6 +160,9 @@ const styles = StyleSheet.create({
   },
   focusProjects: {
     backgroundColor: "#2E3140",
+  },
+  focusReminders: {
+    backgroundColor: "#3A3229",
   },
   title: {
     flex: 1,

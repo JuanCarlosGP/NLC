@@ -62,8 +62,11 @@ export function BottomSheet({
   const bottomInset = resolveBottomInset(insets.bottom);
   const { height: windowHeight } = useWindowDimensions();
   const { overlap: keyboardOverlap } = useKeyboardBottomOverlap(open);
-  const layoutHeight =
+  const rawLayoutHeight =
     Platform.OS === "web" ? windowHeight : Math.max(windowHeight - insets.top, 0);
+  const frozenLayoutRef = useRef(rawLayoutHeight);
+  if (keyboardOverlap < 40) frozenLayoutRef.current = rawLayoutHeight;
+  const layoutHeight = keyboardOverlap >= 40 ? Math.max(frozenLayoutRef.current, rawLayoutHeight) : rawLayoutHeight;
   const [expanded, setExpanded] = useState(false);
   const chrome = Math.max(0, reserveBottom);
   const ratio = expandable && expanded ? expandedRatio : viewportRatio;
@@ -81,9 +84,19 @@ export function BottomSheet({
         : -bottomInset - SHEET_OVERDRAG_TAIL;
 
   const [mounted, setMounted] = useState(false);
+  const [keyboardLiftReady, setKeyboardLiftReady] = useState(false);
   if (open && !mounted) {
     setMounted(true);
   }
+
+  useEffect(() => {
+    if (!open) {
+      setKeyboardLiftReady(false);
+      return;
+    }
+    const timer = setTimeout(() => setKeyboardLiftReady(true), OPEN_FADE_MS + 40);
+    return () => clearTimeout(timer);
+  }, [open]);
 
   const dragCloseActiveRef = useRef(false);
   const settleCloseRef = useRef<() => void>(() => {});
@@ -209,7 +222,18 @@ export function BottomSheet({
               borderColor: colors.rule,
             },
             sheetAnimatedStyle,
-            Platform.OS === "web" ? ({ touchAction: "pan-y" } as object) : null,
+            Platform.OS === "web"
+              ? ({
+                  touchAction: "pan-y",
+                  ...(keyboardLiftReady && open
+                    ? {
+                        transitionProperty: "margin-bottom, height, max-height",
+                        transitionDuration: "200ms",
+                        transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+                      }
+                    : null),
+                } as object)
+              : null,
           ]}
         >
           {handlePanGesture ? <GestureDetector gesture={handlePanGesture}>{handle}</GestureDetector> : handle}

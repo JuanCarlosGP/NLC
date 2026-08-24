@@ -5,6 +5,23 @@ import * as Linking from "expo-linking";
 import { GITHUB_APK_DOWNLOAD } from "@/lib/ota/github-apk";
 
 const PACKAGE = "app.nlc.player";
+const DOWNLOAD_HEADERS = {
+  Accept: "*/*",
+  "User-Agent": "NLC",
+};
+
+async function resolveApkUrl(): Promise<string> {
+  try {
+    const response = await fetch(GITHUB_APK_DOWNLOAD, {
+      method: "HEAD",
+      headers: DOWNLOAD_HEADERS,
+    });
+    if (response.ok && response.url) return response.url;
+  } catch {
+    // Fall back to the GitHub asset URL.
+  }
+  return GITHUB_APK_DOWNLOAD;
+}
 
 export async function downloadAndInstallApk(
   onProgress?: (ratio: number) => void,
@@ -26,15 +43,11 @@ export async function downloadAndInstallApk(
     await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => undefined);
   }
 
+  const url = await resolveApkUrl();
   const task = FileSystem.createDownloadResumable(
-    GITHUB_APK_DOWNLOAD,
+    url,
     dest,
-    {
-      headers: {
-        Accept: "*/*",
-        "User-Agent": "NLC",
-      },
-    },
+    { headers: DOWNLOAD_HEADERS },
     (progress) => {
       if (progress.totalBytesExpectedToWrite > 0) {
         onProgress?.(progress.totalBytesWritten / progress.totalBytesExpectedToWrite);
@@ -44,7 +57,8 @@ export async function downloadAndInstallApk(
 
   const result = await task.downloadAsync();
   if (!result?.uri || result.status < 200 || result.status >= 300) {
-    throw new Error(`HTTP ${result?.status ?? 0}`);
+    await Linking.openURL(GITHUB_APK_DOWNLOAD);
+    return;
   }
 
   onProgress?.(1);

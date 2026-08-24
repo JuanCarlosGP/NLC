@@ -6,6 +6,7 @@ import type { NasSettings } from "@/lib/settings/storage";
 import { applyOtaUpdate, isApkNotification, isOtaNotification } from "@/lib/ota/apply-update";
 import { downloadAndInstallApk } from "@/lib/ota/install-apk";
 import { registerPushTokenOnNas, saveLocalPushToken } from "@/lib/ota/tokens";
+import { isReminderNotification, openRemindersFromNotification } from "@/lib/reminders/open";
 
 const OTA_CHANNEL = "ota";
 
@@ -64,6 +65,10 @@ export async function registerOtaPush(settings: NasSettings, password: string): 
 
 function handleNotificationData(data: Record<string, unknown> | undefined) {
   Notifications.clearLastNotificationResponse();
+  if (isReminderNotification(data)) {
+    openRemindersFromNotification();
+    return;
+  }
   if (data?.test === true || data?.test === "true") return;
   if (isApkNotification(data)) {
     void downloadAndInstallApk();
