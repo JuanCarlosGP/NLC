@@ -327,18 +327,21 @@ function ChatSheetBody() {
                 },
               } as object)
             : null)}
-          style={({ pressed, hovered }) => [
-            styles.sendBtn,
-            webInteractiveStyle(),
-            {
-              backgroundColor: canSend
-                ? pressed || hovered
-                  ? SEND_ACTIVE_HOVER
-                  : SEND_ACTIVE
-                : colors.sheetHover,
-              opacity: canSend ? 1 : 0.55,
-            },
-          ]}
+          style={(state) => {
+            const hovered = Boolean((state as { hovered?: boolean }).hovered);
+            return [
+              styles.sendBtn,
+              webInteractiveStyle(),
+              {
+                backgroundColor: canSend
+                  ? state.pressed || hovered
+                    ? SEND_ACTIVE_HOVER
+                    : SEND_ACTIVE
+                  : colors.sheetHover,
+                opacity: canSend ? 1 : 0.55,
+              },
+            ];
+          }}
         >
           {busy ? (
             <ActivityIndicator color={SEND_ICON} size="small" />
