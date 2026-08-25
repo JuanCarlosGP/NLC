@@ -125,12 +125,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     (track: Track) => {
       const metadata = lockScreenMetadata(track);
       try {
-        if (lockScreenActiveRef.current) {
-          player.updateLockScreenMetadata(metadata);
-        } else {
-          player.setActiveForLockScreen(true, metadata, LOCK_SCREEN_OPTIONS);
-          lockScreenActiveRef.current = true;
-        }
+        // Always activate: native reuses the same MediaSession so Android
+        // does not stack duplicate now-playing cards in the shade carousel.
+        player.setActiveForLockScreen(true, metadata, LOCK_SCREEN_OPTIONS);
+        lockScreenActiveRef.current = true;
       } catch {
         // Lock screen is best-effort on Expo Go / older expo-audio.
       }

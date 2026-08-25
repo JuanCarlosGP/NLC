@@ -1,12 +1,13 @@
 /**
- * Re-applies NLC lock-screen next/previous buttons if `npm install` resets expo-audio.
- * Full patch also lives in node_modules/expo-audio (search SND_MEDIA_SKIP).
+ * Re-applies NLC lock-screen skip buttons if `npm install` resets expo-audio.
+ * Canonical native sources live in plugins/media-skip/ (copied at prebuild).
  */
 const fs = require("fs");
 const path = require("path");
 const { withDangerousMod } = require("expo/config-plugins");
 
-const MARKER = "SND_MEDIA_SKIP";
+const MARKER = "NLC_MEDIA_SKIP";
+const LEGACY_MARKER = "SND_MEDIA_SKIP";
 
 function read(file) {
   return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : null;
@@ -15,11 +16,27 @@ function read(file) {
 function write(file, next) {
   const prev = read(file);
   if (prev == null || prev === next) return;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, next);
 }
 
 function patched(content) {
-  return Boolean(content && content.includes(MARKER));
+  return Boolean(content && (content.includes(MARKER) || content.includes(LEGACY_MARKER)));
+}
+
+function copyPatchedKotlin(root, filename) {
+  const src = path.join(__dirname, "media-skip", filename);
+  const dest = path.join(
+    root,
+    "android/src/main/java/expo/modules/audio/service",
+    filename,
+  );
+  const next = read(src);
+  if (!next) {
+    console.warn(`[with-media-skip-buttons] missing ${src}`);
+    return;
+  }
+  write(dest, next);
 }
 
 function withMediaSkipButtons(config) {
@@ -27,6 +44,7 @@ function withMediaSkipButtons(config) {
     "android",
     async (modConfig) => {
       const root = path.join(modConfig.modRequest.projectRoot, "node_modules/expo-audio");
+
       const records = path.join(root, "android/src/main/java/expo/modules/audio/AudioRecords.kt");
       let source = read(records);
       if (source && !source.includes("showNextTrack")) {
@@ -77,16 +95,9 @@ function withMediaSkipButtons(config) {
         write(player, source);
       }
 
-      const service = path.join(
-        root,
-        "android/src/main/java/expo/modules/audio/service/AudioControlsService.kt",
-      );
-      source = read(service);
-      if (source && !patched(source)) {
-        console.warn(
-          "[with-media-skip-buttons] expo-audio AudioControlsService lost SND_MEDIA_SKIP; restore from git or re-apply the lock-screen patch.",
-        );
-      }
+      copyPatchedKotlin(root, "AudioControlsService.kt");
+      copyPatchedKotlin(root, "AudioMediaSessionCallback.kt");
+      copyPatchedKotlin(root, "LockScreenPlayer.kt");
 
       const iosRecords = path.join(root, "ios/AudioRecords.swift");
       source = read(iosRecords);
