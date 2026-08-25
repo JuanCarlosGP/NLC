@@ -217,37 +217,31 @@ function WealthSearch() {
   const { assets, txs, accounts, goalProgress } = useWealth();
   const q = query.trim().toLowerCase();
 
-  const matchedAssets = useMemo(
-    () =>
-      q
-        ? assets.filter(
-            (asset) =>
-              !asset.archived &&
-              (asset.name.toLowerCase().includes(q) || asset.ticker.toLowerCase().includes(q)),
-          )
-        : [],
-    [assets, q],
-  );
-  const matchedTx = useMemo(
-    () =>
-      q
-        ? txs.filter(
-            (tx) =>
-              tx.title.toLowerCase().includes(q) ||
-              tx.category.toLowerCase().includes(q) ||
-              tx.notes.toLowerCase().includes(q),
-          )
-        : [],
-    [q, txs],
-  );
-  const matchedAccounts = useMemo(
-    () => (q ? accounts.filter((account) => account.name.toLowerCase().includes(q)) : []),
-    [accounts, q],
-  );
-  const matchedGoals = useMemo(
-    () => (q ? goalProgress.filter((item) => item.goal.name.toLowerCase().includes(q)) : []),
-    [goalProgress, q],
-  );
+  const matchedAssets = useMemo(() => {
+    const live = assets.filter((asset) => !asset.archived);
+    if (!q) return live;
+    return live.filter(
+      (asset) => asset.name.toLowerCase().includes(q) || asset.ticker.toLowerCase().includes(q),
+    );
+  }, [assets, q]);
+  const matchedTx = useMemo(() => {
+    if (!q) return txs;
+    return txs.filter(
+      (tx) =>
+        tx.title.toLowerCase().includes(q) ||
+        tx.category.toLowerCase().includes(q) ||
+        tx.notes.toLowerCase().includes(q),
+    );
+  }, [q, txs]);
+  const matchedAccounts = useMemo(() => {
+    const live = accounts.filter((account) => !account.archived);
+    if (!q) return live;
+    return live.filter((account) => account.name.toLowerCase().includes(q));
+  }, [accounts, q]);
+  const matchedGoals = useMemo(() => {
+    if (!q) return goalProgress;
+    return goalProgress.filter((item) => item.goal.name.toLowerCase().includes(q));
+  }, [goalProgress, q]);
   const empty =
     Boolean(q) &&
     !matchedAssets.length &&
@@ -337,11 +331,11 @@ function FocusSearch() {
             (task) =>
               task.title.toLowerCase().includes(q) || task.notes.toLowerCase().includes(q),
           )
-        : [],
+        : tasks,
     [q, tasks],
   );
   const matchedProjects = useMemo(
-    () => (q ? projects.filter((project) => project.name.toLowerCase().includes(q)) : []),
+    () => (q ? projects.filter((project) => project.name.toLowerCase().includes(q)) : projects),
     [projects, q],
   );
   const empty = Boolean(q) && !matchedTasks.length && !matchedProjects.length;

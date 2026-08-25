@@ -10,6 +10,11 @@ export type AssetPosition = {
 
 export type ChartPoint = { at: number; value: number };
 
+const DAY_MS = 86_400_000;
+const TEN_MIN_MS = 10 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const FOUR_HOURS_MS = 4 * HOUR_MS;
+
 const RANGE_MS: Record<Exclude<WealthRange, "max">, number> = {
   "1d": 24 * 60 * 60 * 1000,
   "1w": 7 * 24 * 60 * 60 * 1000,
@@ -93,7 +98,110 @@ export function chartSeries(
   const current = netWorth(accounts, assets, txs);
   points.push({ at: now, value: current });
   if (points.length === 1) points.unshift({ at: now - 1, value: points[0]!.value });
-  return points;
+  return sampleChartPoints(points, range, points[0]!.at, now);
+}
+
+export function chartStepMs(range: WealthRange, start: number, now: number): number {
+  if (range === "1d") return TEN_MIN_MS;
+  if (range === "1w") return HOUR_MS;
+  if (range === "1m") return FOUR_HOURS_MS;
+  if (range === "1y") return DAY_MS;
+  const span = Math.max(DAY_MS, now - start);
+  const days = span / DAY_MS;
+  if (days <= 90) return DAY_MS;
+  if (days <= 365) return 3 * DAY_MS;
+  if (days <= 365 * 3) return 7 * DAY_MS;
+  return 14 * DAY_MS;
+}
+
+function startOfLocalDay(ts: number): number {
+  const next = new Date(ts);
+  next.setHours(0, 0, 0, 0);
+  return next.getTime();
+}
+
+export function alignChartTime(ts: number, range: WealthRange, stepMs: number): number {
+  const date = new Date(ts);
+  date.setSeconds(0, 0);
+  if (range === "1d") {
+    date.setMinutes(Math.floor(date.getMinutes() / 10) * 10);
+    return date.getTime();
+  }
+  if (range === "1w") {
+    date.setMinutes(0);
+    return date.getTime();
+  }
+  if (range === "1m") {
+    date.setMinutes(0);
+    date.setHours(Math.floor(date.getHours() / 4) * 4);
+    return date.getTime();
+  }
+  const day = startOfLocalDay(ts);
+  const group = Math.max(1, Math.round(stepMs / DAY_MS));
+  if (group <= 1) return day;
+  const utcDays = Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
+  const aligned = Math.floor(utcDays / group) * group;
+  const origin = new Date(aligned * DAY_MS);
+  return new Date(origin.getUTCFullYear(), origin.getUTCMonth(), origin.getUTCDate()).getTime();
+}
+
+function nextChartTime(ts: number, range: WealthRange, stepMs: number): number {
+  if (range === "1d" || range === "1w" || range === "1m") return ts + stepMs;
+  const days = Math.max(1, Math.round(stepMs / DAY_MS));
+  const date = new Date(ts);
+  date.setDate(date.getDate() + days);
+  return date.getTime();
+}
+
+export function sampleChartPoints(
+  events: ChartPoint[],
+  range: WealthRange,
+  start: number,
+  now: number,
+): ChartPoint[] {
+  if (!events.length) return [{ at: start || now - 1, value: 0 }, { at: now, value: 0 }];
+  const step = chartStepMs(range, start, now);
+  let t = alignChartTime(start, range, step);
+  const sampled: ChartPoint[] = [];
+  let i = 0;
+  let value = events[0]!.value;
+  const push = (at: number) => {
+    while (i < events.length && events[i]!.at <= at) {
+      value = events[i]!.value;
+      i += 1;
+    }
+    sampled.push({ at, value });
+  };
+  while (t < now) {
+    push(t);
+    const next = nextChartTime(t, range, step);
+    if (next <= t) break;
+    t = next;
+  }
+  push(now);
+  if (sampled.length < 2) sampled.unshift({ at: now - 1, value: sampled[0]!.value });
+  return sampled;
+}
+
+export function formatChartScrub(at: number, range: WealthRange): string {
+  const date = new Date(at);
+  if (range === "1d") {
+    return date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  }
+  if (range === "1w") {
+    const day = date.toLocaleDateString("es-ES", { weekday: "short" });
+    const time = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    return `${day} ${time}`;
+  }
+  if (range === "1m") {
+    const day = date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+    const time = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    return `${day} · ${time}`;
+  }
+  if (range === "1y") {
+    return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  }
+  return date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function changePct(points: ChartPoint[]): number | null {
@@ -125,7 +233,6 @@ function holdingsAt(qty: Map<string, number>, prices: Map<string, number>): numb
   return sum;
 }
 
-const DAY_MS = 86_400_000;
 const MONTH_MS = 30.4375 * DAY_MS;
 const PACE_LOOKBACK_MS = 90 * DAY_MS;
 

@@ -15,6 +15,7 @@ import { WealthChart } from "@/components/wealth/wealth-chart";
 import { assetHref } from "@/lib/library/href";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
+import { changePct, formatChartScrub, type ChartPoint } from "@/lib/wealth/compute";
 import { formatEuro, formatPct } from "@/lib/wealth/money";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 import { RANGE_OPTIONS, type WealthGoal, type WealthHomeTab, type WealthRange, type WealthTxKind } from "@/lib/wealth/types";
@@ -26,15 +27,18 @@ export function WealthHome() {
   const [tab, setTab] = useState<WealthHomeTab>("wealth");
   const [range, setRange] = useState<WealthRange>("max");
   const [txOpen, setTxOpen] = useState(false);
-  const [txKind, setTxKind] = useState<WealthTxKind>("expense");
+  const [txKind, setTxKind] = useState<WealthTxKind>("income");
   const [assetOpen, setAssetOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [goalOpen, setGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<WealthGoal | null>(null);
+  const [scrub, setScrub] = useState<ChartPoint | null>(null);
 
   const points = useMemo(() => series(range), [range, series]);
   const change = rangeChange(range);
+  const scrubChange = scrub && points[0] ? changePct([points[0], scrub]) : change;
   const up = (change ?? 0) >= 0;
+  const shownUp = (scrubChange ?? 0) >= 0;
   const nextGoal = goalProgress.find((item) => !item.reached);
   const headline =
     tab === "wealth" ? total : tab === "cash" ? cash : nextGoal ? nextGoal.remaining : 0;
@@ -74,7 +78,15 @@ export function WealthHome() {
 
         <View style={styles.balanceBlock}>
           <Text style={type.label}>
-            {tab === "wealth" ? "Total" : tab === "cash" ? "Efectivo" : nextGoal ? `Faltan · ${nextGoal.goal.name}` : "Objetivos"}
+            {tab === "wealth"
+              ? scrub
+                ? formatChartScrub(scrub.at, range)
+                : "Total"
+              : tab === "cash"
+                ? "Efectivo"
+                : nextGoal
+                  ? `Faltan · ${nextGoal.goal.name}`
+                  : "Objetivos"}
           </Text>
           <View style={styles.balanceRow}>
             <Text style={styles.balance}>
@@ -83,11 +95,11 @@ export function WealthHome() {
                   ? goalProgress.length
                     ? "Listo"
                     : "—"
-                  : formatEuro(headline)
+                  : formatEuro(tab === "wealth" && scrub ? scrub.value : headline)
                 : "…"}
             </Text>
             {tab === "wealth" ? (
-              <Text style={[styles.chg, up ? styles.up : styles.down]}>{formatPct(change)}</Text>
+              <Text style={[styles.chg, shownUp ? styles.up : styles.down]}>{formatPct(scrubChange)}</Text>
             ) : tab === "goals" && nextGoal ? (
               <Text style={styles.chg}>{`${Math.round(nextGoal.pct * 100)} %`}</Text>
             ) : null}
@@ -106,14 +118,14 @@ export function WealthHome() {
                       triggerUiHaptic();
                       setRange(item.id);
                     }}
-                    style={styles.rangeBtn}
+                    style={[styles.rangeBtn, active && styles.rangeBtnOn]}
                   >
                     <Text style={[styles.rangeLabel, active && styles.rangeOn]}>{item.label}</Text>
                   </Pressable>
                 );
               })}
             </View>
-            <WealthChart points={points} up={up} />
+            <WealthChart points={points} up={up} range={range} onScrub={setScrub} />
           </>
         ) : null}
 
@@ -214,11 +226,11 @@ export function WealthHome() {
           ) : (
             <>
               <Pressable
-                onPress={() => openTx(tab === "cash" ? "income" : "buy")}
+                onPress={() => openTx("income")}
                 style={({ pressed }) => [styles.action, { opacity: pressed ? 0.86 : 1 }]}
               >
                 <Search size={18} color={colors.void} strokeWidth={2} />
-                <Text style={styles.actionLabel}>{tab === "cash" ? "Ingreso" : "Compra"}</Text>
+                <Text style={styles.actionLabel}>Ingreso</Text>
               </Pressable>
               <Pressable
                 onPress={() => openTx(tab === "cash" ? "transfer" : "expense")}
@@ -306,16 +318,28 @@ const styles = StyleSheet.create({
   down: { color: colors.danger },
   ranges: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: 8,
+    alignSelf: "flex-start",
+    alignItems: "center",
+    gap: 2,
+    marginTop: 8,
+    padding: 3,
+    backgroundColor: colors.sheetRaised,
+    borderRadius: 999,
   },
-  rangeBtn: { paddingVertical: 6, paddingHorizontal: 4 },
+  rangeBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+  },
+  rangeBtnOn: {
+    backgroundColor: colors.ink,
+  },
   rangeLabel: {
     fontFamily: fonts.sansMedium,
     fontSize: 13,
     color: colors.muted,
   },
-  rangeOn: { color: colors.ink },
+  rangeOn: { color: colors.void },
   cards: {
     flexDirection: "row",
     flexWrap: "wrap",

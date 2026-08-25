@@ -33,9 +33,11 @@ import { SettingsProvider } from "@/lib/settings/settings-context";
 import { ProductivityProvider } from "@/lib/productivity/productivity-context";
 import { RemindersProvider } from "@/lib/reminders/reminders-context";
 import { WealthProvider } from "@/lib/wealth/wealth-context";
+import { TxActionsProvider } from "@/lib/wealth/tx-actions-context";
 import { TaskActionsProvider } from "@/lib/productivity/task-actions-context";
 import { ZoneProvider } from "@/lib/zone/zone-context";
 import { TaskActionsSheet } from "@/components/productivity/task-actions-sheet";
+import { TxActionsSheet } from "@/components/wealth/tx-composer-sheet";
 import { PlaylistActionsProvider } from "@/lib/spotify/playlist-actions-context";
 import { SpotifyProvider } from "@/lib/spotify/spotify-context";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
@@ -81,6 +83,7 @@ export default function RootLayout() {
         <ProductivityProvider>
         <WealthProvider>
         <RemindersProvider>
+        <TxActionsProvider>
         <TaskActionsProvider>
         <OfflineProvider>
         <DownloadSettingsProvider>
@@ -139,6 +142,7 @@ export default function RootLayout() {
                     <VideoActionsSheet />
                     <PlaylistActionsSheet />
                     <TaskActionsSheet />
+                    <TxActionsSheet />
                   </GestureHandlerRootView>
                 </DockChrome>
                 </PlaylistActionsProvider>
@@ -152,6 +156,7 @@ export default function RootLayout() {
         </DownloadSettingsProvider>
         </OfflineProvider>
         </TaskActionsProvider>
+        </TxActionsProvider>
         </RemindersProvider>
         </WealthProvider>
         </ProductivityProvider>

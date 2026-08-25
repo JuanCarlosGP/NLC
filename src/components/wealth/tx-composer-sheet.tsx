@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { AmountInput } from "@/components/wealth/amount-input";
-import { parseAmount } from "@/lib/wealth/money";
+import { formatAmountInput, parseAmount } from "@/lib/wealth/money";
+import { useTxActions } from "@/lib/wealth/tx-actions-context";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 import {
   ASSET_KIND_LABEL,
@@ -16,17 +18,25 @@ import {
   TX_KIND_LABEL,
   TX_KINDS,
   type WealthAssetKind,
+  type WealthTx,
   type WealthTxKind,
 } from "@/lib/wealth/types";
+
+export function TxActionsSheet() {
+  const { open, tx, setOpen } = useTxActions();
+  return <TxComposerSheet open={open} onOpenChange={setOpen} tx={tx} />;
+}
 
 export function TxComposerSheet({
   open,
   onOpenChange,
-  defaultKind = "expense",
+  defaultKind = "income",
+  tx,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultKind?: WealthTxKind;
+  tx?: WealthTx | null;
 }) {
   return (
     <BottomSheet
@@ -35,7 +45,12 @@ export function TxComposerSheet({
       accessibilityCloseLabel="Cerrar movimiento"
       viewportRatio={0.86}
     >
-      <TxComposerBody open={open} defaultKind={defaultKind} onDone={() => onOpenChange(false)} />
+      <TxComposerBody
+        open={open}
+        defaultKind={defaultKind}
+        tx={tx ?? null}
+        onDone={() => onOpenChange(false)}
+      />
     </BottomSheet>
   );
 }
@@ -43,15 +58,24 @@ export function TxComposerSheet({
 function TxComposerBody({
   open,
   defaultKind,
+  tx,
   onDone,
 }: {
   open: boolean;
   defaultKind: WealthTxKind;
+  tx: WealthTx | null;
   onDone: () => void;
 }) {
-  const { createTx, assets } = useWealth();
+  const { createTx, updateTx, deleteTx, assets } = useWealth();
   const accounts = useLiveAccounts();
-  const liveAssets = useMemo(() => assets.filter((item) => !item.archived), [assets]);
+  const liveAssets = useMemo(() => {
+    const list = assets.filter((item) => !item.archived);
+    if (tx?.assetId && !list.some((item) => item.id === tx.assetId)) {
+      const hidden = assets.find((item) => item.id === tx.assetId);
+      if (hidden) return [hidden, ...list];
+    }
+    return list;
+  }, [assets, tx]);
   const [kind, setKind] = useState<WealthTxKind>(defaultKind);
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
@@ -64,9 +88,26 @@ function TxComposerBody({
   const [assetKind, setAssetKind] = useState<WealthAssetKind>("stock");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    if (tx) {
+      setKind(tx.kind);
+      setTitle(tx.title);
+      setAmount(formatAmountInput(tx.amount));
+      setQuantity(tx.quantity != null ? formatAmountInput(tx.quantity, 8) : "");
+      setCategory(tx.category ?? "");
+      setAccountId(tx.accountId ?? accounts[0]?.id ?? CASH_ACCOUNT_ID);
+      setCounterId(tx.counterAccountId ?? accounts.find((item) => item.id !== tx.accountId)?.id ?? "");
+      setAssetId(tx.assetId ?? "");
+      setAssetName("");
+      setAssetKind(assets.find((item) => item.id === tx.assetId)?.kind ?? "stock");
+      setBusy(false);
+      setError(null);
+      setConfirmDelete(false);
+      return;
+    }
     setKind(defaultKind);
     setTitle("");
     setAmount("");
@@ -79,7 +120,8 @@ function TxComposerBody({
     setAssetKind("stock");
     setBusy(false);
     setError(null);
-  }, [defaultKind, open]);
+    setConfirmDelete(false);
+  }, [defaultKind, open, tx]);
 
   const categories = kind === "income" ? INCOME_CATEGORIES : kind === "expense" ? EXPENSE_CATEGORIES : [];
   const parsedAmount = parseAmount(amount);
@@ -96,7 +138,7 @@ function TxComposerBody({
     setBusy(true);
     setError(null);
     try {
-      await createTx({
+      const input = {
         kind,
         amount: parsedAmount,
         title,
@@ -111,7 +153,11 @@ function TxComposerBody({
             : null,
         assetName: kind === "buy" ? assetName : undefined,
         assetKind: kind === "buy" ? assetKind : undefined,
-      });
+        bookedAt: tx?.bookedAt,
+        notes: tx?.notes,
+      };
+      if (tx) await updateTx(tx.id, input);
+      else await createTx(input);
       triggerUiHaptic();
       onDone();
     } catch (err) {
@@ -122,167 +168,127 @@ function TxComposerBody({
   }
 
   return (
-    <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Text style={type.sectionTitle}>Movimiento</Text>
-      <View style={styles.chips}>
-        {TX_KINDS.map((id) => {
-          const active = kind === id;
-          return (
-            <Pressable
-              key={id}
-              onPress={() => {
-                triggerUiHaptic();
-                setKind(id);
-              }}
-              style={[styles.chip, active && styles.chipOn]}
-            >
-              <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{TX_KIND_LABEL[id]}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <TextInput
-        value={title}
-        onChangeText={setTitle}
-        placeholder={kind === "buy" ? "Nombre de la inversión" : "Concepto"}
-        placeholderTextColor={colors.muted}
-        style={styles.input}
-      />
-      <AmountInput
-        value={amount}
-        onChangeText={setAmount}
-        placeholder="Importe, 12,50 o 1.234,56"
-        accessibilityLabel="Importe"
-        style={styles.input}
-      />
-      {kind === "buy" || kind === "sell" ? (
-        <AmountInput
-          value={quantity}
-          onChangeText={setQuantity}
-          decimals={8}
-          placeholder="Cantidad, 2 o 0,5"
-          accessibilityLabel="Cantidad"
-          style={styles.input}
-        />
-      ) : null}
-      {kind === "buy" && !assetId ? (
-        <>
-          <TextInput
-            value={assetName}
-            onChangeText={setAssetName}
-            placeholder="Ticker o nombre (opcional)"
-            placeholderTextColor={colors.muted}
-            autoCapitalize="characters"
-            style={styles.input}
-          />
-          <View style={styles.chips}>
-            {ASSET_KINDS.map((id) => {
-              const active = assetKind === id;
-              return (
-                <Pressable
-                  key={id}
-                  onPress={() => {
-                    triggerUiHaptic();
-                    setAssetKind(id);
-                  }}
-                  style={[styles.chip, active && styles.chipOn]}
-                >
-                  <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{ASSET_KIND_LABEL[id]}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
-      {kind === "buy" || kind === "sell" ? (
-        <>
-          <Text style={type.label}>Inversión</Text>
-          <View style={styles.chips}>
-            {kind === "buy" ? (
+    <>
+      <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <Text style={type.sectionTitle}>{tx ? "Editar movimiento" : "Movimiento"}</Text>
+        <View style={styles.chips}>
+          {TX_KINDS.map((id) => {
+            const active = kind === id;
+            return (
               <Pressable
+                key={id}
                 onPress={() => {
                   triggerUiHaptic();
-                  setAssetId("");
+                  setKind(id);
                 }}
-                style={[styles.chip, !assetId && styles.chipOn]}
+                style={[styles.chip, active && styles.chipOn]}
               >
-                <Text style={[styles.chipLabel, !assetId && styles.chipLabelOn]}>Nueva</Text>
+                <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{TX_KIND_LABEL[id]}</Text>
               </Pressable>
-            ) : null}
-            {liveAssets.map((asset) => {
-              const active = assetId === asset.id;
-              return (
+            );
+          })}
+        </View>
+        <TextInput
+          value={title}
+          onChangeText={setTitle}
+          placeholder={kind === "buy" ? "Nombre de la inversión" : "Concepto"}
+          placeholderTextColor={colors.muted}
+          style={styles.input}
+        />
+        <AmountInput
+          value={amount}
+          onChangeText={setAmount}
+          placeholder="Importe, 12,50 o 1.234,56"
+          accessibilityLabel="Importe"
+          style={styles.input}
+        />
+        {kind === "buy" || kind === "sell" ? (
+          <AmountInput
+            value={quantity}
+            onChangeText={setQuantity}
+            decimals={8}
+            placeholder="Cantidad, 2 o 0,5"
+            accessibilityLabel="Cantidad"
+            style={styles.input}
+          />
+        ) : null}
+        {kind === "buy" && !assetId ? (
+          <>
+            <TextInput
+              value={assetName}
+              onChangeText={setAssetName}
+              placeholder="Ticker o nombre (opcional)"
+              placeholderTextColor={colors.muted}
+              autoCapitalize="characters"
+              style={styles.input}
+            />
+            <View style={styles.chips}>
+              {ASSET_KINDS.map((id) => {
+                const active = assetKind === id;
+                return (
+                  <Pressable
+                    key={id}
+                    onPress={() => {
+                      triggerUiHaptic();
+                      setAssetKind(id);
+                    }}
+                    style={[styles.chip, active && styles.chipOn]}
+                  >
+                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{ASSET_KIND_LABEL[id]}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
+        {kind === "buy" || kind === "sell" ? (
+          <>
+            <Text style={type.label}>Inversión</Text>
+            <View style={styles.chips}>
+              {kind === "buy" ? (
                 <Pressable
-                  key={asset.id}
                   onPress={() => {
                     triggerUiHaptic();
-                    setAssetId(asset.id);
-                    if (!title.trim()) setTitle(asset.name);
+                    setAssetId("");
                   }}
-                  style={[styles.chip, active && styles.chipOn]}
+                  style={[styles.chip, !assetId && styles.chipOn]}
                 >
-                  <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>
-                    {asset.ticker || asset.name}
-                  </Text>
+                  <Text style={[styles.chipLabel, !assetId && styles.chipLabelOn]}>Nueva</Text>
                 </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
-      {kind !== "transfer" ? (
-        <>
-          <Text style={type.label}>Cuenta</Text>
-          <View style={styles.chips}>
-            {accounts.map((account) => {
-              const active = accountId === account.id;
-              return (
-                <Pressable
-                  key={account.id}
-                  onPress={() => {
-                    triggerUiHaptic();
-                    setAccountId(account.id);
-                  }}
-                  style={[styles.chip, active && styles.chipOn]}
-                >
-                  <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{account.name}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : (
-        <>
-          <Text style={type.label}>Desde</Text>
-          <View style={styles.chips}>
-            {accounts.map((account) => {
-              const active = accountId === account.id;
-              return (
-                <Pressable
-                  key={account.id}
-                  onPress={() => {
-                    triggerUiHaptic();
-                    setAccountId(account.id);
-                  }}
-                  style={[styles.chip, active && styles.chipOn]}
-                >
-                  <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{account.name}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text style={type.label}>Hacia</Text>
-          <View style={styles.chips}>
-            {accounts
-              .filter((account) => account.id !== accountId)
-              .map((account) => {
-                const active = counterId === account.id;
+              ) : null}
+              {liveAssets.map((asset) => {
+                const active = assetId === asset.id;
+                return (
+                  <Pressable
+                    key={asset.id}
+                    onPress={() => {
+                      triggerUiHaptic();
+                      setAssetId(asset.id);
+                      if (!title.trim()) setTitle(asset.name);
+                    }}
+                    style={[styles.chip, active && styles.chipOn]}
+                  >
+                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>
+                      {asset.ticker || asset.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
+        {kind !== "transfer" ? (
+          <>
+            <Text style={type.label}>Cuenta</Text>
+            <View style={styles.chips}>
+              {accounts.map((account) => {
+                const active = accountId === account.id;
                 return (
                   <Pressable
                     key={account.id}
                     onPress={() => {
                       triggerUiHaptic();
-                      setCounterId(account.id);
+                      setAccountId(account.id);
                     }}
                     style={[styles.chip, active && styles.chipOn]}
                   >
@@ -290,41 +296,122 @@ function TxComposerBody({
                   </Pressable>
                 );
               })}
-          </View>
-        </>
-      )}
-      {categories.length ? (
-        <>
-          <Text style={type.label}>Categoría</Text>
-          <View style={styles.chips}>
-            {categories.map((item) => {
-              const active = category === item;
-              return (
-                <Pressable
-                  key={item}
-                  onPress={() => {
-                    triggerUiHaptic();
-                    setCategory(item);
-                  }}
-                  style={[styles.chip, active && styles.chipOn]}
-                >
-                  <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{item}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable
-        accessibilityRole="button"
-        disabled={!canSubmit || busy}
-        onPress={() => void submit()}
-        style={({ pressed }) => [styles.submit, { opacity: !canSubmit || busy ? 0.4 : pressed ? 0.86 : 1 }]}
-      >
-        <Text style={styles.submitText}>{busy ? "…" : "Guardar"}</Text>
-      </Pressable>
-    </SheetScrollView>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={type.label}>Desde</Text>
+            <View style={styles.chips}>
+              {accounts.map((account) => {
+                const active = accountId === account.id;
+                return (
+                  <Pressable
+                    key={account.id}
+                    onPress={() => {
+                      triggerUiHaptic();
+                      setAccountId(account.id);
+                    }}
+                    style={[styles.chip, active && styles.chipOn]}
+                  >
+                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{account.name}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={type.label}>Hacia</Text>
+            <View style={styles.chips}>
+              {accounts
+                .filter((account) => account.id !== accountId)
+                .map((account) => {
+                  const active = counterId === account.id;
+                  return (
+                    <Pressable
+                      key={account.id}
+                      onPress={() => {
+                        triggerUiHaptic();
+                        setCounterId(account.id);
+                      }}
+                      style={[styles.chip, active && styles.chipOn]}
+                    >
+                      <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{account.name}</Text>
+                    </Pressable>
+                  );
+                })}
+            </View>
+          </>
+        )}
+        {categories.length ? (
+          <>
+            <Text style={type.label}>Categoría</Text>
+            <View style={styles.chips}>
+              {categories.map((item) => {
+                const active = category === item;
+                return (
+                  <Pressable
+                    key={item}
+                    onPress={() => {
+                      triggerUiHaptic();
+                      setCategory(item);
+                    }}
+                    style={[styles.chip, active && styles.chipOn]}
+                  >
+                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{item}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        ) : null}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Pressable
+          accessibilityRole="button"
+          disabled={!canSubmit || busy}
+          onPress={() => void submit()}
+          style={({ pressed }) => [styles.submit, { opacity: !canSubmit || busy ? 0.4 : pressed ? 0.86 : 1 }]}
+        >
+          <Text style={styles.submitText}>{busy ? "…" : "Guardar"}</Text>
+        </Pressable>
+        {tx ? (
+          <Pressable
+            onPress={() => {
+              triggerUiHaptic();
+              setConfirmDelete(true);
+            }}
+            style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Text style={styles.removeText}>Eliminar</Text>
+          </Pressable>
+        ) : null}
+      </SheetScrollView>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Eliminar movimiento"
+        message={tx ? `Se borra «${tx.title}» y se deshace su efecto en caja e inversiones.` : ""}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        destructive
+        busy={busy}
+        onCancel={() => {
+          if (!busy) setConfirmDelete(false);
+        }}
+        onConfirm={() => {
+          if (!tx) return;
+          void (async () => {
+            setBusy(true);
+            try {
+              await deleteTx(tx.id);
+              setConfirmDelete(false);
+              onDone();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "No se pudo eliminar.");
+              setConfirmDelete(false);
+            } finally {
+              setBusy(false);
+            }
+          })();
+        }}
+      />
+    </>
   );
 }
 
@@ -385,4 +472,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.accentText,
   },
+  remove: { alignItems: "center", paddingVertical: 8 },
+  removeText: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.danger },
 });

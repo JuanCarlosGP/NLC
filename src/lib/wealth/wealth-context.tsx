@@ -30,6 +30,7 @@ import {
   renameAccount as persistRenameAccount,
   updateAsset as persistUpdateAsset,
   updateGoal as persistUpdateGoal,
+  updateTx as persistUpdateTx,
   type CreateTxInput,
 } from "@/lib/wealth/store";
 import { onWealthStoreChanged, pullWealthFromSources, pushWealthToSources } from "@/lib/wealth/sync";
@@ -103,6 +104,7 @@ type WealthContextValue = {
     },
   ) => Promise<void>;
   createTx: (input: CreateTxInput) => Promise<WealthTx>;
+  updateTx: (id: string, input: CreateTxInput) => Promise<WealthTx>;
   deleteTx: (id: string) => Promise<void>;
   createGoal: (input: CreateGoalInput) => Promise<WealthGoal>;
   updateGoal: (id: string, patch: UpdateGoalInput) => Promise<void>;
@@ -238,6 +240,12 @@ export function WealthProvider({ children }: { children: ReactNode }) {
         await refresh();
         void mirror();
         return created;
+      },
+      updateTx: async (id, input) => {
+        const next = await persistUpdateTx(id, input);
+        await refresh();
+        void mirror();
+        return next;
       },
       deleteTx: async (id) => {
         await persistDeleteTx(id);

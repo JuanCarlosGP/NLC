@@ -348,23 +348,20 @@ export async function createTx(input: CreateTxInput): Promise<WealthTx> {
   if (!title) throw new Error("El movimiento necesita un concepto.");
   await ensureCashAccount();
   const db = await getDb();
-  let assetId = input.assetId ?? null;
   const quantity =
     input.quantity ?? (input.kind === "buy" || input.kind === "sell" ? 1 : null);
   const unitPrice = input.unitPrice ?? (quantity ? input.amount / quantity : null);
 
-  if ((input.kind === "buy" || input.kind === "sell") && !assetId) {
-    if (input.kind === "sell") throw new Error("Elige la inversión que vendes.");
-    const asset = await createAsset({
-      name: input.assetName?.trim() || title,
-      ticker: input.assetTicker,
-      kind: input.assetKind,
-      quantity: 0,
-      price: unitPrice ?? 0,
-      costBasis: 0,
-    });
-    assetId = asset.id;
-  }
+  const assetId = await applyAssetImpact({
+    kind: input.kind,
+    amount: input.amount,
+    quantity,
+    unitPrice,
+    assetId: input.assetId ?? null,
+    assetName: input.assetName?.trim() || title,
+    assetTicker: input.assetTicker,
+    assetKind: input.assetKind,
+  });
 
   const id = newId("wtx");
   const now = Date.now();
@@ -378,15 +375,62 @@ export async function createTx(input: CreateTxInput): Promise<WealthTx> {
     title,
     input.category?.trim() ?? "",
     input.accountId ?? (input.kind === "transfer" ? null : CASH_ACCOUNT_ID),
-    assetId,
-    input.counterAccountId ?? null,
-    quantity,
-    unitPrice,
+    input.kind === "buy" || input.kind === "sell" ? assetId : null,
+    input.kind === "transfer" ? input.counterAccountId ?? null : null,
+    input.kind === "buy" || input.kind === "sell" ? quantity : null,
+    input.kind === "buy" || input.kind === "sell" ? unitPrice : null,
     bookedAt,
     input.notes?.trim() ?? "",
     now,
   );
 
+  const created = await getTx(id);
+  if (!created) throw new Error("No se pudo guardar el movimiento.");
+  return created;
+}
+
+async function reverseAssetImpact(tx: WealthTx): Promise<void> {
+  if (!tx.assetId || tx.quantity == null) return;
+  const asset = await getAsset(tx.assetId);
+  if (!asset) return;
+  if (tx.kind === "buy") {
+    await updateAsset(tx.assetId, {
+      quantity: Math.max(0, asset.quantity - tx.quantity),
+      costBasis: Math.max(0, asset.costBasis - tx.amount),
+    });
+  } else if (tx.kind === "sell") {
+    await updateAsset(tx.assetId, {
+      quantity: asset.quantity + tx.quantity,
+      costBasis: asset.costBasis + tx.amount,
+    });
+  }
+}
+
+async function applyAssetImpact(input: {
+  kind: WealthTxKind;
+  amount: number;
+  quantity: number | null;
+  unitPrice: number | null;
+  assetId: string | null;
+  assetName?: string;
+  assetTicker?: string;
+  assetKind?: WealthAssetKind;
+}): Promise<string | null> {
+  let assetId = input.assetId;
+  const quantity = input.quantity;
+  const unitPrice = input.unitPrice;
+  if ((input.kind === "buy" || input.kind === "sell") && !assetId) {
+    if (input.kind === "sell") throw new Error("Elige la inversión que vendes.");
+    const asset = await createAsset({
+      name: input.assetName?.trim() || "Inversión",
+      ticker: input.assetTicker,
+      kind: input.assetKind,
+      quantity: 0,
+      price: unitPrice ?? 0,
+      costBasis: 0,
+    });
+    assetId = asset.id;
+  }
   if (assetId && quantity != null) {
     const asset = await getAsset(assetId);
     if (asset) {
@@ -408,32 +452,57 @@ export async function createTx(input: CreateTxInput): Promise<WealthTx> {
       }
     }
   }
+  return assetId;
+}
 
-  const created = await getTx(id);
-  if (!created) throw new Error("No se pudo guardar el movimiento.");
-  return created;
+export async function updateTx(id: string, input: CreateTxInput): Promise<WealthTx> {
+  const current = await getTx(id);
+  if (!current) throw new Error("No encuentro ese movimiento.");
+  if (!(input.amount > 0)) throw new Error("El importe tiene que ser mayor que cero.");
+  const title = input.title.trim();
+  if (!title) throw new Error("El movimiento necesita un concepto.");
+  await reverseAssetImpact(current);
+  const quantity =
+    input.quantity ?? (input.kind === "buy" || input.kind === "sell" ? 1 : null);
+  const unitPrice = input.unitPrice ?? (quantity ? input.amount / quantity : null);
+  const assetId = await applyAssetImpact({
+    kind: input.kind,
+    amount: input.amount,
+    quantity,
+    unitPrice,
+    assetId: input.assetId ?? null,
+    assetName: input.assetName?.trim() || title,
+    assetTicker: input.assetTicker,
+    assetKind: input.assetKind,
+  });
+  const db = await getDb();
+  await db.runAsync(
+    `UPDATE wealth_tx
+     SET kind = ?, amount = ?, title = ?, category = ?, account_id = ?, asset_id = ?, counter_account_id = ?,
+         quantity = ?, unit_price = ?, booked_at = ?, notes = ?
+     WHERE id = ?`,
+    input.kind,
+    input.amount,
+    title,
+    input.category?.trim() ?? "",
+    input.accountId ?? (input.kind === "transfer" ? null : CASH_ACCOUNT_ID),
+    input.kind === "buy" || input.kind === "sell" ? assetId : null,
+    input.kind === "transfer" ? input.counterAccountId ?? null : null,
+    input.kind === "buy" || input.kind === "sell" ? quantity : null,
+    input.kind === "buy" || input.kind === "sell" ? unitPrice : null,
+    input.bookedAt ?? current.bookedAt,
+    input.notes?.trim() ?? current.notes,
+    id,
+  );
+  const next = await getTx(id);
+  if (!next) throw new Error("No se pudo guardar el movimiento.");
+  return next;
 }
 
 export async function deleteTx(id: string): Promise<void> {
   const tx = await getTx(id);
   if (!tx) return;
-  if (tx.assetId && tx.quantity != null) {
-    const asset = await getAsset(tx.assetId);
-    if (asset) {
-      if (tx.kind === "buy") {
-        const nextQty = Math.max(0, asset.quantity - tx.quantity);
-        await updateAsset(tx.assetId, {
-          quantity: nextQty,
-          costBasis: Math.max(0, asset.costBasis - tx.amount),
-        });
-      } else if (tx.kind === "sell") {
-        await updateAsset(tx.assetId, {
-          quantity: asset.quantity + tx.quantity,
-          costBasis: asset.costBasis + tx.amount,
-        });
-      }
-    }
-  }
+  await reverseAssetImpact(tx);
   const db = await getDb();
   await db.runAsync("DELETE FROM wealth_tx WHERE id = ?", id);
 }

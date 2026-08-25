@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fonts } from "@/lib/theme";
+import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { formatEuro, formatSignedEuro } from "@/lib/wealth/money";
+import { useTxActions } from "@/lib/wealth/tx-actions-context";
 import { TX_KIND_LABEL, type WealthTx } from "@/lib/wealth/types";
 
 function signedAmount(tx: WealthTx): number {
@@ -10,14 +12,25 @@ function signedAmount(tx: WealthTx): number {
 }
 
 export function TxRow({ tx, onPress }: { tx: WealthTx; onPress?: () => void }) {
+  const { openTxActions } = useTxActions();
   const signed = signedAmount(tx);
   const when = new Date(tx.bookedAt);
   const date = when.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
   return (
     <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      style={({ pressed }) => [styles.row, { opacity: pressed && onPress ? 0.72 : 1 }]}
+      accessibilityRole="button"
+      accessibilityHint="Mantén pulsado para editar"
+      delayLongPress={350}
+      onPress={
+        onPress
+          ? () => {
+              triggerSelectionUiHaptic();
+              onPress();
+            }
+          : undefined
+      }
+      onLongPress={() => openTxActions(tx)}
+      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.72 : 1 }]}
     >
       <View style={styles.meta}>
         <Text numberOfLines={1} style={styles.title}>
