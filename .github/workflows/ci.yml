@@ -20,9 +20,39 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
 
       - run: npm run typecheck
+
+  ota:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Publish OTA
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          MSG="$(git log -1 --pretty=%s)"
+          npx eas-cli update --channel production --non-interactive --message "$MSG"
+
+      - name: Notify devices
+        env:
+          EXPO_PUSH_TOKEN: ${{ secrets.EXPO_PUSH_TOKEN }}
+          EXPO_PUSH_TOKENS: ${{ secrets.EXPO_PUSH_TOKENS }}
+          NLC_NAS_PASSWORD: ${{ secrets.NLC_NAS_PASSWORD }}
+          SND_NAS_PASSWORD: ${{ secrets.SND_NAS_PASSWORD }}
+        run: node scripts/notify-ota.mjs production
+        continue-on-error: true

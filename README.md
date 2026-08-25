@@ -27,8 +27,8 @@ La release `apk` guarda **una sola APK**, la última. Cada rebuild nativo la sus
 
 | Tipo de cambio | Cómo llega al teléfono |
 | --- | --- |
-| JS, pantallas, estilos | `npm run update:production` (OTA + aviso) |
-| Nativo (plugins, permisos, Expo SDK, `app.config`) | `npm run apk:release` → GitHub Releases |
+| JS, pantallas, estilos | Push a `main`: el CI publica la OTA y avisa a la APK |
+| Nativo (plugins, permisos, Expo SDK, `app.config`) | `npm run apk:release` o **Actions → Release APK** |
 
 Una OTA no puede añadir módulos nativos. Si hace falta APK nueva, el aviso abre la descarga de GitHub.
 
@@ -100,7 +100,9 @@ Por defecto sube el patch (`0.1.0` → `0.1.1`) y el `versionCode`. También: `n
 
 En GitHub Actions: **Actions → Release APK → Run workflow**. Secret: `EXPO_TOKEN` ([token de Expo](https://expo.dev/settings/access-tokens)).
 
-OTA sin reinstalar:
+Un push a `main` que pasa el typecheck publica la OTA en el canal `production` y manda el aviso. Secretos: `EXPO_TOKEN` (obligatorio) y `EXPO_PUSH_TOKENS` (el token Expo del teléfono). GitHub no alcanza el NAS de la LAN, así que el aviso no puede leer `nlc-push-tokens.json` ahí.
+
+OTA a mano, si hace falta:
 
 ```bash
 npm run update:production
