@@ -1,18 +1,53 @@
 import { getAlbums, getTracks, loadPlaylists } from "@/lib/db/catalog";
 import { listProjects, listTasks } from "@/lib/productivity/store";
+import { listAccounts, listAssets, listGoals, listTx } from "@/lib/wealth/store";
+import { formatEuro } from "@/lib/wealth/money";
+import { formatGoalEta, goalProgress, netWorth, cashTotal, holdingsValue, accountBalance } from "@/lib/wealth/compute";
 import { STATUS_LABEL } from "@/lib/productivity/types";
 import { formatDue } from "@/lib/productivity/dates";
+import { listReminders } from "@/lib/reminders/store";
+import { formatReminderWhen } from "@/lib/reminders/types";
+import { TX_KIND_LABEL } from "@/lib/wealth/types";
 import type { AppZone } from "@/lib/zone/zone-context";
 
 export async function buildAssistantSnapshot(zone: AppZone): Promise<string> {
-  const [projects, tasks, playlists, music, podcasts, albums] = await Promise.all([
+  const [projects, tasks, playlists, music, podcasts, albums, accounts, assets, txs, reminders, goals] = await Promise.all([
     listProjects(),
     listTasks(),
     loadPlaylists(),
     getTracks({ kind: "music" }),
     getTracks({ kind: "podcast" }),
     getAlbums(),
+    listAccounts(),
+    listAssets(),
+    listTx(),
+    listReminders(),
+    listGoals(),
   ]);
+
+  const liveAccounts = accounts.filter((item) => !item.archived);
+  const liveAssets = assets.filter((item) => !item.archived);
+  const total = netWorth(liveAccounts, liveAssets, txs);
+  const cash = cashTotal(liveAccounts, txs);
+  const invested = holdingsValue(liveAssets);
+  const assetLines = liveAssets.slice(0, 20).map((asset) => {
+    const value = asset.quantity * asset.price;
+    return `- ${asset.name}${asset.ticker ? ` (${asset.ticker})` : ""} · ${formatEuro(value)} · ${asset.quantity} × ${formatEuro(asset.price)}`;
+  });
+  const txLines = txs.slice(0, 24).map(
+    (tx) => `- ${TX_KIND_LABEL[tx.kind]} ${formatEuro(tx.amount)} · ${tx.title}${tx.category ? ` · ${tx.category}` : ""}`,
+  );
+  const accountLines = liveAccounts.map(
+    (account) => `- ${account.name} · ${formatEuro(accountBalance(account.id, txs))}`,
+  );
+  const goalLines = goals.slice(0, 16).map((goal) => {
+    const progress = goalProgress(goal, liveAccounts, liveAssets, txs);
+    return `- ${goal.name} · ${formatEuro(progress.current)} / ${formatEuro(goal.target)} · ${formatGoalEta(progress)}`;
+  });
+  const reminderLines = reminders.slice(0, 16).map((item) => {
+    const state = item.enabled ? "" : " (off)";
+    return `- ${item.title} · ${formatReminderWhen(item)}${state}`;
+  });
 
   const projectName = (id: string) => projects.find((item) => item.id === id)?.name ?? id;
   const taskLines = tasks.slice(0, 40).map((task) => {
@@ -52,5 +87,18 @@ export async function buildAssistantSnapshot(zone: AppZone): Promise<string> {
     "",
     "Álbumes (muestra):",
     albumLines.join("\n") || "- (vacío)",
+    "",
+    "Recordatorios:",
+    reminderLines.join("\n") || "- (ninguno)",
+    "",
+    `Patrimonio: ${formatEuro(total)} · caja ${formatEuro(cash)} · invertido ${formatEuro(invested)}.`,
+    "Cuentas:",
+    accountLines.join("\n") || "- (ninguna)",
+    "Inversiones:",
+    assetLines.join("\n") || "- (ninguna)",
+    "Movimientos recientes:",
+    txLines.join("\n") || "- (ninguno)",
+    "Objetivos:",
+    goalLines.join("\n") || "- (ninguno)",
   ].join("\n");
 }

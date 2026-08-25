@@ -49,6 +49,28 @@ const PODCAST_HELP = [
   },
 ] as const;
 
+const WEALTH_HELP = [
+  {
+    title: "Archivo",
+    body: "En esa carpeta NLC escribe nlc-wealth.json: cuentas, inversiones y movimientos.",
+  },
+  {
+    title: "NAS",
+    body: "Si también hay carpeta compartida, se copia al NAS. Gana el archivo más reciente.",
+  },
+] as const;
+
+const FOCUS_HELP = [
+  {
+    title: "Archivo",
+    body: "En esa carpeta NLC escribe nlc-tasks.json: tareas, proyectos y recordatorios.",
+  },
+  {
+    title: "NAS",
+    body: "Si también hay carpeta compartida, se copia al NAS. Gana el archivo más reciente.",
+  },
+] as const;
+
 const VIDEO_HELP = [
   {
     title: "Series",
@@ -79,7 +101,7 @@ export function LocalFolderSheet({
   applyLocalFolder: (next: NasSettings) => Promise<void>;
   busy: boolean;
   feedback: SettingsFeedback | null;
-  variant?: "music" | "podcast" | "video";
+  variant?: "music" | "podcast" | "video" | "wealth" | "focus";
 }) {
   const [error, setError] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -88,19 +110,29 @@ export function LocalFolderSheet({
       ? settings.videoLocalFolderUri
       : variant === "podcast"
         ? settings.podcastLocalFolderUri
-        : settings.localFolderUri;
+        : variant === "wealth"
+          ? settings.wealthLocalFolderUri
+          : variant === "focus"
+            ? settings.focusLocalFolderUri
+            : settings.localFolderUri;
   const storedName =
     variant === "video"
       ? settings.videoLocalFolderName
       : variant === "podcast"
         ? settings.podcastLocalFolderName
-        : settings.localFolderName;
+        : variant === "wealth"
+          ? settings.wealthLocalFolderName
+          : variant === "focus"
+            ? settings.focusLocalFolderName
+            : settings.localFolderName;
   const name = folderDisplayName(uri, storedName);
   const hasFolder = Boolean(uri);
 
   function withFolder(nextUri: string, nextName: string): NasSettings {
     if (variant === "video") return { ...settings, videoLocalFolderUri: nextUri, videoLocalFolderName: nextName };
     if (variant === "podcast") return { ...settings, podcastLocalFolderUri: nextUri, podcastLocalFolderName: nextName };
+    if (variant === "wealth") return { ...settings, wealthLocalFolderUri: nextUri, wealthLocalFolderName: nextName };
+    if (variant === "focus") return { ...settings, focusLocalFolderUri: nextUri, focusLocalFolderName: nextName };
     return { ...settings, localFolderUri: nextUri, localFolderName: nextName };
   }
 
@@ -149,15 +181,19 @@ export function LocalFolderSheet({
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Biblioteca</Text>
+          <Text style={styles.sectionLabel}>{variant === "wealth" || variant === "focus" ? "Archivo" : "Biblioteca"}</Text>
           <View style={styles.card}>
             <View style={styles.cardBody}>
               <Text style={styles.pathLabel}>Carpeta</Text>
               <Text style={styles.pathValue}>{hasFolder ? name : "Ninguna"}</Text>
               <Text style={styles.hint}>
-                {Platform.OS === "web"
-                  ? "En el PC se usa hasta recargar. En el teléfono queda guardada."
-                  : "Se mezcla con lo que ya hay en el NAS. Cada apartado usa su propia carpeta."}
+                {variant === "wealth"
+                  ? "Ahí se guarda nlc-wealth.json. Puedes copiarla a otro teléfono o al NAS."
+                  : variant === "focus"
+                    ? "Ahí se guarda nlc-tasks.json. Puedes copiarla a otro teléfono o al NAS."
+                    : Platform.OS === "web"
+                      ? "En el PC se usa hasta recargar. En el teléfono queda guardada."
+                      : "Se mezcla con lo que ya hay en el NAS. Cada apartado usa su propia carpeta."}
               </Text>
             </View>
             <View style={styles.actions}>
@@ -202,9 +238,18 @@ function LocalFolderHelpDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  variant?: "music" | "podcast" | "video";
+  variant?: "music" | "podcast" | "video" | "wealth" | "focus";
 }) {
-  const steps = variant === "video" ? VIDEO_HELP : variant === "podcast" ? PODCAST_HELP : MUSIC_HELP;
+  const steps =
+    variant === "video"
+      ? VIDEO_HELP
+      : variant === "podcast"
+        ? PODCAST_HELP
+        : variant === "wealth"
+          ? WEALTH_HELP
+          : variant === "focus"
+            ? FOCUS_HELP
+            : MUSIC_HELP;
   const { height: windowHeight } = useWindowDimensions();
   const cardMaxHeight = Math.round(windowHeight * 0.9);
 

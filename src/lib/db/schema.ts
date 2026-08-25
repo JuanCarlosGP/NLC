@@ -119,4 +119,61 @@ CREATE TABLE IF NOT EXISTS prod_reminders (
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS wealth_accounts (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'cash',
+  currency TEXT NOT NULL DEFAULT 'EUR',
+  created_at INTEGER NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS wealth_assets (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  ticker TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'other',
+  quantity REAL NOT NULL DEFAULT 0,
+  price REAL NOT NULL DEFAULT 0,
+  cost_basis REAL NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'EUR',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS wealth_tx (
+  id TEXT PRIMARY KEY NOT NULL,
+  kind TEXT NOT NULL,
+  amount REAL NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'EUR',
+  title TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT '',
+  account_id TEXT,
+  asset_id TEXT,
+  counter_account_id TEXT,
+  quantity REAL,
+  unit_price REAL,
+  booked_at INTEGER NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS wealth_tx_booked ON wealth_tx(booked_at);
+CREATE INDEX IF NOT EXISTS wealth_tx_account ON wealth_tx(account_id);
+CREATE INDEX IF NOT EXISTS wealth_tx_asset ON wealth_tx(asset_id);
+
+CREATE TABLE IF NOT EXISTS wealth_goals (
+  id TEXT PRIMARY KEY NOT NULL,
+  name TEXT NOT NULL,
+  target REAL NOT NULL,
+  scope TEXT NOT NULL DEFAULT 'networth',
+  account_id TEXT,
+  asset_id TEXT,
+  deadline_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0
+);
 `

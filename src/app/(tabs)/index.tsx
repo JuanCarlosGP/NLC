@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowUpDown, LayoutGrid, List } from "lucide-react-native";
 import { FocusHome } from "@/components/productivity/focus-home";
+import { WealthHome } from "@/components/wealth/wealth-home";
 import { LadybugMark } from "@/components/brand/ladybug-mark";
 import { ZoneSwitch } from "@/components/layout/zone-switch";
 import { HomeListSkeleton, HomeShortcutBone } from "@/components/home/home-skeleton";
@@ -47,6 +48,7 @@ export default function HomeScreen() {
   const podcast = zone === "podcast";
   const video = zone === "video";
   const focus = zone === "focus";
+  const wealth = zone === "wealth";
   const albums = podcast ? podcastAlbums : musicAlbums;
 
   useFocusEffect(
@@ -197,6 +199,7 @@ export default function HomeScreen() {
     return next;
   }, [moreAlbums, podcast, sort, sortedRecents]);
 
+  if (wealth) return <WealthHome />;
   if (focus) return <FocusHome />;
 
   return (

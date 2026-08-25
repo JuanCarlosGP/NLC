@@ -28,6 +28,12 @@ export type NasSettings = {
   videoUseHttps: boolean;
   videoLocalFolderUri: string;
   videoLocalFolderName: string;
+  wealthSharePath: string;
+  wealthLocalFolderUri: string;
+  wealthLocalFolderName: string;
+  focusSharePath: string;
+  focusLocalFolderUri: string;
+  focusLocalFolderName: string;
 };
 
 export const DEFAULT_NAS_SETTINGS: NasSettings = {
@@ -50,6 +56,12 @@ export const DEFAULT_NAS_SETTINGS: NasSettings = {
   videoUseHttps: false,
   videoLocalFolderUri: "",
   videoLocalFolderName: "",
+  wealthSharePath: "/volume1/Music/NLC",
+  wealthLocalFolderUri: "",
+  wealthLocalFolderName: "",
+  focusSharePath: "/volume1/Music/NLC",
+  focusLocalFolderUri: "",
+  focusLocalFolderName: "",
 };
 
 function asNasFolderPath(path: string, fallback: string): string {
@@ -57,7 +69,11 @@ function asNasFolderPath(path: string, fallback: string): string {
   if (!trimmed) return fallback;
   if (trimmed === "/Music") return "/volume1/Music";
   if (trimmed === "/Music/Podcasts") return "/volume1/Music/Podcasts";
+  if (trimmed === "/Music/NLC") return "/volume1/Music/NLC";
   if (trimmed === "/Popcorn") return "/volume1/Popcorn";
+  if (trimmed === "/Documents/NLC" || trimmed === "/volume1/Documents/NLC") {
+    return "/volume1/Music/NLC";
+  }
   return trimmed;
 }
 
@@ -69,6 +85,14 @@ function hydrateSettings(parsed: Partial<NasSettings>): NasSettings {
     joinPath(next.sharePath, "Podcasts"),
   );
   next.videoSharePath = asNasFolderPath(next.videoSharePath, "/volume1/Popcorn");
+  next.wealthSharePath = asNasFolderPath(
+    next.wealthSharePath || joinPath(next.sharePath, "NLC"),
+    "/volume1/Music/NLC",
+  );
+  next.focusSharePath = asNasFolderPath(
+    next.focusSharePath || joinPath(next.sharePath, "NLC"),
+    "/volume1/Music/NLC",
+  );
   if (!next.podcastSharePath.trim()) {
     next.podcastSharePath = joinPath(next.sharePath, "Podcasts");
   }
@@ -188,5 +212,43 @@ export function applyPodcastSourceSettings(base: NasSettings, edited: NasSetting
     username: edited.username,
     useHttps: edited.useHttps,
     podcastSharePath: edited.sharePath,
+  };
+}
+
+/** Same server as music, pointed at the wealth folder (`nlc-wealth.json`). */
+export function wealthSourceSettings(settings: NasSettings): NasSettings {
+  return {
+    ...settings,
+    sharePath: settings.wealthSharePath.trim() || joinPath(settings.sharePath, "NLC"),
+  };
+}
+
+export function applyWealthSourceSettings(base: NasSettings, edited: NasSettings): NasSettings {
+  return {
+    ...base,
+    host: edited.host,
+    port: edited.port,
+    username: edited.username,
+    useHttps: edited.useHttps,
+    wealthSharePath: edited.sharePath,
+  };
+}
+
+/** Same server as music, pointed at the tasks folder (`nlc-tasks.json`). */
+export function focusSourceSettings(settings: NasSettings): NasSettings {
+  return {
+    ...settings,
+    sharePath: settings.focusSharePath.trim() || joinPath(settings.sharePath, "NLC"),
+  };
+}
+
+export function applyFocusSourceSettings(base: NasSettings, edited: NasSettings): NasSettings {
+  return {
+    ...base,
+    host: edited.host,
+    port: edited.port,
+    username: edited.username,
+    useHttps: edited.useHttps,
+    focusSharePath: edited.sharePath,
   };
 }

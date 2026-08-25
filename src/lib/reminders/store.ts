@@ -134,6 +134,31 @@ export async function deleteReminder(id: string): Promise<void> {
   await db.runAsync("DELETE FROM prod_reminders WHERE id = ?", id);
 }
 
+export async function replaceReminders(reminders: ProdReminder[]): Promise<void> {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM prod_reminders");
+    for (const reminder of reminders) {
+      await db.runAsync(
+        `INSERT INTO prod_reminders
+         (id, title, body, hour, minute, frequency, weekday, once_at, enabled, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reminder.id,
+        reminder.title,
+        reminder.body,
+        clampHour(reminder.hour),
+        clampMinute(reminder.minute),
+        reminder.frequency,
+        reminder.weekday,
+        reminder.onceAt,
+        reminder.enabled ? 1 : 0,
+        reminder.createdAt,
+        reminder.updatedAt,
+      );
+    }
+  });
+}
+
 function clampHour(value: number): number {
   if (!Number.isFinite(value)) return 9;
   return Math.min(23, Math.max(0, Math.round(value)));

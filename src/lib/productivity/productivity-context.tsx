@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
 import {
   archiveProject as persistArchive,
@@ -11,12 +11,14 @@ import {
   listTasks,
   updateTask as persistUpdate,
 } from "@/lib/productivity/store";
+import { onFocusStoreChanged, pullFocusFromSources, pushFocusToSources } from "@/lib/productivity/sync";
 import {
   INBOX_PROJECT_ID,
   type ProdProject,
   type ProdTask,
   type TaskStatus,
 } from "@/lib/productivity/types";
+import { useSettings } from "@/lib/settings/settings-context";
 
 type CreateTaskInput = {
   title: string;
@@ -53,9 +55,14 @@ type ProductivityContextValue = {
 const ProductivityContext = createContext<ProductivityContextValue | null>(null);
 
 export function ProductivityProvider({ children }: { children: ReactNode }) {
+  const { ready: settingsReady, settings, password } = useSettings();
   const [ready, setReady] = useState(false);
   const [projects, setProjects] = useState<ProdProject[]>([]);
   const [tasks, setTasks] = useState<ProdTask[]>([]);
+  const settingsRef = useRef(settings);
+  const passwordRef = useRef(password);
+  settingsRef.current = settings;
+  passwordRef.current = password;
 
   const refresh = useCallback(async () => {
     await ensureInbox();
@@ -68,42 +75,66 @@ export function ProductivityProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, []);
 
+  const mirror = useCallback(async () => {
+    try {
+      await pushFocusToSources(settingsRef.current, passwordRef.current);
+    } catch {
+      // NAS / carpeta local are best-effort.
+    }
+  }, []);
+
+  useEffect(() => onFocusStoreChanged(() => {
+    void refresh();
+  }), [refresh]);
+
   useEffect(() => {
     let cancelled = false;
-    void refresh().catch(() => {
-      if (!cancelled) setReady(true);
-    });
+    void (async () => {
+      try {
+        if (settingsReady) {
+          await pullFocusFromSources(settings, password);
+        }
+        if (!cancelled) await refresh();
+      } catch {
+        if (!cancelled) setReady(true);
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [refresh]);
+  }, [password, refresh, settings.focusLocalFolderUri, settings.focusSharePath, settingsReady]);
 
-  useEffect(() => subscribeAssistantMutations(() => { void refresh(); }), [refresh]);
+  useEffect(() => subscribeAssistantMutations(() => {
+    void refresh().then(() => void mirror());
+  }), [mirror, refresh]);
 
   const createProject = useCallback(
     async (name: string) => {
       const project = await persistCreateProject(name);
       await refresh();
+      void mirror();
       return project;
     },
-    [refresh],
+    [mirror, refresh],
   );
 
   const archiveProject = useCallback(
     async (id: string, archived = true) => {
       await persistArchive(id, archived);
       await refresh();
+      void mirror();
     },
-    [refresh],
+    [mirror, refresh],
   );
 
   const createTask = useCallback(
     async (input: CreateTaskInput) => {
       const task = await persistCreateTask(input);
       await refresh();
+      void mirror();
       return task;
     },
-    [refresh],
+    [mirror, refresh],
   );
 
   const updateTask = useCallback(
@@ -120,23 +151,26 @@ export function ProductivityProvider({ children }: { children: ReactNode }) {
     ) => {
       await persistUpdate(id, patch);
       await refresh();
+      void mirror();
     },
-    [refresh],
+    [mirror, refresh],
   );
 
   const deleteTask = useCallback(
     async (id: string) => {
       await persistDelete(id);
       await refresh();
+      void mirror();
     },
-    [refresh],
+    [mirror, refresh],
   );
 
   const clearDone = useCallback(async () => {
     const removed = await persistClearDone();
     await refresh();
+    void mirror();
     return removed;
-  }, [refresh]);
+  }, [mirror, refresh]);
 
   const inbox = useMemo(
     () => projects.find((project) => project.id === INBOX_PROJECT_ID) ?? null,

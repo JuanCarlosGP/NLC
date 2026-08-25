@@ -10,6 +10,7 @@ import { LibrarySortSheet, librarySortLabel, type LibrarySort } from "@/componen
 import { LibraryTile } from "@/components/library/library-tile";
 import { TrackRow } from "@/components/library/track-row";
 import { FocusBoard } from "@/components/productivity/focus-board";
+import { WealthLedger } from "@/components/wealth/wealth-ledger";
 import { Screen } from "@/components/ui/screen";
 import { SeriesRow, seriesListStyle } from "@/components/video/series-row";
 import { albumHref, artistHref } from "@/lib/library/href";
@@ -129,7 +130,7 @@ export default function LibraryScreen() {
   );
 
   useEffect(() => {
-    if (zone === "video" || zone === "focus") return;
+    if (zone === "video" || zone === "focus" || zone === "wealth") return;
     if (!tabs.some((item) => item.id === tab)) {
       setTab(tabs[0]?.id ?? "recents");
     }
@@ -295,6 +296,7 @@ export default function LibraryScreen() {
   }
 
   if (zone === "focus") return <FocusBoard />;
+  if (zone === "wealth") return <WealthLedger title="Movimientos" />;
 
   return (
     <>

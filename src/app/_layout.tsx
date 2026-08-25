@@ -32,6 +32,7 @@ import { OfflineProvider } from "@/lib/offline/offline-context";
 import { SettingsProvider } from "@/lib/settings/settings-context";
 import { ProductivityProvider } from "@/lib/productivity/productivity-context";
 import { RemindersProvider } from "@/lib/reminders/reminders-context";
+import { WealthProvider } from "@/lib/wealth/wealth-context";
 import { TaskActionsProvider } from "@/lib/productivity/task-actions-context";
 import { ZoneProvider } from "@/lib/zone/zone-context";
 import { TaskActionsSheet } from "@/components/productivity/task-actions-sheet";
@@ -78,6 +79,7 @@ export default function RootLayout() {
         <OtaBootstrap />
         <ZoneProvider>
         <ProductivityProvider>
+        <WealthProvider>
         <RemindersProvider>
         <TaskActionsProvider>
         <OfflineProvider>
@@ -122,6 +124,10 @@ export default function RootLayout() {
                       <Stack.Screen name="focus/reminders" />
                       <Stack.Screen name="projects" />
                       <Stack.Screen name="project/[id]" />
+                      <Stack.Screen name="wealth/activity" />
+                      <Stack.Screen name="wealth/assets" />
+                      <Stack.Screen name="wealth/accounts" />
+                      <Stack.Screen name="wealth/asset/[id]" />
                       <Stack.Screen name="now-playing" />
                       <Stack.Screen name="queue" />
                     </Stack>
@@ -147,6 +153,7 @@ export default function RootLayout() {
         </OfflineProvider>
         </TaskActionsProvider>
         </RemindersProvider>
+        </WealthProvider>
         </ProductivityProvider>
         </ZoneProvider>
       </SettingsProvider>

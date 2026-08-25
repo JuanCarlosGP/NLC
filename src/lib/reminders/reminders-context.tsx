@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { router } from "expo-router";
 import {
   removeReminderNotification,
@@ -15,6 +15,9 @@ import {
   type ReminderInput,
 } from "@/lib/reminders/store";
 import type { ProdReminder } from "@/lib/reminders/types";
+import { onFocusStoreChanged, pushFocusToSources } from "@/lib/productivity/sync";
+import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
+import { useSettings } from "@/lib/settings/settings-context";
 
 type RemindersContextValue = {
   ready: boolean;
@@ -28,8 +31,13 @@ type RemindersContextValue = {
 const RemindersContext = createContext<RemindersContextValue | null>(null);
 
 export function RemindersProvider({ children }: { children: ReactNode }) {
+  const { settings, password } = useSettings();
   const [ready, setReady] = useState(false);
   const [reminders, setReminders] = useState<ProdReminder[]>([]);
+  const settingsRef = useRef(settings);
+  const passwordRef = useRef(password);
+  settingsRef.current = settings;
+  passwordRef.current = password;
 
   const refresh = useCallback(async () => {
     const next = await listReminders();
@@ -37,6 +45,22 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
     setReady(true);
     void syncAllReminderNotifications(next);
   }, []);
+
+  const mirror = useCallback(async () => {
+    try {
+      await pushFocusToSources(settingsRef.current, passwordRef.current);
+    } catch {
+      // NAS / carpeta local are best-effort.
+    }
+  }, []);
+
+  useEffect(() => onFocusStoreChanged(() => {
+    void refresh();
+  }), [refresh]);
+
+  useEffect(() => subscribeAssistantMutations(() => {
+    void refresh().then(() => void mirror());
+  }), [mirror, refresh]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,9 +88,10 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
       const reminder = await persistCreate(input);
       await syncReminderNotification(reminder, true);
       await refresh();
+      void mirror();
       return reminder;
     },
-    [refresh],
+    [mirror, refresh],
   );
 
   const updateReminder = useCallback(
@@ -77,15 +102,17 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
       if (reminder) await syncReminderNotification(reminder, Boolean(patch.enabled));
       else await removeReminderNotification(id);
       setReminders(next);
+      void mirror();
     },
-    [],
+    [mirror],
   );
 
   const deleteReminder = useCallback(async (id: string) => {
     await persistDelete(id);
     await removeReminderNotification(id);
     setReminders((current) => current.filter((item) => item.id !== id));
-  }, []);
+    void mirror();
+  }, [mirror]);
 
   const value = useMemo(
     () => ({ ready, reminders, refresh, createReminder, updateReminder, deleteReminder }),

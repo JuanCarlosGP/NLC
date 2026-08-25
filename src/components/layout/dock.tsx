@@ -11,6 +11,7 @@ import { usePlayerUi } from "@/lib/player/player-ui-context";
 import { colors } from "@/lib/theme";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { USE_NATIVE_DRIVER } from "@/lib/use-native-driver";
+import { useZone } from "@/lib/zone/zone-context";
 
 const HIDE_SPRING = { damping: 22, stiffness: 280, mass: 0.85 };
 const GLASS_FILL = "rgba(14, 13, 12, 0.94)";
@@ -61,6 +62,7 @@ function DockButton({
 function DockIcons() {
   const router = useRouter();
   const pathname = usePathname();
+  const { zone } = useZone();
   const apkPending = usePendingApk();
   const { chatOpen, chatUnread, setChatOpen } = useCursor();
   const homeActive = isHomeRoute(pathname);
@@ -68,9 +70,15 @@ function DockIcons() {
     pathname.startsWith("/library") ||
     pathname.startsWith("/album") ||
     pathname.startsWith("/artist") ||
-    pathname.startsWith("/imported");
+    pathname.startsWith("/imported") ||
+    pathname.startsWith("/wealth") ||
+    pathname.startsWith("/focus") ||
+    pathname.startsWith("/projects") ||
+    pathname.startsWith("/project") ||
+    pathname.startsWith("/task");
   const searchActive = pathname.startsWith("/search");
   const settingsActive = pathname.startsWith("/settings");
+  const libraryLabel = zone === "wealth" ? "Libro" : "Biblioteca";
 
   return (
     <>
@@ -104,7 +112,7 @@ function DockIcons() {
       </DockButton>
       <DockButton
         active={libraryActive}
-        label="Biblioteca"
+        label={libraryLabel}
         onPress={() => {
           if (pathname === "/library" || pathname.replace(/\/$/, "") === "/library") return;
           router.push("/library");

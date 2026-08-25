@@ -11,6 +11,10 @@ const TABLES = [
   "favorites",
   "playlists",
   "playlist_tracks",
+  "wealth_accounts",
+  "wealth_assets",
+  "wealth_tx",
+  "wealth_goals",
 ] as const;
 
 const PRIMARY: Record<string, string[]> = {
@@ -22,6 +26,10 @@ const PRIMARY: Record<string, string[]> = {
   favorites: ["position"],
   playlists: ["id"],
   playlist_tracks: ["playlist_id", "position"],
+  wealth_accounts: ["id"],
+  wealth_assets: ["id"],
+  wealth_tx: ["id"],
+  wealth_goals: ["id"],
 };
 
 function emptyTables(): Record<string, Row[]> {

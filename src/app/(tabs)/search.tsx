@@ -5,9 +5,12 @@ import { AlbumRow } from "@/components/library/album-row";
 import { ArtistRow } from "@/components/library/artist-row";
 import { TrackRow } from "@/components/library/track-row";
 import { TaskRow, taskListStyle } from "@/components/productivity/task-row";
+import { TxRow, txListStyle } from "@/components/wealth/tx-row";
+import { GoalRow, goalListStyle } from "@/components/wealth/goal-row";
+import { AssetRow, assetListStyle } from "@/components/wealth/asset-row";
 import { Screen } from "@/components/ui/screen";
 import { SeriesRow, seriesListStyle } from "@/components/video/series-row";
-import { albumHref, artistHref, projectHref, taskHref } from "@/lib/library/href";
+import { albumHref, artistHref, assetHref, projectHref, taskHref } from "@/lib/library/href";
 import { useExitingList } from "@/hooks/use-exiting-list";
 import { useSearch } from "@/hooks/use-search";
 import { isPodcastAlbum, isPodcastArtist, isPodcastTrack } from "@/lib/nas/webdav";
@@ -17,6 +20,8 @@ import { browseRoute } from "@/lib/video/browse";
 import { listVideoShows, type VideoShow } from "@/lib/video/catalog";
 import { watchRoute } from "@/lib/video/onepiece";
 import { useActiveProjects, useVisibleTasks } from "@/lib/productivity/productivity-context";
+import { useWealth } from "@/lib/wealth/wealth-context";
+import { assetPosition } from "@/lib/wealth/compute";
 import { useTaskActions } from "@/lib/productivity/task-actions-context";
 import { colors, fonts, type } from "@/lib/theme";
 import { useZone } from "@/lib/zone/zone-context";
@@ -24,6 +29,7 @@ import { useZone } from "@/lib/zone/zone-context";
 export default function SearchScreen() {
   const { zone } = useZone();
   if (zone === "focus") return <FocusSearch />;
+  if (zone === "wealth") return <WealthSearch />;
   if (zone === "video") return <VideoSearch />;
   return <CatalogSearch zone={zone} />;
 }
@@ -197,6 +203,117 @@ function VideoSearch() {
                 playable={show.file}
                 onPress={() => openShow(show)}
               />
+            ))}
+          </View>
+        </View>
+      ) : null}
+    </Screen>
+  );
+}
+
+function WealthSearch() {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const { assets, txs, accounts, goalProgress } = useWealth();
+  const q = query.trim().toLowerCase();
+
+  const matchedAssets = useMemo(
+    () =>
+      q
+        ? assets.filter(
+            (asset) =>
+              !asset.archived &&
+              (asset.name.toLowerCase().includes(q) || asset.ticker.toLowerCase().includes(q)),
+          )
+        : [],
+    [assets, q],
+  );
+  const matchedTx = useMemo(
+    () =>
+      q
+        ? txs.filter(
+            (tx) =>
+              tx.title.toLowerCase().includes(q) ||
+              tx.category.toLowerCase().includes(q) ||
+              tx.notes.toLowerCase().includes(q),
+          )
+        : [],
+    [q, txs],
+  );
+  const matchedAccounts = useMemo(
+    () => (q ? accounts.filter((account) => account.name.toLowerCase().includes(q)) : []),
+    [accounts, q],
+  );
+  const matchedGoals = useMemo(
+    () => (q ? goalProgress.filter((item) => item.goal.name.toLowerCase().includes(q)) : []),
+    [goalProgress, q],
+  );
+  const empty =
+    Boolean(q) &&
+    !matchedAssets.length &&
+    !matchedTx.length &&
+    !matchedAccounts.length &&
+    !matchedGoals.length;
+
+  return (
+    <Screen>
+      <Text style={type.pageTitle}>Buscar</Text>
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Inversión, movimiento, cuenta u objetivo"
+        placeholderTextColor={colors.muted}
+        autoCorrect={false}
+        style={styles.input}
+      />
+      {empty ? <Text style={type.body}>Nada para «{query.trim()}».</Text> : null}
+      {matchedGoals.length ? (
+        <View>
+          <Text style={type.sectionTitle}>Objetivos</Text>
+          <View style={goalListStyle}>
+            {matchedGoals.map((item) => (
+              <GoalRow
+                key={item.goal.id}
+                progress={item}
+                onPress={() => router.push("/wealth/goals")}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+      {matchedAccounts.length ? (
+        <View>
+          <Text style={type.sectionTitle}>Cuentas</Text>
+          {matchedAccounts.map((account) => (
+            <SeriesRow
+              key={account.id}
+              title={account.name}
+              subtitle="Cuenta"
+              onPress={() => router.push("/wealth/accounts")}
+            />
+          ))}
+        </View>
+      ) : null}
+      {matchedAssets.length ? (
+        <View>
+          <Text style={type.sectionTitle}>Inversiones</Text>
+          <View style={assetListStyle}>
+            {matchedAssets.map((asset) => (
+              <AssetRow
+                key={asset.id}
+                position={assetPosition(asset)}
+                onPress={() => router.push(assetHref(asset.id))}
+              />
+            ))}
+          </View>
+        </View>
+      ) : null}
+      {matchedTx.length ? (
+        <View>
+          <Text style={type.sectionTitle}>Movimientos</Text>
+          <View style={txListStyle}>
+            {matchedTx.map((tx) => (
+              <TxRow key={tx.id} tx={tx} />
             ))}
           </View>
         </View>

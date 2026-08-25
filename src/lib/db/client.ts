@@ -3,7 +3,7 @@ import { SCHEMA_SQL } from "@/lib/db/schema";
 import type { CatalogDb } from "@/lib/db/types";
 
 const DB_NAME = "nlc-catalog.db";
-const SCHEMA_VERSION = "2";
+const SCHEMA_VERSION = "4";
 
 let opened: Promise<CatalogDb> | null = null;
 

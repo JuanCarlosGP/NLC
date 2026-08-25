@@ -35,6 +35,37 @@ import { notifyAssistantMutations } from "@/lib/cursor/assistant-bus";
 import { loadVideoFavorites, toggleVideoFavorite, type VideoFavorite } from "@/lib/video/favorites";
 import { listVideoShows } from "@/lib/video/catalog";
 import type { AppZone } from "@/lib/zone/zone-context";
+import {
+  archiveAccount,
+  createAccount,
+  createAsset,
+  createGoal,
+  createTx,
+  deleteGoal,
+  deleteTx,
+  listAccounts,
+  listAssets,
+  listGoals,
+  listTx,
+  renameAccount,
+  updateAsset,
+  updateGoal,
+} from "@/lib/wealth/store";
+import { parseAmount, roundTo } from "@/lib/wealth/money";
+import {
+  CASH_ACCOUNT_ID,
+  parseGoalScope,
+  type WealthAccountKind,
+  type WealthAssetKind,
+  type WealthTxKind,
+} from "@/lib/wealth/types";
+import {
+  createReminder,
+  deleteReminder,
+  listReminders,
+  updateReminder,
+} from "@/lib/reminders/store";
+import type { ReminderFrequency } from "@/lib/reminders/types";
 
 export type AssistantAction = {
   op: string;
@@ -51,12 +82,33 @@ export type AssistantAction = {
   starred?: boolean;
   liked?: boolean;
   zone?: string;
+  kind?: string;
+  amount?: number | string;
+  quantity?: number | string;
+  price?: number | string;
+  cost_basis?: number | string;
+  ticker?: string;
+  account?: string;
+  asset?: string;
+  counter?: string;
+  category?: string;
+  body?: string;
+  hour?: number | string;
+  minute?: number | string;
+  time?: string;
+  frequency?: string;
+  weekday?: number | string;
+  enabled?: boolean;
+  archived?: boolean;
+  asset_kind?: string;
+  target?: number | string;
+  scope?: string;
 };
 
 export type AssistantRuntime = {
   settings: NasSettings;
   password: string;
-  setZone: (zone: AppZone) => void;
+  setZone: (zone: AppZone) => boolean;
 };
 
 export type ActionResult = { ok: boolean; message: string };
@@ -117,7 +169,79 @@ function parseZone(raw: string | undefined): AppZone | null {
   if (value === "podcast" || value === "podcasts") return "podcast";
   if (value === "video" || value === "video") return "video";
   if (value === "focus" || value === "productividad" || value === "tareas") return "focus";
+  if (value === "wealth" || value === "finanzas" || value === "patrimonio" || value === "dinero") return "wealth";
   return null;
+}
+
+function parseMoney(raw: number | string | undefined, decimals = 2): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) return roundTo(raw, decimals);
+  if (typeof raw === "string") return parseAmount(raw, decimals) ?? undefined;
+  return undefined;
+}
+
+function parseTxKind(raw: string | undefined): WealthTxKind | undefined {
+  const value = normalize(raw ?? "");
+  if (value === "income" || value === "ingreso" || value === "cobro" || value === "nomina") return "income";
+  if (value === "expense" || value === "gasto" || value === "pago") return "expense";
+  if (value === "buy" || value === "compra" || value === "comprar") return "buy";
+  if (value === "sell" || value === "venta" || value === "vender") return "sell";
+  if (value === "transfer" || value === "traspaso" || value === "transferencia") return "transfer";
+  return undefined;
+}
+
+function parseAccountKind(raw: string | undefined): WealthAccountKind | undefined {
+  const value = normalize(raw ?? "");
+  if (value === "cash" || value === "efectivo" || value === "caja") return "cash";
+  if (value === "bank" || value === "banco" || value === "cuenta") return "bank";
+  if (value === "wallet" || value === "monedero" || value === "cartera") return "wallet";
+  return undefined;
+}
+
+function parseAssetKind(raw: string | undefined): WealthAssetKind | undefined {
+  const value = normalize(raw ?? "");
+  if (value === "stock" || value === "accion" || value === "acciones") return "stock";
+  if (value === "crypto" || value === "cripto" || value === "criptomoneda") return "crypto";
+  if (value === "fund" || value === "fondo") return "fund";
+  if (value === "other" || value === "otro") return "other";
+  return undefined;
+}
+
+function parseFrequency(raw: string | undefined): ReminderFrequency | undefined {
+  const value = normalize(raw ?? "");
+  if (value === "once" || value === "una vez" || value === "puntual") return "once";
+  if (value === "daily" || value === "cada dia" || value === "diario") return "daily";
+  if (value === "weekdays" || value === "laborables" || value === "lunes a viernes") return "weekdays";
+  if (value === "weekly" || value === "cada semana" || value === "semanal") return "weekly";
+  return undefined;
+}
+
+function parseWeekday(raw: number | string | undefined): number | undefined {
+  if (typeof raw === "number" && raw >= 1 && raw <= 7) return Math.round(raw);
+  const value = normalize(String(raw ?? ""));
+  if (value === "domingo" || value === "d") return 1;
+  if (value === "lunes" || value === "l") return 2;
+  if (value === "martes" || value === "m") return 3;
+  if (value === "miercoles" || value === "x") return 4;
+  if (value === "jueves" || value === "j") return 5;
+  if (value === "viernes" || value === "v") return 6;
+  if (value === "sabado" || value === "s") return 7;
+  const n = Number(value);
+  if (n >= 1 && n <= 7) return n;
+  return undefined;
+}
+
+function parseClock(
+  action: Pick<AssistantAction, "hour" | "minute" | "time">,
+): { hour: number; minute: number } | undefined {
+  const fromTime = String(action.time ?? "").trim().match(/^(\d{1,2})[:h](\d{2})$/i);
+  if (fromTime) {
+    return { hour: Number(fromTime[1]), minute: Number(fromTime[2]) };
+  }
+  const hour = typeof action.hour === "number" ? action.hour : action.hour != null ? Number(action.hour) : undefined;
+  const minute =
+    typeof action.minute === "number" ? action.minute : action.minute != null ? Number(action.minute) : undefined;
+  if (hour == null || !Number.isFinite(hour)) return undefined;
+  return { hour, minute: Number.isFinite(minute) ? (minute as number) : 0 };
 }
 
 function basename(path: string): string {
@@ -162,6 +286,46 @@ async function tryMove(
 
 export function inferLocalActions(text: string): AssistantAction[] {
   const raw = text.trim();
+  const money = raw.match(
+    /^(?:apunta|anota|registra)\s+(?:un\s+)?(gasto|ingreso|cobro)\s+de\s+([\d.,]+)\s*(?:€|eur)?(?:\s+(?:en|de|por)\s+(.+?))?\.?$/i,
+  );
+  if (money) {
+    const kind = parseTxKind(money[1]);
+    const amount = parseMoney(money[2]);
+    const title = money[3]?.trim() || (kind === "income" ? "Ingreso" : "Gasto");
+    if (kind && amount != null) return [{ op: "create_tx", kind, amount, title }];
+  }
+  const buy = raw.match(
+    /^(?:compré|compra|apunta(?:\s+una)?\s+compra)\s+(?:(\d+[.,]?\d*)\s+(?:de\s+)?)?(.+?)\s+(?:a|por)\s+([\d.,]+)\s*(?:€|eur)?\.?$/i,
+  );
+  if (buy) {
+    const quantity = buy[1] ? parseMoney(buy[1], 8) : 1;
+    const price = parseMoney(buy[3]);
+    const name = buy[2]?.trim();
+    if (name && price != null && quantity != null) {
+      return [{
+        op: "create_tx",
+        kind: "buy",
+        title: name,
+        asset: name,
+        quantity,
+        price,
+        amount: quantity * price,
+      }];
+    }
+  }
+  const reminder = raw.match(
+    /^(?:recuérdame|recuerdame|crea(?:r)?\s+(?:un\s+)?recordatorio)\s+(.+?)(?:\s+a\s+las\s+(\d{1,2})(?::(\d{2}))?)?\.?$/i,
+  );
+  if (reminder) {
+    return [{
+      op: "create_reminder",
+      title: reminder[1]?.trim(),
+      hour: reminder[2],
+      minute: reminder[3] ?? "0",
+      frequency: "daily",
+    }];
+  }
   const create = raw.match(/^(?:crea(?:r)?|apunta|anota|añade|agrega)\s+(?:la\s+)?tarea\s+«?(.+?)»?(?:\s+en\s+(.+?))?(?:\s+para\s+(hoy|mañana|tomorrow))?\.?$/i);
   if (create) {
     return [{
@@ -431,10 +595,188 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     await toggleVideoFavorite(fav);
     return { ok: true, message: `Favorito de vídeo: «${show.title}».` };
   }
+  if (op === "create_tx") {
+    const kind = parseTxKind(action.kind) ?? "expense";
+    const quantity = parseMoney(action.quantity, 8);
+    const price = parseMoney(action.price);
+    const amount = parseMoney(action.amount) ?? (quantity != null && price != null ? quantity * price : undefined);
+    const title = action.title?.trim() || action.name?.trim() || action.asset?.trim();
+    if (amount == null || !(amount > 0)) return { ok: false, message: "Falta el importe del movimiento." };
+    if (!title) return { ok: false, message: "Falta el concepto del movimiento." };
+    const account = await resolveAccount(action.account);
+    const counter = await resolveAccount(action.counter);
+    if (kind === "transfer" && !counter) {
+      return { ok: false, message: "Falta la cuenta destino del traspaso." };
+    }
+    const asset = await resolveAsset(action.asset || (kind === "sell" ? title : undefined));
+    if (kind === "sell" && !asset) {
+      return { ok: false, message: "Elige la inversión que vendes." };
+    }
+    const tx = await createTx({
+      kind,
+      amount,
+      title,
+      category: action.category,
+      notes: action.notes,
+      bookedAt: parseDue(action.due) ?? undefined,
+      accountId: kind === "transfer" ? account?.id ?? CASH_ACCOUNT_ID : account?.id ?? CASH_ACCOUNT_ID,
+      counterAccountId: kind === "transfer" ? counter?.id ?? null : null,
+      assetId: kind === "buy" || kind === "sell" ? asset?.id ?? null : null,
+      quantity: kind === "buy" || kind === "sell" ? quantity ?? null : null,
+      unitPrice: kind === "buy" || kind === "sell" ? price ?? null : null,
+      assetName: kind === "buy" ? action.asset || title : undefined,
+      assetTicker: action.ticker,
+      assetKind: parseAssetKind(action.asset_kind) ?? (kind === "buy" ? "stock" : undefined),
+    });
+    return { ok: true, message: `Movimiento «${tx.title}» · ${tx.kind} ${tx.amount} €.` };
+  }
+  if (op === "delete_tx") {
+    const tx = await resolveTx(action.match || action.title);
+    if (!tx) return { ok: false, message: `No encuentro el movimiento «${action.match || action.title}».` };
+    await deleteTx(tx.id);
+    return { ok: true, message: `Eliminado «${tx.title}».` };
+  }
+  if (op === "create_account") {
+    const name = action.name?.trim() || action.title?.trim();
+    if (!name) return { ok: false, message: "Falta el nombre de la cuenta." };
+    const account = await createAccount(name, parseAccountKind(action.kind) ?? "bank");
+    return { ok: true, message: `Cuenta «${account.name}» creada.` };
+  }
+  if (op === "rename_account") {
+    const account = await resolveAccount(action.match);
+    if (!account) return { ok: false, message: `No encuentro la cuenta «${action.match}».` };
+    const name = action.name?.trim();
+    if (!name) return { ok: false, message: "Falta el nombre nuevo." };
+    await renameAccount(account.id, name);
+    return { ok: true, message: `Cuenta «${account.name}» → «${name}».` };
+  }
+  if (op === "archive_account") {
+    const account = await resolveAccount(action.match || action.name);
+    if (!account) return { ok: false, message: `No encuentro la cuenta «${action.match}».` };
+    await archiveAccount(account.id, action.archived !== false);
+    return { ok: true, message: action.archived === false ? `Cuenta «${account.name}» restaurada.` : `Archivada «${account.name}».` };
+  }
+  if (op === "create_asset") {
+    const name = action.name?.trim() || action.title?.trim();
+    if (!name) return { ok: false, message: "Falta el nombre de la inversión." };
+    const quantity = parseMoney(action.quantity, 8) ?? 0;
+    const price = parseMoney(action.price) ?? 0;
+    const asset = await createAsset({
+      name,
+      ticker: action.ticker,
+      kind: parseAssetKind(action.kind) ?? parseAssetKind(action.asset_kind) ?? "other",
+      quantity,
+      price,
+      costBasis: parseMoney(action.cost_basis) ?? quantity * price,
+    });
+    return { ok: true, message: `Inversión «${asset.name}» creada.` };
+  }
+  if (op === "update_asset" || op === "archive_asset") {
+    const asset = await resolveAsset(action.match || action.name || action.ticker || action.title);
+    if (!asset) return { ok: false, message: `No encuentro la inversión «${action.match || action.name}».` };
+    await updateAsset(asset.id, {
+      name: action.name || action.title,
+      ticker: action.ticker,
+      kind: parseAssetKind(action.asset_kind || (op === "update_asset" ? action.kind : undefined)),
+      quantity: parseMoney(action.quantity, 8),
+      price: parseMoney(action.price),
+      costBasis: parseMoney(action.cost_basis),
+      archived: op === "archive_asset" ? action.archived !== false : action.archived,
+    });
+    return { ok: true, message: `Inversión «${asset.name}» actualizada.` };
+  }
+  if (op === "create_goal") {
+    const name = action.name?.trim() || action.title?.trim();
+    const target = parseMoney(action.target) ?? parseMoney(action.amount);
+    if (!name) return { ok: false, message: "Falta el nombre del objetivo." };
+    if (target == null || !(target > 0)) return { ok: false, message: "Falta el importe del objetivo." };
+    const scope = parseGoalScope(action.scope) ?? "networth";
+    const account = await resolveAccount(action.account);
+    const asset = await resolveAsset(action.asset);
+    if (scope === "account" && !account) {
+      return { ok: false, message: "Elige la cuenta del objetivo." };
+    }
+    if (scope === "asset" && !asset) {
+      return { ok: false, message: "Elige la inversión del objetivo." };
+    }
+    const goal = await createGoal({
+      name,
+      target,
+      scope,
+      accountId: account?.id ?? null,
+      assetId: asset?.id ?? null,
+      deadlineAt: parseDue(action.due) ?? null,
+    });
+    return { ok: true, message: `Objetivo «${goal.name}» · ${goal.target} €.` };
+  }
+  if (op === "update_goal") {
+    const goal = await resolveGoal(action.match || action.title || action.name);
+    if (!goal) return { ok: false, message: `No encuentro el objetivo «${action.match || action.name}».` };
+    const scope = parseGoalScope(action.scope);
+    const account = action.account ? await resolveAccount(action.account) : null;
+    const asset = action.asset ? await resolveAsset(action.asset) : null;
+    await updateGoal(goal.id, {
+      name: action.name || action.title,
+      target: parseMoney(action.target) ?? parseMoney(action.amount),
+      scope: scope ?? undefined,
+      accountId: account?.id,
+      assetId: asset?.id,
+      deadlineAt: parseDue(action.due),
+      archived: action.archived,
+    });
+    return { ok: true, message: `Objetivo «${goal.name}» actualizado.` };
+  }
+  if (op === "archive_goal" || op === "delete_goal") {
+    const goal = await resolveGoal(action.match || action.title || action.name);
+    if (!goal) return { ok: false, message: `No encuentro el objetivo «${action.match || action.name}».` };
+    if (op === "delete_goal") await deleteGoal(goal.id);
+    else await updateGoal(goal.id, { archived: action.archived !== false });
+    return { ok: true, message: `Objetivo «${goal.name}» ${op === "delete_goal" ? "eliminado" : "archivado"}.` };
+  }
+  if (op === "create_reminder") {
+    const title = action.title?.trim() || action.name?.trim();
+    if (!title) return { ok: false, message: "Falta el mensaje del recordatorio." };
+    const clock = parseClock(action) ?? { hour: 9, minute: 0 };
+    const reminder = await createReminder({
+      title,
+      body: action.body || action.notes,
+      hour: clock.hour,
+      minute: clock.minute,
+      frequency: parseFrequency(action.frequency) ?? "daily",
+      weekday: parseWeekday(action.weekday),
+      onceAt: parseDue(action.due) ?? null,
+      enabled: action.enabled !== false,
+    });
+    return { ok: true, message: `Recordatorio «${reminder.title}» creado.` };
+  }
+  if (op === "update_reminder") {
+    const reminder = await resolveReminder(action.match || action.title);
+    if (!reminder) return { ok: false, message: `No encuentro el recordatorio «${action.match}».` };
+    const clock = parseClock(action);
+    await updateReminder(reminder.id, {
+      title: action.title || action.name,
+      body: action.body ?? action.notes,
+      hour: clock?.hour,
+      minute: clock?.minute,
+      frequency: parseFrequency(action.frequency),
+      weekday: parseWeekday(action.weekday),
+      onceAt: parseDue(action.due),
+      enabled: action.enabled,
+    });
+    return { ok: true, message: `Recordatorio «${reminder.title}» actualizado.` };
+  }
+  if (op === "delete_reminder") {
+    const reminder = await resolveReminder(action.match || action.title);
+    if (!reminder) return { ok: false, message: `No encuentro el recordatorio «${action.match}».` };
+    await deleteReminder(reminder.id);
+    return { ok: true, message: `Eliminado el recordatorio «${reminder.title}».` };
+  }
   if (op === "set_zone") {
     const zone = parseZone(action.zone || action.name || action.match);
-    if (!zone) return { ok: false, message: "Zona no válida. Usa música, podcasts, vídeo o productividad." };
-    runtime.setZone(zone);
+    if (!zone) return { ok: false, message: "Zona no válida. Usa música, podcasts, vídeo, tareas o patrimonio." };
+    if (!runtime.setZone(zone)) {
+      return { ok: false, message: "Ese apartado está oculto en Ajustes." };
+    }
     return { ok: true, message: `Zona: ${zone}.` };
   }
   return { ok: false, message: `No conozco la acción «${op}».` };
@@ -473,4 +815,41 @@ async function resolveTracks(queries: string[]) {
     if (hit) found.push(hit);
   }
   return found;
+}
+
+async function resolveAccount(match?: string) {
+  if (!match) return null;
+  const accounts = await listAccounts({ includeArchived: true });
+  const q = normalize(match);
+  if (q === "caja" || q === "cash" || q === "efectivo") {
+    return accounts.find((item) => item.id === CASH_ACCOUNT_ID) ?? null;
+  }
+  return bestMatch(accounts, (item) => item.name, match);
+}
+
+async function resolveAsset(match?: string) {
+  if (!match) return null;
+  const assets = await listAssets({ includeArchived: true });
+  return (
+    bestMatch(assets, (item) => item.ticker, match) ||
+    bestMatch(assets, (item) => item.name, match)
+  );
+}
+
+async function resolveTx(match?: string) {
+  if (!match) return null;
+  const txs = await listTx();
+  return bestMatch(txs, (item) => item.title, match);
+}
+
+async function resolveGoal(match?: string) {
+  if (!match) return null;
+  const goals = await listGoals({ includeArchived: true });
+  return bestMatch(goals, (item) => item.name, match);
+}
+
+async function resolveReminder(match?: string) {
+  if (!match) return null;
+  const reminders = await listReminders();
+  return bestMatch(reminders, (item) => item.title, match);
 }

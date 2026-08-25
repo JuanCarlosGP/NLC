@@ -28,19 +28,38 @@ export function SourceConfigSheet({
   busy: boolean;
   testConnection: () => Promise<void>;
   save: () => Promise<void>;
-  variant?: "music" | "podcast" | "video";
+  variant?: "music" | "podcast" | "video" | "wealth" | "focus";
 }) {
   const shared = settings.sourceKind !== "mock";
   const folderPlaceholder =
-    variant === "video" ? "/volume1/Popcorn" : variant === "podcast" ? "/volume1/Music/Podcasts" : "/volume1/Music";
-  const title = variant === "video" ? "Vídeo" : variant === "podcast" ? "Podcasts" : "Música";
+    variant === "video"
+      ? "/volume1/Popcorn"
+      : variant === "podcast"
+        ? "/volume1/Music/Podcasts"
+        : variant === "wealth" || variant === "focus"
+          ? "/volume1/Music/NLC"
+          : "/volume1/Music";
+  const title =
+    variant === "video"
+      ? "Vídeo"
+      : variant === "podcast"
+        ? "Podcasts"
+        : variant === "wealth"
+          ? "Patrimonio"
+          : variant === "focus"
+            ? "Tareas"
+            : "Música";
   const summary = `${settings.useHttps ? "https" : "http"}://${settings.host}:${settings.port}`;
   const folderHint =
     variant === "video"
       ? "La ruta que ves en el NAS, por ejemplo /volume1/Popcorn. Dentro: series/ y movies/."
       : variant === "podcast"
         ? "La ruta que ves en el NAS, por ejemplo /volume1/Music/Podcasts."
-        : "La ruta que ves en el NAS, por ejemplo /volume1/Music.";
+        : variant === "wealth"
+          ? "Carpeta del NAS donde se guarda nlc-wealth.json (cuentas, movimientos e inversiones)."
+          : variant === "focus"
+            ? "Carpeta del NAS donde se guarda nlc-tasks.json (tareas, proyectos y recordatorios)."
+            : "La ruta que ves en el NAS, por ejemplo /volume1/Music.";
 
   return (
     <BottomSheet
@@ -116,7 +135,7 @@ export function SourceConfigSheet({
               />
             </View>
 
-            {settings.sourceKind === "opensubsonic" ? (
+            {settings.sourceKind === "opensubsonic" && variant !== "wealth" && variant !== "focus" ? (
               <View style={styles.cardBody}>
                 <Text style={type.label}>Calidad de stream</Text>
                 <View style={styles.row}>

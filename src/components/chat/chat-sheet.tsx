@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -104,6 +105,27 @@ const UTILITIES: { id: string; label: string; hint: string; draft: string }[] = 
     draft:
       "No encuentro o no abre el capítulo «arco / episodio» de One Piece. ¿Cómo está montado (saga → arco → archivo) y qué reviso?",
   },
+  {
+    id: "wealth-tx",
+    label: "Apuntar dinero",
+    hint: "Gasto, ingreso, compra o venta",
+    draft:
+      "Apunta un gasto de 24,50 € en Comida: «restaurante». Cuenta Caja.",
+  },
+  {
+    id: "wealth-hold",
+    label: "Inversión",
+    hint: "Posición o compra",
+    draft:
+      "Compré 2 acciones de Tesla (TSLA) a 180 €. Regístralo en patrimonio.",
+  },
+  {
+    id: "wealth-goal",
+    label: "Objetivo",
+    hint: "Importe y cuándo llegas",
+    draft:
+      "Crea un objetivo de 20.000 € de patrimonio para dentro de un año, fondo de emergencia.",
+  },
 ];
 
 function ChatDialog({
@@ -117,14 +139,26 @@ function ChatDialog({
   onClose: () => void;
   children: ReactNode;
 }) {
-  if (!open) return null;
   return (
-    <Pressable style={styles.dialogBackdrop} onPress={onClose} accessibilityLabel="Cerrar">
-      <Pressable style={styles.dialogCard} onPress={(event) => event.stopPropagation()}>
-        <Text style={styles.dialogTitle}>{title}</Text>
-        {children}
+    <Modal
+      visible={open}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Cerrar"
+        style={styles.dialogBackdrop}
+        onPress={onClose}
+      >
+        <Pressable style={styles.dialogCard} onPress={(event) => event.stopPropagation()}>
+          <Text style={styles.dialogTitle}>{title}</Text>
+          {children}
+        </Pressable>
       </Pressable>
-    </Pressable>
+    </Modal>
   );
 }
 
@@ -388,12 +422,11 @@ function ChatSheetBody() {
 const styles = StyleSheet.create({
   panel: { flex: 1, minHeight: 0 },
   dialogBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     backgroundColor: "rgba(8, 7, 6, 0.72)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
-    zIndex: 20,
   },
   dialogCard: {
     width: "100%",

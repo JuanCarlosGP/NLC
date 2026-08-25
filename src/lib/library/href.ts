@@ -17,6 +17,10 @@ export function projectHref(id: string): Href {
   return { pathname: "/project/[id]", params: { id } };
 }
 
+export function assetHref(id: string): Href {
+  return { pathname: "/wealth/asset/[id]", params: { id } };
+}
+
 export function libraryParamId(raw: string | string[] | undefined): string | undefined {
   if (raw == null) return undefined;
   return Array.isArray(raw) ? raw.join("/") : raw;

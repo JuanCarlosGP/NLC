@@ -283,6 +283,54 @@ export async function clearDoneTasks(): Promise<number> {
   return result.changes;
 }
 
+export type ProductivityDump = {
+  projects: ProdProject[];
+  tasks: ProdTask[];
+};
+
+export async function dumpProductivity(): Promise<ProductivityDump> {
+  const [projects, tasks] = await Promise.all([
+    listProjects({ includeArchived: true }),
+    listTasks({ includeArchived: true }),
+  ]);
+  return { projects, tasks };
+}
+
+export async function replaceProductivity(dump: ProductivityDump): Promise<void> {
+  const db = await getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM prod_tasks");
+    await db.runAsync("DELETE FROM prod_projects");
+    for (const project of dump.projects) {
+      await db.runAsync(
+        "INSERT INTO prod_projects (id, name, color, created_at, archived) VALUES (?, ?, ?, ?, ?)",
+        project.id,
+        project.name,
+        project.color,
+        project.createdAt,
+        project.archived ? 1 : 0,
+      );
+    }
+    for (const task of dump.tasks) {
+      await db.runAsync(
+        `INSERT INTO prod_tasks (id, project_id, title, notes, status, sort, due_at, starred, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        task.id,
+        task.projectId,
+        task.title,
+        task.notes,
+        task.status,
+        task.sort,
+        task.dueAt,
+        task.starred ? 1 : 0,
+        task.createdAt,
+        task.updatedAt,
+      );
+    }
+  });
+  await ensureInbox();
+}
+
 export async function searchProductivity(query: string): Promise<{
   tasks: ProdTask[];
   projects: ProdProject[];

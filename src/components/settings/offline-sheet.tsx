@@ -32,7 +32,8 @@ export function OfflineSheet({
   const [clearOpen, setClearOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
   const supported = progress.supported;
-  const canSync = activeKind !== "video";
+  const isVideo = activeKind === "video";
+  const canSync = !isVideo;
   const ready = readyTracks.filter((item) => item.kind === activeKind);
   const pending = pendingTracks.filter((item) => item.kind === activeKind);
   const readyBytes = ready.reduce((sum, item) => sum + item.localBytes, 0);
@@ -43,7 +44,7 @@ export function OfflineSheet({
     return next;
   }, [readyTracks]);
   const pct = scopedTotal > 0 ? Math.min(1, ready.length / scopedTotal) : 0;
-  const kindLabel = activeKind === "podcast" ? "podcasts" : activeKind === "video" ? "vídeos" : "música";
+  const kindLabel = activeKind === "podcast" ? "podcasts" : isVideo ? "capítulos" : "música";
   const status = !supported
     ? "Las copias se guardan en el teléfono"
     : progress.paused
@@ -55,20 +56,20 @@ export function OfflineSheet({
         : pending.length
           ? `${pending.length} pendientes`
           : scopedTotal
-            ? `Toda la ${activeKind === "podcast" ? "lista" : activeKind === "video" ? "videoteca" : "música"} en el teléfono`
-            : "Aún no hay catálogo";
+            ? `Toda la ${activeKind === "podcast" ? "lista" : "música"} en el teléfono`
+            : "Nada guardado";
 
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar offline"
+      accessibilityCloseLabel="Cerrar espacio interno"
       viewportRatio={0.82}
     >
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.titleMeta}>
-          <Text style={type.label}>Offline</Text>
-          <Text style={type.pageTitle}>Biblioteca</Text>
+          <Text style={type.label}>Espacio interno</Text>
+          <Text style={type.pageTitle}>NLC</Text>
         </View>
 
         {lockedKind ? null : (
@@ -97,7 +98,32 @@ export function OfflineSheet({
         </View>
         )}
 
-        {canSync ? (
+        {isVideo ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Videoteca</Text>
+            <View style={styles.card}>
+              <Text style={styles.empty}>
+                One Piece y las películas están en Inicio. NLC no copia la serie entera al teléfono: ocupa demasiado. Un
+                capítulo concreto se guarda desde la serie, no desde aquí.
+              </Text>
+              {ready.length ? (
+                <View style={styles.actions}>
+                  <Pressable
+                    onPress={() => setClearOpen(true)}
+                    disabled={!supported}
+                    style={({ pressed }) => [
+                      styles.btn,
+                      styles.btnDanger,
+                      { opacity: !supported ? 0.4 : pressed ? 0.7 : 1 },
+                    ]}
+                  >
+                    <Text style={styles.btnDangerText}>Vaciar capítulos</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        ) : (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Progreso</Text>
             <View style={styles.card}>
@@ -138,25 +164,31 @@ export function OfflineSheet({
               </View>
             </View>
           </View>
-        ) : null}
+        )}
 
         <InventorySection
           title="En el teléfono"
           countLabel={ready.length ? `${ready.length} · ${formatOfflineBytes(readyBytes)}` : String(ready.length)}
           items={ready}
-          empty="Nada descargado."
+          empty={
+            isVideo
+              ? "Ningún capítulo guardado en NLC. La lista de series no cuenta aquí."
+              : "Nada descargado."
+          }
           supported={supported}
           onRemove={(item) => {
             triggerUiHaptic();
             setPendingRemove(item);
           }}
         />
-        <InventorySection
-          title="Solo NAS"
-          countLabel={String(pending.length)}
-          items={pending}
-          empty="Nada pendiente."
-        />
+        {canSync ? (
+          <InventorySection
+            title="Solo NAS"
+            countLabel={String(pending.length)}
+            items={pending}
+            empty="Nada pendiente."
+          />
+        ) : null}
       </SheetScrollView>
 
       <ConfirmDialog

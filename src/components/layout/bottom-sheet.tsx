@@ -11,7 +11,6 @@ import {
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useKeyboardBottomOverlap } from "@/components/chat/use-keyboard-bottom-overlap";
 import { BottomSheetProvider } from "@/components/layout/sheet-context";
 import { useSheetDragDismiss } from "@/components/layout/use-sheet-drag-dismiss";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -60,43 +59,37 @@ export function BottomSheet({
 }) {
   const insets = useSafeAreaInsets();
   const bottomInset = resolveBottomInset(insets.bottom);
-  const { height: windowHeight } = useWindowDimensions();
-  const { overlap: keyboardOverlap } = useKeyboardBottomOverlap(open);
-  const rawLayoutHeight =
-    Platform.OS === "web" ? windowHeight : Math.max(windowHeight - insets.top, 0);
-  const frozenLayoutRef = useRef(rawLayoutHeight);
-  if (keyboardOverlap < 40) frozenLayoutRef.current = rawLayoutHeight;
-  const layoutHeight = keyboardOverlap >= 40 ? Math.max(frozenLayoutRef.current, rawLayoutHeight) : rawLayoutHeight;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
   const chrome = Math.max(0, reserveBottom);
   const ratio = expandable && expanded ? expandedRatio : viewportRatio;
+  const [layoutHeight, setLayoutHeight] = useState(() =>
+    Platform.OS === "web" ? windowHeight : Math.max(windowHeight - insets.top, 0),
+  );
+
+  const windowHeightRef = useRef(windowHeight);
+  windowHeightRef.current = windowHeight;
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const next =
+      Platform.OS === "web" && typeof window !== "undefined"
+        ? window.innerHeight
+        : Math.max(windowHeightRef.current - insets.top, 0);
+    setLayoutHeight(next);
+  }, [open, windowWidth, insets.top]);
+
   const viewportCap = layoutHeight * ratio;
-  const available = Math.max(layoutHeight - chrome - keyboardOverlap, 160);
-  const maxSheetHeight =
-    Math.min(viewportCap, available) + (chrome > 0 || keyboardOverlap > 0 ? 0 : bottomInset);
+  const available = Math.max(layoutHeight - chrome, 160);
+  const maxSheetHeight = Math.min(viewportCap, available) + (chrome > 0 ? 0 : bottomInset);
   const slideDistance = maxSheetHeight + 48;
   const overlay = presentation === "overlay";
-  const sheetMarginBottom =
-    chrome > 0
-      ? chrome - SHEET_OVERDRAG_TAIL + keyboardOverlap
-      : keyboardOverlap > 0
-        ? keyboardOverlap - SHEET_OVERDRAG_TAIL
-        : -bottomInset - SHEET_OVERDRAG_TAIL;
+  const sheetMarginBottom = chrome > 0 ? chrome - SHEET_OVERDRAG_TAIL : -bottomInset - SHEET_OVERDRAG_TAIL;
 
   const [mounted, setMounted] = useState(false);
-  const [keyboardLiftReady, setKeyboardLiftReady] = useState(false);
   if (open && !mounted) {
     setMounted(true);
   }
-
-  useEffect(() => {
-    if (!open) {
-      setKeyboardLiftReady(false);
-      return;
-    }
-    const timer = setTimeout(() => setKeyboardLiftReady(true), OPEN_FADE_MS + 40);
-    return () => clearTimeout(timer);
-  }, [open]);
 
   const dragCloseActiveRef = useRef(false);
   const settleCloseRef = useRef<() => void>(() => {});
@@ -152,6 +145,26 @@ export function BottomSheet({
     if (open) setExpanded(false);
   }, [open]);
 
+  useEffect(() => {
+    if (Platform.OS !== "web" || !open || typeof window === "undefined") return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    const pin = () => window.scrollTo(0, 0);
+    pin();
+    window.addEventListener("scroll", pin);
+    document.addEventListener("focusin", pin);
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      window.removeEventListener("scroll", pin);
+      document.removeEventListener("focusin", pin);
+    };
+  }, [open]);
+
   useLayoutEffect(() => {
     if (!mounted) return;
 
@@ -184,10 +197,22 @@ export function BottomSheet({
     </View>
   );
 
+  const webFrame =
+    Platform.OS === "web"
+      ? ({
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          width: "100%",
+          height: layoutHeight,
+        } as object)
+      : null;
+
   const body = (
-    <GestureHandlerRootView style={styles.root} pointerEvents={overlay ? "box-none" : "auto"}>
+    <GestureHandlerRootView style={[styles.root, webFrame]} pointerEvents={overlay ? "box-none" : "auto"}>
       <View
-        style={styles.root}
+        style={[styles.root, webFrame]}
         pointerEvents={open ? (overlay ? "box-none" : "auto") : "none"}
         accessibilityViewIsModal={open && !overlay}
       >
@@ -222,18 +247,7 @@ export function BottomSheet({
               borderColor: colors.rule,
             },
             sheetAnimatedStyle,
-            Platform.OS === "web"
-              ? ({
-                  touchAction: "pan-y",
-                  ...(keyboardLiftReady && open
-                    ? {
-                        transitionProperty: "margin-bottom, height, max-height",
-                        transitionDuration: "200ms",
-                        transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
-                      }
-                    : null),
-                } as object)
-              : null,
+            Platform.OS === "web" ? ({ touchAction: "pan-y" } as object) : null,
           ]}
         >
           {handlePanGesture ? <GestureDetector gesture={handlePanGesture}>{handle}</GestureDetector> : handle}
