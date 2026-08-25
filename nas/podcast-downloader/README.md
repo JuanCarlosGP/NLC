@@ -1,37 +1,37 @@
-# Podcast downloader (yt-dlp) for Ugreen NAS
+# Downloader de podcasts (yt-dlp)
 
-Small Docker service used by **NLC**. You do **not** install Python on UGOS — only Docker / Container Manager.
+Servicio Docker pequeño que usa **NLC**. No instales Python en UGOS: solo Docker / Container Manager.
 
-Requires a Ugreen **DXP** (or other host) with Docker. DH series without Docker: run this compose on a PC instead; point NLC at that host.
+Hace falta un Ugreen **DXP** (u otro host) con Docker. En una serie DH sin Docker, corre el compose en un PC y apunta NLC a ese host.
 
-## What it does
+## Qué hace
 
 - `GET /health` — liveness
 - `POST /download` — `{ "url": "https://…" }` → `{ "id", "status": "queued" }`
 - `GET /jobs/{id}` — `queued | running | done | error`
 
-Auth (optional): if `AUTH_TOKEN` is empty, leave Token blank in NLC. If you set a token in compose, put the same value in NLC (`X-Download-Token` / Bearer).
+Auth (opcional): si `AUTH_TOKEN` está vacío, deja el token en blanco en NLC. Si pones un token en el compose, usa el mismo valor en NLC (`X-Download-Token` / Bearer).
 
-Audio is saved as MP3 under **Music/Canciones** (songs) or **Music/Podcasts** (podcasts). No channel/artist subfolders. yt-dlp also writes a sidecar JPG with the same name (`Episodio.mp3` + `Episodio.jpg`). NLC only uses that file as cover — never a shared `cover.jpg` in the dump folder.
+El audio se guarda como MP3 en **Music/Canciones** (canciones) o **Music/Podcasts** (podcasts), sin subcarpetas de canal. yt-dlp también escribe un JPG con el mismo nombre (`Episodio.mp3` + `Episodio.jpg`). NLC usa ese fichero como portada; nunca un `cover.jpg` compartido de la carpeta.
 
-## Deploy on Ugreen
+## Despliegue en Ugreen
 
-1. In File Manager, under your music share, create folders **`Podcasts`** and **`Canciones`** (e.g. `Music/Podcasts`, `Music/Canciones`).
-2. Copy this directory to the NAS (or paste the compose in Container Manager).
-3. Edit `docker-compose.yml`:
-   - Left side of the volume → real path to `Podcasts` (often `/volume1/Music/Podcasts`).
-   - Set `AUTH_TOKEN` (same value you will enter in NLC).
-4. Container Manager → **Compose** → create stack → Deploy (build from Dockerfile).
-5. Check `http://<NAS-IP>:8091/health` from a PC on the LAN.
+1. En el File Manager, dentro del share de música, crea **`Podcasts`** y **`Canciones`** (p. ej. `Music/Podcasts`, `Music/Canciones`).
+2. Copia este directorio al NAS (o pega el compose en Container Manager).
+3. Edita `docker-compose.yml`:
+   - Lado izquierdo del volumen → ruta real de `Podcasts` (a menudo `/volume1/Music/Podcasts`).
+   - Pon un `AUTH_TOKEN` (el mismo que escribirás en NLC).
+4. Container Manager → **Compose** → crear stack → Deploy (build desde el Dockerfile).
+5. Comprueba `http://<IP-DEL-NAS>:8091/health` desde un PC en la LAN.
 
-## Viewer user
+## Usuario de solo lectura
 
-- The **container** writes files (volume mount). It does not use Viewer/Viewer.
-- **Viewer** only needs **read** on `Music` / `Podcasts` so NLC WebDAV can play the new files.
-- Write on Viewer is only needed for `nlc.json` (Guardar configuración), not for podcast downloads.
+- El **contenedor** escribe ficheros (mount del volumen). No usa el usuario Viewer.
+- Viewer solo necesita **lectura** en `Music` / `Podcasts` para que NLC reproduzca por WebDAV.
+- Escritura en Viewer solo hace falta para `nlc.json` (Guardar configuración), no para las descargas.
 
-## NLC app
+## App NLC
 
-Ajustes → **Descargas**: host = NAS IP, puerto `8091`, token = `AUTH_TOKEN`. Paste a YouTube / podcast page URL and enqueue. When status is `done`, refresh the library.
+Ajustes → **Descargas**: host = IP del NAS, puerto `8091`, token = `AUTH_TOKEN`. Pega una URL de YouTube / podcast y encola. Cuando el estado sea `done`, refresca la biblioteca.
 
-Do not use Spotify episode links for audio download (DRM / unsupported). Spotify import in NLC remains metadata-only.
+No uses enlaces de episodios de Spotify para bajar audio (DRM / no soportado). El import de Spotify en NLC sigue siendo solo metadatos.

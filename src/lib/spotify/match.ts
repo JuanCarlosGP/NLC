@@ -96,14 +96,14 @@ export async function matchImportedTracks(
 }
 
 export function matchedNasTracks(tracks: ImportedTrack[]): Track[] {
-  return tracks
-    .map((track) => {
-      if (!track.matched) return null;
-      return {
-        ...track.matched,
-        artworkUrl: track.coverUrl || track.matched.artworkUrl || null,
-        durationMs: track.matched.durationMs || track.durationMs || 0,
-      };
-    })
-    .filter((track): track is Track => Boolean(track));
+  const next: Track[] = [];
+  for (const track of tracks) {
+    if (!track.matched) continue;
+    next.push({
+      ...track.matched,
+      artworkUrl: track.coverUrl || track.matched.artworkUrl || null,
+      durationMs: track.matched.durationMs || track.durationMs || 0,
+    });
+  }
+  return next;
 }

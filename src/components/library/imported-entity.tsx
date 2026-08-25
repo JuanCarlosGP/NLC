@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useSharedValue } from "react-native-reanimated";
@@ -54,7 +54,7 @@ export function ImportedEntityView({
   const { openPlaylistActions } = usePlaylistActions();
   const dock = useDock();
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<Animated.ScrollView>(null);
   const scrollY = useSharedValue(0);
   const viewportTop = useSharedValue(0);
   const viewportHeight = useSharedValue(0);
@@ -264,7 +264,10 @@ export function ImportedEntityView({
       })}
       onLayout={(event) => {
         viewportHeight.value = event.nativeEvent.layout.height;
-        scrollRef.current?.measureInWindow((_x, y) => {
+        const node = scrollRef.current as unknown as {
+          measureInWindow?: (callback: (x: number, y: number) => void) => void;
+        } | null;
+        node?.measureInWindow?.((_x, y) => {
           viewportTop.value = y;
         });
       }}

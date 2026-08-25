@@ -68,7 +68,7 @@ const UTILITIES: { id: string; label: string; hint: string; draft: string }[] = 
     label: "No suena",
     hint: "Pista, episodio o capítulo",
     draft:
-      "No reproduce «título». Fuente WebDAV 192.168.1.106:5005 /Music. ¿Qué reviso (conexión, ruta, formato)?",
+      "No reproduce «título». Fuente WebDAV (host/puerto/carpeta de Ajustes). ¿Qué reviso (conexión, ruta, formato)?",
   },
   {
     id: "missing",
@@ -82,14 +82,14 @@ const UTILITIES: { id: string; label: string; hint: string; draft: string }[] = 
     label: "Descargar",
     hint: "yt-dlp :8091 y miniatura",
     draft:
-      "Quiero bajar «URL» con yt-dlp (192.168.1.106:8091) a /Music/Podcasts o /Music/Canciones, con jpg al lado. ¿Cómo lo dejo en Ajustes y en el NAS?",
+      "Quiero bajar «URL» con yt-dlp (Ajustes → Descargas, puerto 8091) a /Music/Podcasts o /Music/Canciones, con jpg al lado. ¿Cómo lo dejo en Ajustes y en el NAS?",
   },
   {
     id: "nas",
     label: "NAS no conecta",
     hint: "Host, puerto, usuario y carpeta",
     draft:
-      "No conecta la carpeta compartida. Host «192.168.1.106», puerto «5005», usuario Viewer, carpeta /Music, HTTPS off. ¿Checklist?",
+      "No conecta la carpeta compartida. Host, puerto, usuario y carpeta son los de Ajustes; HTTPS off. ¿Checklist?",
   },
   {
     id: "spotify",

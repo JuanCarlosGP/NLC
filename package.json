@@ -2,6 +2,30 @@
   "name": "nlc",
   "version": "0.1.5",
   "private": true,
+  "description": "Reproductor Android personal para la biblioteca de un NAS (música, podcasts, vídeo, foco y patrimonio).",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "JuanCarlosGP",
+  "homepage": "https://github.com/JuanCarlosGP/NLC#readme",
+  "bugs": {
+    "url": "https://github.com/JuanCarlosGP/NLC/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JuanCarlosGP/NLC.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "android",
+    "expo",
+    "react-native",
+    "navidrome",
+    "opensubsonic",
+    "webdav",
+    "nas",
+    "music-player"
+  ],
   "main": "index.ts",
   "scripts": {
     "start": "expo start",

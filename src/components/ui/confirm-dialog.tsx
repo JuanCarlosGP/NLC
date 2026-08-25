@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View, type ReactNode } from "react-native";
+import type { ReactNode } from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { ArrowDownCircle, Check, CircleCheck, Trash2 } from "lucide-react-native";
 import { colors, fonts, type } from "@/lib/theme";
 

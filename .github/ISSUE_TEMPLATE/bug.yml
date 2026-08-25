@@ -1,0 +1,62 @@
+name: Fallo
+description: Algo no funciona como debería
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias. Un hallazgo = un flujo reproducible. No mezcles tres fallos en el mismo issue.
+  - type: textarea
+    id: what
+    attributes:
+      label: Qué pasa
+      placeholder: El mini player tapa el dock al abrir Biblioteca.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Qué debería pasar
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1. Abrir Biblioteca
+        2. Reproducir una pista
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Fuente de biblioteca
+      options:
+        - Carpeta compartida (WebDAV)
+        - Navidrome / OpenSubsonic
+        - Carpeta local
+        - Biblioteca de ejemplo
+        - No aplica
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión
+      description: APK (p. ej. 0.1.5) o "Expo Go / main".
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severidad
+      options:
+        - P0 — no se puede reproducir o entrar a la app
+        - P1 — flujo principal roto
+        - P2 — molesta pero hay salida
+        - P3 — cosmética / copy
+    validations:
+      required: true

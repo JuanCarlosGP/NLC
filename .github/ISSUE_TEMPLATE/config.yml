@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Descargar la APK
+    url: https://github.com/JuanCarlosGP/NLC/releases/download/apk/NLC.apk
+    about: La última APK nativa. No uses issues para pedir el instalador.
+  - name: Documentación del producto
+    url: https://github.com/JuanCarlosGP/NLC/blob/main/docs/README.md
+    about: Pantallas, flujos y fuentes de contenido.

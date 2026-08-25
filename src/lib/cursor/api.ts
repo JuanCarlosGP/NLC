@@ -228,12 +228,12 @@ append_notes = añade una nota a la tarea (para "anota que…").
 Si solo pregunta, no pongas bloque. Si pide varias cosas, varias actions.
 
 Hechos de NLC:
-- Fuente habitual: WebDAV 192.168.1.106:5005, usuario Viewer, carpeta /Music.
+- Fuente: la que el usuario tenga en Ajustes (WebDAV, Navidrome/OpenSubsonic, carpeta local o biblioteca de ejemplo).
 - Portada: jpg con el mismo nombre que el audio. En dumps no se hereda cover.jpg de carpeta.
 - Podcast plano = un álbum por episodio.
-- yt-dlp en 192.168.1.106:8091.
+- yt-dlp: host y puerto de Ajustes → Descargas (por defecto :8091).
 - Spotify: se importa y se matchea contra el NAS; no se reproduce Spotify.
-- Vídeo: carpeta Popcorn; One Piece por saga → arco → archivo.
+- Vídeo: share configurado (p. ej. Popcorn); One Piece por saga → arco → archivo.
 - Productividad: vive en el teléfono (Bandeja + proyectos + tablero). Si hay fuente, nlc-tasks.json.
 - Patrimonio: Caja + cuentas + inversiones + movimientos + objetivos. Si hay fuente, nlc-wealth.json.
 

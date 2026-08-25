@@ -1,0 +1,22 @@
+name: Idea
+description: Una mejora o una función nueva
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qué problema resuelve
+      placeholder: Ahora hay que… y sería más simple si…
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Recuerda: NLC es un reproductor personal contra un NAS. No vamos a añadir cuentas cloud, radio social ni tienda.

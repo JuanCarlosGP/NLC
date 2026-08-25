@@ -80,21 +80,22 @@ function sameTrackMeta(a: Track, b: Track): boolean {
 
 export function hydrateTracksFromLibrary(stored: Track[], libraryTracks: Track[]): Track[] {
   const byId = new Map(libraryTracks.map((track) => [track.id, track]));
-  return stored
-    .map((track) => {
-      const fresh = byId.get(track.id);
-      if (!fresh) return null;
-      if (isPodcastTrack(fresh) || isPodcastTrack(track)) {
-        return { ...fresh, artworkUrl: null, durationMs: fresh.durationMs || track.durationMs || 0 };
-      }
-      return {
-        ...fresh,
-        artworkUrl:
-          fresh.artworkUrl || (fresh.coverId === track.coverId ? track.artworkUrl : null) || null,
-        durationMs: fresh.durationMs || track.durationMs || 0,
-      };
-    })
-    .filter((track): track is Track => Boolean(track));
+  const next: Track[] = [];
+  for (const track of stored) {
+    const fresh = byId.get(track.id);
+    if (!fresh) continue;
+    if (isPodcastTrack(fresh) || isPodcastTrack(track)) {
+      next.push({ ...fresh, artworkUrl: null, durationMs: fresh.durationMs || track.durationMs || 0 });
+      continue;
+    }
+    next.push({
+      ...fresh,
+      artworkUrl:
+        fresh.artworkUrl || (fresh.coverId === track.coverId ? track.artworkUrl : null) || null,
+      durationMs: fresh.durationMs || track.durationMs || 0,
+    });
+  }
+  return next;
 }
 
 export async function pruneMissingLibraryTracks(

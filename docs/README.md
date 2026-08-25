@@ -1,19 +1,14 @@
 # Docs NLC
 
-Cerebro del producto. Lo que hace la app, no cómo está implementada.
+Qué hace la app, no cómo está implementada. Si esta carpeta y el README discrepan, gana lo que corre en el teléfono y se abre un hallazgo o un issue.
 
 | Carpeta | Qué es |
 | --- | --- |
 | [producto/pantallas.md](producto/pantallas.md) | Qué hace cada pantalla |
 | [producto/flujos.md](producto/flujos.md) | Recorridos de punta a punta |
 | [producto/fuentes.md](producto/fuentes.md) | Mock, Navidrome, Spotify, podcasts, WebDAV |
-| [qa/README.md](qa/README.md) | Cobertura, hallazgos, cómo trabaja el equipo |
+| [qa/README.md](qa/README.md) | Cobertura y hallazgos del equipo de prueba |
 
-## Quién escribe qué
+`docs/qa/` es el cuaderno de trabajo interno (dispositivo, LAN, ids `SND-xxx`). No es la guía de usuario.
 
-- **QA Manual 1** redacta pantallas y flujos en la primera pasada (lo que ve en el teléfono).
-- **QA Manual 2** revisa esa doc con criterio propio. Si el texto no cuadra con la app, lo corrige. Si el comportamiento no tiene sentido, abre hallazgo, no “documenta el bug”.
-- **DEV 1** no rellena esto. Si un arreglo cambia una pantalla, lo dice en el canal y QA actualiza.
-- **NLC PM** mantiene el índice y cierra contradicciones.
-
-Hoy la fuente de verdad es lo que corre en Expo Go en el Nothing Phone. Si README del repo y esta carpeta discrepan, gana lo que hace la app y se abre hallazgo.
+Para instalar, desarrollar o licenciar, empieza por el [README](../README.md).

@@ -170,7 +170,7 @@ export async function listLocalVideoShows(folderUri: string): Promise<LocalVideo
   const root = await loadLocalVideoTree(folderUri);
   const seriesDir = root.children.find((child) => child.dir && child.name.toLowerCase() === "series");
   const moviesDir = root.children.find((child) => child.dir && child.name.toLowerCase() === "movies");
-  const items: VideoShow[] = [];
+  const items: LocalVideoShow[] = [];
   if (seriesDir || moviesDir) {
     for (const child of seriesDir?.children ?? []) {
       if (child.dir) items.push(toShow(child, "series"));
@@ -185,5 +185,5 @@ export async function listLocalVideoShows(folderUri: string): Promise<LocalVideo
       else if (VIDEO_EXT.has(extOf(child.name))) items.push(toShow(child, "movie", true));
     }
   }
-  return items.sort((a, b) => a.title.localeCompare(b.title, "es"));
+  return items.sort((a, b) => a.name.localeCompare(b.name, "es"));
 }

@@ -1,13 +1,13 @@
-MIT License
+MIT License with Commons Clause
 
 Copyright (c) 2026 JuanCarlosGP
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+to use, copy, modify, merge, publish, distribute, and/or sublicense copies of
+the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
@@ -19,3 +19,33 @@ authors or copyright holders be liable for any claim, damages or other
 liability, whether in an action of contract, tort or otherwise, arising from,
 out of or in connection with the Software or the use or other dealings in the
 Software.
+
+------------------------------------------------------------------------
+
+“Commons Clause” License Condition v1.0
+
+The Software is provided to you by the Licensor under the License, as defined
+below, subject to the following condition.
+
+Without limiting other conditions in the License, the grant of rights under
+the License will not include, and the License does not grant to you, the right
+to Sell the Software.
+
+For purposes of the foregoing, “Sell” means practicing any or all of the
+rights granted to you under the License to provide to third parties, for a
+fee or other consideration (including without limitation fees for hosting or
+consulting/support services related to the Software), a product or service
+whose value derives, entirely or substantially, from the functionality of the
+Software. Any license you grant must also be subject to these limitations.
+
+“License” means the terms of the MIT License as included above, as modified
+by this Commons Clause.
+“Licensor” means JuanCarlosGP.
+“Software” means NLC and all associated files in this repository.
+
+Personal, educational, research, and other non-commercial use — including
+running NLC against your own NAS, forking the project, and contributing
+changes — is permitted. Selling NLC, selling a product that is substantially
+NLC, or offering NLC as a paid hosted service is not permitted.
+
+For commercial licensing, contact the copyright holder.

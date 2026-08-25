@@ -17,3 +17,7 @@ ios/
 npm-debug.*
 .DS_Store
 expo-env.d.ts
+*.apk
+*.aab
+.idea/
+coverage/
