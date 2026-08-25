@@ -5,6 +5,7 @@ import { ArrowUpDown, Plus, Search } from "lucide-react-native";
 import { LadybugMark } from "@/components/brand/ladybug-mark";
 import { ZoneSwitch } from "@/components/layout/zone-switch";
 import { Screen } from "@/components/ui/screen";
+import { AccountActivitySheet } from "@/components/wealth/account-activity-sheet";
 import { AccountComposerSheet, AssetComposerSheet } from "@/components/wealth/account-composer-sheet";
 import { GoalComposerSheet } from "@/components/wealth/goal-composer-sheet";
 import { GoalRow, goalListStyle } from "@/components/wealth/goal-row";
@@ -18,7 +19,7 @@ import { colors, fonts, type } from "@/lib/theme";
 import { changePct, formatChartScrub, visualChartRange, type ChartPoint } from "@/lib/wealth/compute";
 import { formatEuro, formatPct } from "@/lib/wealth/money";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
-import { RANGE_OPTIONS, type WealthGoal, type WealthHomeTab, type WealthRange, type WealthTxKind } from "@/lib/wealth/types";
+import { RANGE_OPTIONS, type WealthAccount, type WealthGoal, type WealthHomeTab, type WealthRange, type WealthTxKind } from "@/lib/wealth/types";
 
 export function WealthHome() {
   const router = useRouter();
@@ -32,6 +33,7 @@ export function WealthHome() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [goalOpen, setGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<WealthGoal | null>(null);
+  const [previewAccount, setPreviewAccount] = useState<WealthAccount | null>(null);
   const [scrub, setScrub] = useState<ChartPoint | null>(null);
 
   const points = useMemo(() => series(range), [range, series]);
@@ -135,11 +137,37 @@ export function WealthHome() {
           <QuickCard
             title="Movimientos"
             hint={`${txs.length}`}
+            addLabel="Nuevo movimiento"
             onPress={() => router.push("/wealth/activity")}
+            onAdd={() => openTx("income")}
           />
-          <QuickCard title="Inversiones" hint={`${positions.length}`} onPress={() => router.push("/wealth/assets")} />
-          <QuickCard title="Cuentas" hint={`${accounts.length}`} onPress={() => router.push("/wealth/accounts")} />
-          <QuickCard title="Objetivos" hint={`${goalProgress.length}`} onPress={() => router.push("/wealth/goals")} />
+          <QuickCard
+            title="Inversiones"
+            hint={`${positions.length}`}
+            addLabel="Nueva inversión"
+            onPress={() => router.push("/wealth/assets")}
+            onAdd={() => {
+              triggerUiHaptic();
+              setAssetOpen(true);
+            }}
+          />
+          <QuickCard
+            title="Cuentas"
+            hint={`${accounts.length}`}
+            addLabel="Nueva cuenta"
+            onPress={() => router.push("/wealth/accounts")}
+            onAdd={() => {
+              triggerUiHaptic();
+              setAccountOpen(true);
+            }}
+          />
+          <QuickCard
+            title="Objetivos"
+            hint={`${goalProgress.length}`}
+            addLabel="Nuevo objetivo"
+            onPress={() => router.push("/wealth/goals")}
+            onAdd={() => openGoal()}
+          />
         </View>
 
         {tab === "goals" ? (
@@ -193,13 +221,22 @@ export function WealthHome() {
               </Pressable>
             </View>
             {accounts.map((account) => (
-              <View key={account.id} style={styles.accountRow}>
+              <Pressable
+                key={account.id}
+                accessibilityRole="button"
+                accessibilityLabel={`${account.name}, ${formatEuro(balanceOf(account.id))}`}
+                onPress={() => {
+                  triggerUiHaptic();
+                  setPreviewAccount(account);
+                }}
+                style={({ pressed }) => [styles.accountRow, { opacity: pressed ? 0.72 : 1 }]}
+              >
                 <View>
                   <Text style={styles.accountName}>{account.name}</Text>
                   <Text style={type.meta}>{account.kind === "bank" ? "Banco" : account.kind === "wallet" ? "Monedero" : "Efectivo"}</Text>
                 </View>
                 <Text style={styles.accountBal}>{formatEuro(balanceOf(account.id))}</Text>
-              </View>
+              </Pressable>
             ))}
             {recent.length ? (
               <View style={styles.section}>
@@ -252,6 +289,12 @@ export function WealthHome() {
       <TxComposerSheet open={txOpen} onOpenChange={setTxOpen} defaultKind={txKind} />
       <AssetComposerSheet open={assetOpen} onOpenChange={setAssetOpen} />
       <AccountComposerSheet open={accountOpen} onOpenChange={setAccountOpen} />
+      <AccountActivitySheet
+        account={previewAccount}
+        onOpenChange={(open) => {
+          if (!open) setPreviewAccount(null);
+        }}
+      />
       <GoalComposerSheet
         open={goalOpen}
         onOpenChange={(next) => {
@@ -264,12 +307,39 @@ export function WealthHome() {
   );
 }
 
-function QuickCard({ title, hint, onPress }: { title: string; hint: string; onPress: () => void }) {
+function QuickCard({
+  title,
+  hint,
+  addLabel,
+  onPress,
+  onAdd,
+}: {
+  title: string;
+  hint: string;
+  addLabel: string;
+  onPress: () => void;
+  onAdd: () => void;
+}) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, { opacity: pressed ? 0.86 : 1 }]}>
-      <Text style={styles.cardTitle}>{title}</Text>
-      <Text style={styles.cardHint}>{hint}</Text>
-    </Pressable>
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.cardMain, { opacity: pressed ? 0.86 : 1 }]}
+      >
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardHint}>{hint}</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={addLabel}
+        hitSlop={6}
+        onPress={onAdd}
+        style={({ pressed }) => [styles.cardAdd, { opacity: pressed ? 0.7 : 1 }]}
+      >
+        <Plus size={15} color={colors.muted} strokeWidth={1.6} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -351,11 +421,28 @@ const styles = StyleSheet.create({
   card: {
     flexGrow: 1,
     flexBasis: "47%",
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: colors.sheetRaised,
     borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingLeft: 12,
+    paddingRight: 8,
+    gap: 8,
+  },
+  cardMain: {
+    flex: 1,
     gap: 6,
+    paddingVertical: 4,
+  },
+  cardAdd: {
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.rule,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardTitle: {
     fontFamily: fonts.sansMedium,

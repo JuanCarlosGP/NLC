@@ -5,15 +5,28 @@ import { formatEuro, formatSignedEuro } from "@/lib/wealth/money";
 import { useTxActions } from "@/lib/wealth/tx-actions-context";
 import { TX_KIND_LABEL, type WealthTx } from "@/lib/wealth/types";
 
-function signedAmount(tx: WealthTx): number {
+function signedAmount(tx: WealthTx, accountId?: string): number {
+  if (accountId && tx.kind === "transfer") {
+    if (tx.counterAccountId === accountId) return tx.amount;
+    if (tx.accountId === accountId) return -tx.amount;
+    return 0;
+  }
   if (tx.kind === "income" || tx.kind === "sell") return tx.amount;
   if (tx.kind === "transfer") return 0;
   return -tx.amount;
 }
 
-export function TxRow({ tx, onPress }: { tx: WealthTx; onPress?: () => void }) {
+export function TxRow({
+  tx,
+  accountId,
+  onPress,
+}: {
+  tx: WealthTx;
+  accountId?: string;
+  onPress?: () => void;
+}) {
   const { openTxActions } = useTxActions();
-  const signed = signedAmount(tx);
+  const signed = signedAmount(tx, accountId);
   const when = new Date(tx.bookedAt);
   const date = when.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
   return (
@@ -42,7 +55,7 @@ export function TxRow({ tx, onPress }: { tx: WealthTx; onPress?: () => void }) {
         </Text>
       </View>
       <Text style={[styles.amount, signed > 0 ? styles.in : signed < 0 ? styles.out : styles.flat]}>
-        {tx.kind === "transfer" ? formatEuro(tx.amount) : formatSignedEuro(signed)}
+        {tx.kind === "transfer" && !accountId ? formatEuro(tx.amount) : formatSignedEuro(signed)}
       </Text>
     </Pressable>
   );
