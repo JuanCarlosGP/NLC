@@ -3,7 +3,7 @@ import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, Library, MessageCircle, Search, Settings } from "lucide-react-native";
-import { usePendingApk } from "@/hooks/use-app-update";
+import { usePendingUpdate } from "@/hooks/use-app-update";
 import { useCursor } from "@/hooks/use-cursor";
 import { DOCK_HEIGHT, DOCK_MARGIN, useDock } from "@/lib/dock-context";
 import { webInteractiveStyle } from "@/lib/interactive";
@@ -63,7 +63,7 @@ function DockIcons() {
   const router = useRouter();
   const pathname = usePathname();
   const { zone } = useZone();
-  const apkPending = usePendingApk();
+  const updatePending = usePendingUpdate();
   const { chatOpen, chatUnread, setChatOpen } = useCursor();
   const homeActive = isHomeRoute(pathname);
   const libraryActive =
@@ -122,7 +122,7 @@ function DockIcons() {
       </DockButton>
       <DockButton
         active={settingsActive}
-        badge={apkPending}
+        badge={updatePending}
         label="Ajustes"
         onPress={() => {
           if (pathname.startsWith("/settings")) return;
@@ -219,6 +219,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
     minHeight: DOCK_HEIGHT,
+    overflow: "visible",
   },
   button: {
     width: 48,
@@ -227,15 +228,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "visible",
   },
   badge: {
     position: "absolute",
-    top: 5,
-    right: 5,
-    width: 10,
-    height: 10,
+    top: 2,
+    right: 2,
+    width: 11,
+    height: 11,
     borderRadius: 999,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.warn,
     borderWidth: 2,
     borderColor: colors.void,
   },

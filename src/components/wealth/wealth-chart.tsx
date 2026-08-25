@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PanResponder, Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import Svg, { Circle, Line, Path } from "react-native-svg";
-import { colors, fonts } from "@/lib/theme";
+import { PanResponder, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
+import Svg, { Line, Path } from "react-native-svg";
+import { colors } from "@/lib/theme";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
-import { formatChartScrub, type ChartPoint } from "@/lib/wealth/compute";
-import { formatEuro } from "@/lib/wealth/money";
+import { visualChartRange, type ChartPoint } from "@/lib/wealth/compute";
 import type { WealthRange } from "@/lib/wealth/types";
+
+const PAD_X = 10;
+const PAD_Y = 14;
 
 function isMajorTick(at: number, range: WealthRange): boolean {
   const date = new Date(at);
@@ -39,26 +41,27 @@ export function WealthChart({
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const width = Math.max(280, windowWidth - 40);
-  const height = 148;
-  const pad = 4;
-  const innerW = width - pad * 2;
-  const innerH = height - pad * 2;
+  const height = 156;
+  const innerW = width - PAD_X * 2;
+  const innerH = height - PAD_Y * 2;
   const onScrubRef = useRef(onScrub);
   onScrubRef.current = onScrub;
   const layout = useMemo(() => {
     if (points.length < 2) return null;
     const values = points.map((point) => point.value);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    const rawMin = Math.min(...values);
+    const rawMax = Math.max(...values);
+    const min = rawMin > 0 ? 0 : rawMin;
+    const max = rawMax < 0 ? 0 : rawMax;
     const span = max - min || 1;
     const t0 = points[0]!.at;
     const t1 = points[points.length - 1]!.at;
     const timeSpan = t1 - t0 || 1;
     const coords = points.map((point) => ({
-      x: pad + ((point.at - t0) / timeSpan) * innerW,
-      y: pad + innerH - ((point.value - min) / span) * innerH,
+      x: PAD_X + ((point.at - t0) / timeSpan) * innerW,
+      y: PAD_Y + (1 - (point.value - min) / span) * innerH,
     }));
-    return { min, max, t0, t1, timeSpan, coords, innerW, pad };
+    return { min, max, t0, t1, timeSpan, coords, innerW };
   }, [innerH, innerW, points]);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
@@ -93,8 +96,8 @@ export function WealthChart({
     const current = layoutRef.current;
     const series = pointsRef.current;
     if (!current || series.length < 2) return;
-    const x = Math.min(current.pad + current.innerW, Math.max(current.pad, locationX));
-    const at = current.t0 + ((x - current.pad) / current.innerW) * current.timeSpan;
+    const x = Math.min(PAD_X + current.innerW, Math.max(PAD_X, locationX));
+    const at = current.t0 + ((x - PAD_X) / current.innerW) * current.timeSpan;
     const idx = indexAtTime(series, at);
     const point = series[idx];
     const coord = current.coords[idx];
@@ -117,16 +120,13 @@ export function WealthChart({
     return <View style={[styles.frame, { height }]} />;
   }
 
-  const { min, max, coords } = layout;
+  const { min, max, coords, t0, t1 } = layout;
+  const tickRange = visualChartRange(t0, t1);
   const d = coords
     .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`)
     .join(" ");
   const stroke = up ? colors.ok : colors.danger;
-  const zeroY = pad + innerH - ((0 - min) / (max - min || 1)) * innerH;
-  const tipWidth = 148;
-  const tipLeft = cursor
-    ? Math.min(width - tipWidth, Math.max(0, cursor.x - tipWidth / 2))
-    : 0;
+  const zeroY = PAD_Y + (1 - (0 - min) / (max - min || 1)) * innerH;
 
   return (
     <View
@@ -138,17 +138,17 @@ export function WealthChart({
       ]}
       {...pan.panHandlers}
     >
-      <Svg width={width} height={height} pointerEvents="none">
+      <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} pointerEvents="none">
         {coords.map((coord, index) => {
           const point = points[index];
-          if (!point || !isMajorTick(point.at, range)) return null;
+          if (!point || !isMajorTick(point.at, tickRange)) return null;
           return (
             <Line
               key={`${point.at}-${index}`}
               x1={coord.x}
               x2={coord.x}
-              y1={pad}
-              y2={height - pad}
+              y1={PAD_Y}
+              y2={height - PAD_Y}
               stroke={colors.rule}
               strokeWidth={1}
             />
@@ -156,8 +156,8 @@ export function WealthChart({
         })}
         {min < 0 && max > 0 ? (
           <Line
-            x1={pad}
-            x2={width - pad}
+            x1={PAD_X}
+            x2={width - PAD_X}
             y1={zeroY}
             y2={zeroY}
             stroke={colors.ruleLight}
@@ -165,26 +165,30 @@ export function WealthChart({
             strokeWidth={1}
           />
         ) : null}
-        <Path d={d} fill="none" stroke={stroke} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+        <Path d={d} fill="none" stroke={stroke} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
         {cursor ? (
-          <>
-            <Line
-              x1={cursor.x}
-              x2={cursor.x}
-              y1={pad}
-              y2={height - pad}
-              stroke={colors.ink}
-              strokeWidth={1.2}
-            />
-            <Circle cx={cursor.x} cy={cursor.y} r={5} fill={stroke} stroke={colors.void} strokeWidth={2} />
-          </>
+          <Line
+            x1={cursor.x}
+            x2={cursor.x}
+            y1={PAD_Y}
+            y2={height - PAD_Y}
+            stroke={colors.ink}
+            strokeWidth={1.2}
+          />
         ) : null}
       </Svg>
       {cursor ? (
-        <View pointerEvents="none" style={[styles.tip, { left: tipLeft, width: tipWidth }]}>
-          <Text style={styles.tipValue}>{formatEuro(cursor.point.value)}</Text>
-          <Text style={styles.tipTime}>{formatChartScrub(cursor.point.at, range)}</Text>
-        </View>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.cursorDot,
+            {
+              left: cursor.x - 6,
+              top: cursor.y - 6,
+              backgroundColor: stroke,
+            },
+          ]}
+        />
       ) : null}
     </View>
   );
@@ -193,21 +197,14 @@ export function WealthChart({
 const styles = StyleSheet.create({
   frame: {
     marginHorizontal: -4,
+    overflow: "visible",
   },
-  tip: {
+  cursorDot: {
     position: "absolute",
-    top: 8,
-    alignItems: "center",
-    gap: 1,
-  },
-  tipValue: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 13,
-    color: colors.ink,
-  },
-  tipTime: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.muted,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.ink,
   },
 });

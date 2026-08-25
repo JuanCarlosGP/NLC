@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Constants from "expo-constants";
-import { applyOtaUpdate, getOtaInfo, type OtaInfo } from "@/lib/ota/apply-update";
+import { applyOtaUpdate, checkOtaAvailable, getOtaInfo, type OtaInfo } from "@/lib/ota/apply-update";
 import { fetchRemoteApk, isRemoteApkNewer, type RemoteApk } from "@/lib/ota/github-apk";
 import { downloadAndInstallApk } from "@/lib/ota/install-apk";
 
@@ -14,19 +14,20 @@ function localApkIdentity() {
   return { version, code };
 }
 
-export function usePendingApk() {
+export function usePendingUpdate() {
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const { version, code } = localApkIdentity();
-    void fetchRemoteApk()
-      .then((remote) => {
-        if (!cancelled) setPending(Boolean(remote && isRemoteApkNewer(remote, version, code)));
-      })
-      .catch(() => {
-        if (!cancelled) setPending(false);
-      });
+    void Promise.all([
+      fetchRemoteApk()
+        .then((remote) => Boolean(remote && isRemoteApkNewer(remote, version, code)))
+        .catch(() => false),
+      checkOtaAvailable().catch(() => false),
+    ]).then(([apk, ota]) => {
+      if (!cancelled) setPending(apk || ota);
+    });
     return () => {
       cancelled = true;
     };

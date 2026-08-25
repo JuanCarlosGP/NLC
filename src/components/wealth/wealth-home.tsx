@@ -15,7 +15,7 @@ import { WealthChart } from "@/components/wealth/wealth-chart";
 import { assetHref } from "@/lib/library/href";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
-import { changePct, formatChartScrub, type ChartPoint } from "@/lib/wealth/compute";
+import { changePct, formatChartScrub, visualChartRange, type ChartPoint } from "@/lib/wealth/compute";
 import { formatEuro, formatPct } from "@/lib/wealth/money";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 import { RANGE_OPTIONS, type WealthGoal, type WealthHomeTab, type WealthRange, type WealthTxKind } from "@/lib/wealth/types";
@@ -35,8 +35,10 @@ export function WealthHome() {
   const [scrub, setScrub] = useState<ChartPoint | null>(null);
 
   const points = useMemo(() => series(range), [range, series]);
+  const baseline = points.find((point) => Math.abs(point.value) >= 0.005) ?? points[0];
   const change = rangeChange(range);
-  const scrubChange = scrub && points[0] ? changePct([points[0], scrub]) : change;
+  const scrubChange = scrub && baseline ? changePct([baseline, scrub]) : change;
+  const chartRange = points.length >= 2 ? visualChartRange(points[0]!.at, points[points.length - 1]!.at) : range;
   const up = (change ?? 0) >= 0;
   const shownUp = (scrubChange ?? 0) >= 0;
   const nextGoal = goalProgress.find((item) => !item.reached);
@@ -80,7 +82,7 @@ export function WealthHome() {
           <Text style={type.label}>
             {tab === "wealth"
               ? scrub
-                ? formatChartScrub(scrub.at, range)
+                ? formatChartScrub(scrub.at, chartRange)
                 : "Total"
               : tab === "cash"
                 ? "Efectivo"

@@ -72,6 +72,11 @@ export function rangeStart(range: WealthRange, now = Date.now()): number {
   return now - RANGE_MS[range];
 }
 
+function originLeadMs(firstAt: number, now: number): number {
+  const span = Math.max(now - firstAt, 60_000);
+  return Math.min(Math.max(span * 0.06, 60_000), 36 * HOUR_MS);
+}
+
 export function chartSeries(
   accounts: WealthAccount[],
   assets: WealthAsset[],
@@ -79,37 +84,64 @@ export function chartSeries(
   range: WealthRange,
   now = Date.now(),
 ): ChartPoint[] {
-  const start = rangeStart(range, now);
+  const windowStart = rangeStart(range, now);
   const prices = new Map(assets.map((asset) => [asset.id, asset.price]));
+  const ordered = [...txs].sort((a, b) => a.bookedAt - b.bookedAt || a.createdAt - b.createdAt);
+  const firstAt = ordered[0]?.bookedAt;
+  const current = netWorth(accounts, assets, txs);
+  if (firstAt == null) {
+    return [
+      { at: now - 60_000, value: 0 },
+      { at: now, value: current },
+    ];
+  }
+
+  const start = Math.max(windowStart, firstAt);
   const qty = new Map<string, number>();
   let cash = 0;
-  const points: ChartPoint[] = [{ at: start || (txs[0]?.bookedAt ?? now), value: 0 }];
-
-  const ordered = [...txs].sort((a, b) => a.bookedAt - b.bookedAt || a.createdAt - b.createdAt);
+  let openValue = 0;
+  const events: ChartPoint[] = [];
   for (const tx of ordered) {
     cash = applyCash(cash, tx);
     applyQty(qty, tx);
-    const holdings = holdingsAt(qty, prices);
-    const value = roundMoney(cash + holdings);
-    if (tx.bookedAt >= start) points.push({ at: tx.bookedAt, value });
-    else points[0] = { at: start, value };
+    const value = roundMoney(cash + holdingsAt(qty, prices));
+    if (tx.bookedAt < start) {
+      openValue = value;
+      continue;
+    }
+    events.push({ at: tx.bookedAt, value });
   }
 
-  const current = netWorth(accounts, assets, txs);
-  points.push({ at: now, value: current });
-  if (points.length === 1) points.unshift({ at: now - 1, value: points[0]!.value });
+  const points: ChartPoint[] = [];
+  if (firstAt >= windowStart) {
+    points.push({ at: firstAt - originLeadMs(firstAt, now), value: 0 });
+  } else {
+    points.push({ at: start, value: openValue });
+  }
+  points.push(...events);
+  const last = points[points.length - 1];
+  if (!last || last.at !== now) points.push({ at: now, value: current });
+  else points[points.length - 1] = { at: now, value: current };
+
   return sampleChartPoints(points, range, points[0]!.at, now);
 }
 
-export function chartStepMs(range: WealthRange, start: number, now: number): number {
-  if (range === "1d") return TEN_MIN_MS;
-  if (range === "1w") return HOUR_MS;
-  if (range === "1m") return FOUR_HOURS_MS;
-  if (range === "1y") return DAY_MS;
-  const span = Math.max(DAY_MS, now - start);
-  const days = span / DAY_MS;
-  if (days <= 90) return DAY_MS;
-  if (days <= 365) return 3 * DAY_MS;
+export function visualChartRange(start: number, now: number): WealthRange {
+  const span = Math.max(0, now - start);
+  if (span <= DAY_MS * 1.2) return "1d";
+  if (span <= DAY_MS * 8) return "1w";
+  if (span <= DAY_MS * 40) return "1m";
+  if (span <= DAY_MS * 400) return "1y";
+  return "max";
+}
+
+export function chartStepMs(_range: WealthRange, start: number, now: number): number {
+  const view = visualChartRange(start, now);
+  if (view === "1d") return TEN_MIN_MS;
+  if (view === "1w") return HOUR_MS;
+  if (view === "1m") return FOUR_HOURS_MS;
+  if (view === "1y") return DAY_MS;
+  const days = Math.max(DAY_MS, now - start) / DAY_MS;
   if (days <= 365 * 3) return 7 * DAY_MS;
   return 14 * DAY_MS;
 }
@@ -120,18 +152,18 @@ function startOfLocalDay(ts: number): number {
   return next.getTime();
 }
 
-export function alignChartTime(ts: number, range: WealthRange, stepMs: number): number {
+export function alignChartTime(ts: number, _range: WealthRange, stepMs: number): number {
   const date = new Date(ts);
   date.setSeconds(0, 0);
-  if (range === "1d") {
+  if (stepMs <= TEN_MIN_MS) {
     date.setMinutes(Math.floor(date.getMinutes() / 10) * 10);
     return date.getTime();
   }
-  if (range === "1w") {
+  if (stepMs <= HOUR_MS) {
     date.setMinutes(0);
     return date.getTime();
   }
-  if (range === "1m") {
+  if (stepMs <= FOUR_HOURS_MS) {
     date.setMinutes(0);
     date.setHours(Math.floor(date.getHours() / 4) * 4);
     return date.getTime();
@@ -145,8 +177,8 @@ export function alignChartTime(ts: number, range: WealthRange, stepMs: number): 
   return new Date(origin.getUTCFullYear(), origin.getUTCMonth(), origin.getUTCDate()).getTime();
 }
 
-function nextChartTime(ts: number, range: WealthRange, stepMs: number): number {
-  if (range === "1d" || range === "1w" || range === "1m") return ts + stepMs;
+function nextChartTime(ts: number, stepMs: number): number {
+  if (stepMs < DAY_MS) return ts + stepMs;
   const days = Math.max(1, Math.round(stepMs / DAY_MS));
   const date = new Date(ts);
   date.setDate(date.getDate() + days);
@@ -161,25 +193,30 @@ export function sampleChartPoints(
 ): ChartPoint[] {
   if (!events.length) return [{ at: start || now - 1, value: 0 }, { at: now, value: 0 }];
   const step = chartStepMs(range, start, now);
+  const times = new Set<number>([start, now]);
+  for (const event of events) {
+    if (event.at >= start && event.at <= now) times.add(event.at);
+  }
   let t = alignChartTime(start, range, step);
+  if (t < start) t = start;
+  while (t < now) {
+    times.add(t);
+    const next = nextChartTime(t, step);
+    if (next <= t) break;
+    t = next;
+  }
+  const stamps = [...times].sort((a, b) => a - b);
   const sampled: ChartPoint[] = [];
   let i = 0;
   let value = events[0]!.value;
-  const push = (at: number) => {
+  for (const at of stamps) {
     while (i < events.length && events[i]!.at <= at) {
       value = events[i]!.value;
       i += 1;
     }
     sampled.push({ at, value });
-  };
-  while (t < now) {
-    push(t);
-    const next = nextChartTime(t, range, step);
-    if (next <= t) break;
-    t = next;
   }
-  push(now);
-  if (sampled.length < 2) sampled.unshift({ at: now - 1, value: sampled[0]!.value });
+  if (sampled.length < 2) sampled.unshift({ at: now - 1, value: sampled[0]?.value ?? 0 });
   return sampled;
 }
 
@@ -206,9 +243,10 @@ export function formatChartScrub(at: number, range: WealthRange): string {
 
 export function changePct(points: ChartPoint[]): number | null {
   if (points.length < 2) return null;
-  const first = points[0]!.value;
   const last = points[points.length - 1]!.value;
-  if (Math.abs(first) < 0.005) return last > 0.005 ? 100 : last < -0.005 ? -100 : 0;
+  const firstLive = points.find((point) => Math.abs(point.value) >= 0.005);
+  const first = firstLive?.value ?? points[0]!.value;
+  if (Math.abs(first) < 0.005) return 0;
   return ((last - first) / Math.abs(first)) * 100;
 }
 
