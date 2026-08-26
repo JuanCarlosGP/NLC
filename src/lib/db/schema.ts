@@ -171,7 +171,6 @@ CREATE TABLE IF NOT EXISTS wealth_tx (
   created_at INTEGER NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS wealth_assets_account ON wealth_assets(account_id);
 CREATE INDEX IF NOT EXISTS wealth_tx_booked ON wealth_tx(booked_at);
 CREATE INDEX IF NOT EXISTS wealth_tx_account ON wealth_tx(account_id);
 CREATE INDEX IF NOT EXISTS wealth_tx_asset ON wealth_tx(asset_id);

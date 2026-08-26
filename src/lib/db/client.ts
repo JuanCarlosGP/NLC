@@ -15,7 +15,12 @@ function isPoisonedHandle(error: unknown): boolean {
 async function ensureWealthAssetAccountColumn(db: CatalogDb): Promise<void> {
   const cols = await db.getAllAsync<{ name: string }>("PRAGMA table_info(wealth_assets)");
   if (!cols.length || cols.some((col) => col.name === "account_id")) return;
-  await db.execAsync("ALTER TABLE wealth_assets ADD COLUMN account_id TEXT");
+  try {
+    await db.execAsync("ALTER TABLE wealth_assets ADD COLUMN account_id TEXT");
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!msg.includes("duplicate column")) throw error;
+  }
 }
 
 async function execStatements(db: CatalogDb, sql: string): Promise<void> {
@@ -41,10 +46,10 @@ async function boot(db: CatalogDb): Promise<CatalogDb> {
     current = undefined;
   }
 
+  await execStatements(db, SCHEMA_SQL);
+  await ensureWealthAssetAccountColumn(db);
+  await db.execAsync("CREATE INDEX IF NOT EXISTS wealth_assets_account ON wealth_assets(account_id)");
   if (current !== SCHEMA_VERSION) {
-    await execStatements(db, SCHEMA_SQL);
-    await ensureWealthAssetAccountColumn(db);
-    await db.execAsync("CREATE INDEX IF NOT EXISTS wealth_assets_account ON wealth_assets(account_id)");
     await db.runAsync("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema', ?)", SCHEMA_VERSION);
   }
 
