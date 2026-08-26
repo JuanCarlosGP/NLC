@@ -1,19 +1,24 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { AssetComposerSheet } from "@/components/wealth/account-composer-sheet";
 import { AssetRow, assetListStyle } from "@/components/wealth/asset-row";
-import { assetHref } from "@/lib/library/href";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, type } from "@/lib/theme";
+import type { WealthAsset } from "@/lib/wealth/types";
 import { useWealth } from "@/lib/wealth/wealth-context";
 
 export default function WealthAssetsScreen() {
-  const router = useRouter();
   const { positions } = useWealth();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<WealthAsset | null>(null);
+
+  function openAsset(next?: WealthAsset | null) {
+    triggerUiHaptic();
+    setEditing(next ?? null);
+    setOpen(true);
+  }
 
   return (
     <>
@@ -22,10 +27,7 @@ export default function WealthAssetsScreen() {
           <Text style={[type.pageTitle, styles.title]}>Inversiones</Text>
           <Pressable
             accessibilityLabel="Nueva inversión"
-            onPress={() => {
-              triggerUiHaptic();
-              setOpen(true);
-            }}
+            onPress={() => openAsset()}
             style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
           >
             <Plus size={24} color={colors.ink} strokeWidth={1.8} />
@@ -34,18 +36,21 @@ export default function WealthAssetsScreen() {
         {positions.length ? (
           <View style={assetListStyle}>
             {positions.map((position) => (
-              <AssetRow
-                key={position.asset.id}
-                position={position}
-                onPress={() => router.push(assetHref(position.asset.id))}
-              />
+              <AssetRow key={position.asset.id} position={position} onPress={() => openAsset(position.asset)} />
             ))}
           </View>
         ) : (
           <Text style={type.body}>Todavía no hay posiciones. Añade una o registra una compra.</Text>
         )}
       </Screen>
-      <AssetComposerSheet open={open} onOpenChange={setOpen} />
+      <AssetComposerSheet
+        open={open}
+        asset={editing}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setEditing(null);
+        }}
+      />
     </>
   );
 }

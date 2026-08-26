@@ -1,5 +1,5 @@
 export type WealthAccountKind = "cash" | "bank" | "wallet";
-export type WealthAssetKind = "stock" | "crypto" | "fund" | "other";
+export type WealthAssetKind = "stock" | "etf" | "crypto" | "fund" | "portfolio" | "other";
 export type WealthTxKind = "income" | "expense" | "buy" | "sell" | "transfer";
 export type WealthRange = "1d" | "1w" | "1m" | "1y" | "max";
 export type WealthHomeTab = "wealth" | "cash" | "goals";
@@ -19,6 +19,7 @@ export type WealthAsset = {
   name: string;
   ticker: string;
   kind: WealthAssetKind;
+  accountId: string | null;
   quantity: number;
   price: number;
   costBasis: number;
@@ -26,6 +27,14 @@ export type WealthAsset = {
   createdAt: number;
   updatedAt: number;
   archived: boolean;
+};
+
+export type WealthQuote = {
+  id: string;
+  assetId: string;
+  price: number;
+  bookedAt: number;
+  createdAt: number;
 };
 
 export type WealthTx = {
@@ -71,12 +80,14 @@ export const TX_KIND_LABEL: Record<WealthTxKind, string> = {
   transfer: "Traspaso",
 };
 
-export const ASSET_KINDS: WealthAssetKind[] = ["stock", "crypto", "fund", "other"];
+export const ASSET_KINDS: WealthAssetKind[] = ["stock", "etf", "crypto", "fund", "portfolio", "other"];
 
 export const ASSET_KIND_LABEL: Record<WealthAssetKind, string> = {
   stock: "Acción",
+  etf: "ETF",
   crypto: "Cripto",
   fund: "Fondo",
+  portfolio: "Cartera",
   other: "Otro",
 };
 

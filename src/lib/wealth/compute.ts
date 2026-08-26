@@ -1,5 +1,5 @@
 import { roundMoney } from "@/lib/wealth/money";
-import { GOAL_SCOPE_LABEL, type WealthAccount, type WealthAsset, type WealthGoal, type WealthRange, type WealthTx } from "@/lib/wealth/types";
+import { GOAL_SCOPE_LABEL, type WealthAccount, type WealthAsset, type WealthGoal, type WealthQuote, type WealthRange, type WealthTx } from "@/lib/wealth/types";
 
 export type AssetPosition = {
   asset: WealthAsset;
@@ -46,8 +46,13 @@ export function accountBalance(accountId: string, txs: WealthTx[]): number {
   return roundMoney(balance);
 }
 
+export function assetQty(asset: WealthAsset): number {
+  if (asset.quantity > 0.00000001) return asset.quantity;
+  return asset.price > 0.004 ? 1 : 0;
+}
+
 export function assetValue(asset: WealthAsset): number {
-  return roundMoney(asset.quantity * asset.price);
+  return roundMoney(assetQty(asset) * asset.price);
 }
 
 export function assetPosition(asset: WealthAsset): AssetPosition {
@@ -63,8 +68,190 @@ export function holdingsValue(assets: WealthAsset[]): number {
   );
 }
 
+export function accountHoldings(assets: WealthAsset[], accountId: string): number {
+  return roundMoney(
+    assets
+      .filter((asset) => !asset.archived && asset.accountId === accountId)
+      .reduce((sum, asset) => sum + assetValue(asset), 0),
+  );
+}
+
+export function accountTotal(accountId: string, assets: WealthAsset[], txs: WealthTx[]): number {
+  return roundMoney(accountBalance(accountId, txs) + accountHoldings(assets, accountId));
+}
+
 export function netWorth(accounts: WealthAccount[], assets: WealthAsset[], txs: WealthTx[]): number {
   return roundMoney(cashTotal(accounts, txs) + holdingsValue(assets));
+}
+
+type PriceMark = { at: number; created: number; price: number };
+
+function addMark(map: Map<string, PriceMark[]>, assetId: string, at: number, created: number, price: number) {
+  if (!(price > 0.00000001)) return;
+  const list = map.get(assetId) ?? [];
+  list.push({ at, created, price });
+  map.set(assetId, list);
+}
+
+export function priceMarks(
+  assets: WealthAsset[],
+  quotes: WealthQuote[],
+  txs: WealthTx[],
+): Map<string, PriceMark[]> {
+  const map = new Map<string, PriceMark[]>();
+  for (const quote of quotes) addMark(map, quote.assetId, quote.bookedAt, quote.createdAt, quote.price);
+  for (const tx of txs) {
+    if ((tx.kind === "buy" || tx.kind === "sell") && tx.assetId && tx.unitPrice != null) {
+      addMark(map, tx.assetId, tx.bookedAt, tx.createdAt, tx.unitPrice);
+    }
+  }
+  for (const asset of assets) {
+    if (asset.archived || !(asset.price > 0.00000001)) continue;
+    if (!map.has(asset.id)) addMark(map, asset.id, asset.createdAt, asset.createdAt, asset.price);
+  }
+  for (const list of map.values()) {
+    list.sort((a, b) => a.at - b.at || a.created - b.created);
+  }
+  return map;
+}
+
+export function priceAtMarks(marks: PriceMark[] | undefined, at: number, fallback: number): number {
+  if (!marks?.length) return fallback;
+  let price = marks[0]!.price;
+  for (const mark of marks) {
+    if (mark.at > at) break;
+    price = mark.price;
+  }
+  return price;
+}
+
+export function assetQtyAt(asset: WealthAsset, txs: WealthTx[], at: number): number {
+  let qty = asset.quantity;
+  for (const tx of txs) {
+    if (tx.assetId !== asset.id || tx.bookedAt <= at || tx.quantity == null) continue;
+    if (tx.kind === "buy") qty -= tx.quantity;
+    if (tx.kind === "sell") qty += tx.quantity;
+  }
+  return Math.max(0, qty);
+}
+
+function holdingsAtTime(
+  assets: WealthAsset[],
+  txs: WealthTx[],
+  marks: Map<string, PriceMark[]>,
+  at: number,
+): number {
+  let sum = 0;
+  for (const asset of assets) {
+    if (asset.archived) continue;
+    const qty = assetQtyAt(asset, txs, at);
+    if (qty <= 0.00000001) continue;
+    sum += qty * priceAtMarks(marks.get(asset.id), at, asset.price);
+  }
+  return roundMoney(sum);
+}
+
+export type AssetHistoryItem = {
+  id: string;
+  kind: "quote" | "buy" | "sell";
+  at: number;
+  price: number | null;
+  quantity: number | null;
+  amount: number | null;
+  value: number;
+  tx?: WealthTx;
+  quote?: WealthQuote;
+};
+
+export function assetHistory(
+  asset: WealthAsset,
+  quotes: WealthQuote[],
+  txs: WealthTx[],
+): AssetHistoryItem[] {
+  const relatedQuotes = quotes.filter((item) => item.assetId === asset.id);
+  const relatedTxs = txs.filter(
+    (tx) => tx.assetId === asset.id && (tx.kind === "buy" || tx.kind === "sell"),
+  );
+  const marks = priceMarks([asset], relatedQuotes, relatedTxs);
+  const items: AssetHistoryItem[] = [];
+  for (const quote of relatedQuotes) {
+    const qty = assetQtyAt(asset, relatedTxs, quote.bookedAt);
+    items.push({
+      id: quote.id,
+      kind: "quote",
+      at: quote.bookedAt,
+      price: quote.price,
+      quantity: qty,
+      amount: null,
+      value: roundMoney(qty * quote.price),
+      quote,
+    });
+  }
+  for (const tx of relatedTxs) {
+    const qty = assetQtyAt(asset, relatedTxs, tx.bookedAt);
+    const price = tx.unitPrice ?? priceAtMarks(marks.get(asset.id), tx.bookedAt, asset.price);
+    items.push({
+      id: tx.id,
+      kind: tx.kind === "sell" ? "sell" : "buy",
+      at: tx.bookedAt,
+      price,
+      quantity: tx.quantity,
+      amount: tx.amount,
+      value: roundMoney(qty * price),
+      tx,
+    });
+  }
+  return items.sort((a, b) => b.at - a.at || b.id.localeCompare(a.id));
+}
+
+export function assetSeries(
+  asset: WealthAsset,
+  quotes: WealthQuote[],
+  txs: WealthTx[],
+  range: WealthRange,
+  now = Date.now(),
+): ChartPoint[] {
+  const relatedQuotes = quotes.filter((item) => item.assetId === asset.id);
+  const relatedTxs = txs.filter(
+    (tx) => tx.assetId === asset.id && (tx.kind === "buy" || tx.kind === "sell"),
+  );
+  const marks = priceMarks([asset], relatedQuotes, relatedTxs);
+  const windowStart = rangeStart(range, now);
+  const times = new Set<number>([now]);
+  for (const quote of relatedQuotes) times.add(quote.bookedAt);
+  for (const tx of relatedTxs) times.add(tx.bookedAt);
+  if (asset.createdAt) times.add(asset.createdAt);
+  const stamps = [...times].filter((at) => at >= windowStart || at === now).sort((a, b) => a - b);
+  if (!stamps.length) return [{ at: now - 60_000, value: assetValue(asset) }, { at: now, value: assetValue(asset) }];
+  const points: ChartPoint[] = stamps.map((at) => {
+    const qty = assetQtyAt(asset, relatedTxs, at);
+    const price = priceAtMarks(marks.get(asset.id), at, asset.price);
+    return { at, value: roundMoney(Math.max(0, qty) * price) };
+  });
+  if (points[0] && points[0].at > windowStart && range === "max") {
+    points.unshift({ at: Math.max(0, points[0].at - originLeadMs(points[0].at, now)), value: points[0].value });
+  }
+  const last = points[points.length - 1];
+  const current = assetValue(asset);
+  if (!last || last.at !== now) points.push({ at: now, value: current });
+  else points[points.length - 1] = { at: now, value: current };
+  if (points.length < 2) points.unshift({ at: now - 60_000, value: points[0]?.value ?? 0 });
+  return sampleChartPoints(points, range, points[0]!.at, now);
+}
+
+export function parseBookedDay(raw: string, now = Date.now()): number | null {
+  const value = raw.trim().toLowerCase();
+  if (!value || value === "hoy") return now;
+  if (value === "ayer") return now - DAY_MS;
+  const match = value.match(/^(\d{1,2})[/\-.](\d{1,2})(?:[/\-.](\d{2,4}))?$/);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  let year = match[3] ? Number(match[3]) : new Date(now).getFullYear();
+  if (year < 100) year += 2000;
+  const date = new Date(year, month, day, 12, 0, 0, 0);
+  if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+  return date.getTime();
 }
 
 export function rangeStart(range: WealthRange, now = Date.now()): number {
@@ -82,14 +269,17 @@ export function chartSeries(
   assets: WealthAsset[],
   txs: WealthTx[],
   range: WealthRange,
+  quotes: WealthQuote[] = [],
   now = Date.now(),
 ): ChartPoint[] {
   const windowStart = rangeStart(range, now);
-  const prices = new Map(assets.map((asset) => [asset.id, asset.price]));
+  const marks = priceMarks(assets, quotes, txs);
   const ordered = [...txs].sort((a, b) => a.bookedAt - b.bookedAt || a.createdAt - b.createdAt);
-  const firstAt = ordered[0]?.bookedAt;
+  const firstTx = ordered[0]?.bookedAt;
+  const firstQuote = quotes.reduce((min, item) => Math.min(min, item.bookedAt), Number.POSITIVE_INFINITY);
+  const firstAt = Math.min(firstTx ?? Number.POSITIVE_INFINITY, firstQuote);
   const current = netWorth(accounts, assets, txs);
-  if (firstAt == null) {
+  if (!Number.isFinite(firstAt)) {
     return [
       { at: now - 60_000, value: 0 },
       { at: now, value: current },
@@ -97,19 +287,30 @@ export function chartSeries(
   }
 
   const start = Math.max(windowStart, firstAt);
-  const qty = new Map<string, number>();
-  let cash = 0;
-  let openValue = 0;
-  const events: ChartPoint[] = [];
+  const times = new Set<number>();
   for (const tx of ordered) {
+    if (tx.bookedAt >= start && tx.bookedAt <= now) times.add(tx.bookedAt);
+  }
+  for (const quote of quotes) {
+    if (quote.bookedAt >= start && quote.bookedAt <= now) times.add(quote.bookedAt);
+  }
+  const stamps = [...times].sort((a, b) => a - b);
+
+  let cash = 0;
+  for (const tx of ordered) {
+    if (tx.bookedAt >= start) break;
     cash = applyCash(cash, tx);
-    applyQty(qty, tx);
-    const value = roundMoney(cash + holdingsAt(qty, prices));
-    if (tx.bookedAt < start) {
-      openValue = value;
-      continue;
+  }
+  const openValue = roundMoney(cash + holdingsAtTime(assets, txs, marks, start));
+  const events: ChartPoint[] = [];
+  let txIndex = 0;
+  while (txIndex < ordered.length && ordered[txIndex]!.bookedAt < start) txIndex += 1;
+  for (const at of stamps) {
+    while (txIndex < ordered.length && ordered[txIndex]!.bookedAt <= at) {
+      cash = applyCash(cash, ordered[txIndex]!);
+      txIndex += 1;
     }
-    events.push({ at: tx.bookedAt, value });
+    events.push({ at, value: roundMoney(cash + holdingsAtTime(assets, txs, marks, at)) });
   }
 
   const points: ChartPoint[] = [];
@@ -256,21 +457,6 @@ function applyCash(cash: number, tx: WealthTx): number {
   return cash;
 }
 
-function applyQty(qty: Map<string, number>, tx: WealthTx) {
-  if (!tx.assetId || tx.quantity == null) return;
-  const current = qty.get(tx.assetId) ?? 0;
-  if (tx.kind === "buy") qty.set(tx.assetId, current + tx.quantity);
-  if (tx.kind === "sell") qty.set(tx.assetId, current - tx.quantity);
-}
-
-function holdingsAt(qty: Map<string, number>, prices: Map<string, number>): number {
-  let sum = 0;
-  for (const [id, amount] of qty) {
-    sum += amount * (prices.get(id) ?? 0);
-  }
-  return sum;
-}
-
 const MONTH_MS = 30.4375 * DAY_MS;
 const PACE_LOOKBACK_MS = 90 * DAY_MS;
 
@@ -295,7 +481,7 @@ export function goalCurrent(
 ): number {
   const sliced = txs.filter((tx) => tx.bookedAt <= at);
   if (goal.scope === "cash") return cashTotal(accounts, sliced);
-  if (goal.scope === "account" && goal.accountId) return accountBalance(goal.accountId, sliced);
+  if (goal.scope === "account" && goal.accountId) return accountTotal(goal.accountId, assets, sliced);
   if (goal.scope === "asset" && goal.assetId) {
     const asset = assets.find((item) => item.id === goal.assetId);
     if (!asset) return 0;
@@ -306,18 +492,12 @@ export function goalCurrent(
     if (asset.archived) continue;
     qty.set(asset.id, assetQtyAt(asset, txs, at));
   }
-  const prices = new Map(assets.map((asset) => [asset.id, asset.price]));
-  return roundMoney(cashTotal(accounts, sliced) + holdingsAt(qty, prices));
-}
-
-function assetQtyAt(asset: WealthAsset, txs: WealthTx[], at: number): number {
-  let qty = asset.quantity;
-  for (const tx of txs) {
-    if (tx.assetId !== asset.id || tx.bookedAt <= at || tx.quantity == null) continue;
-    if (tx.kind === "buy") qty -= tx.quantity;
-    if (tx.kind === "sell") qty += tx.quantity;
+  let invested = 0;
+  for (const asset of assets) {
+    if (asset.archived) continue;
+    invested += (qty.get(asset.id) ?? 0) * asset.price;
   }
-  return Math.max(0, qty);
+  return roundMoney(cashTotal(accounts, sliced) + invested);
 }
 
 export function goalProgress(

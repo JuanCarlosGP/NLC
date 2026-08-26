@@ -31,11 +31,17 @@ export function TxComposerSheet({
   open,
   onOpenChange,
   defaultKind = "income",
+  defaultAssetId,
+  defaultAccountId,
+  defaultCounterId,
   tx,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultKind?: WealthTxKind;
+  defaultAssetId?: string;
+  defaultAccountId?: string;
+  defaultCounterId?: string;
   tx?: WealthTx | null;
 }) {
   return (
@@ -48,6 +54,9 @@ export function TxComposerSheet({
       <TxComposerBody
         open={open}
         defaultKind={defaultKind}
+        defaultAssetId={defaultAssetId}
+        defaultAccountId={defaultAccountId}
+        defaultCounterId={defaultCounterId}
         tx={tx ?? null}
         onDone={() => onOpenChange(false)}
       />
@@ -58,11 +67,17 @@ export function TxComposerSheet({
 function TxComposerBody({
   open,
   defaultKind,
+  defaultAssetId,
+  defaultAccountId,
+  defaultCounterId,
   tx,
   onDone,
 }: {
   open: boolean;
   defaultKind: WealthTxKind;
+  defaultAssetId?: string;
+  defaultAccountId?: string;
+  defaultCounterId?: string;
   tx: WealthTx | null;
   onDone: () => void;
 }) {
@@ -113,15 +128,26 @@ function TxComposerBody({
     setAmount("");
     setQuantity("");
     setCategory("");
-    setAccountId(accounts[0]?.id ?? CASH_ACCOUNT_ID);
-    setCounterId(accounts[1]?.id ?? "");
-    setAssetId("");
+    const defaultAsset = assets.find((item) => item.id === defaultAssetId);
+    const source =
+      defaultAsset?.accountId ??
+      defaultAccountId ??
+      accounts.find((item) => item.id !== defaultCounterId)?.id ??
+      accounts[0]?.id ??
+      CASH_ACCOUNT_ID;
+    setAccountId(source);
+    setCounterId(
+      defaultCounterId && defaultCounterId !== source
+        ? defaultCounterId
+        : (accounts.find((item) => item.id !== source)?.id ?? ""),
+    );
+    setAssetId(defaultAssetId ?? "");
     setAssetName("");
-    setAssetKind("stock");
+    setAssetKind(defaultAsset?.kind ?? "stock");
     setBusy(false);
     setError(null);
     setConfirmDelete(false);
-  }, [defaultKind, open, tx]);
+  }, [defaultAccountId, defaultAssetId, defaultCounterId, defaultKind, open, tx]);
 
   const categories = kind === "income" ? INCOME_CATEGORIES : kind === "expense" ? EXPENSE_CATEGORIES : [];
   const parsedAmount = parseAmount(amount);
@@ -265,6 +291,7 @@ function TxComposerBody({
                       triggerUiHaptic();
                       setAssetId(asset.id);
                       if (!title.trim()) setTitle(asset.name);
+                      if (asset.accountId) setAccountId(asset.accountId);
                     }}
                     style={[styles.chip, active && styles.chipOn]}
                   >

@@ -9,6 +9,7 @@ import {
   type WealthAssetKind,
   type WealthGoal,
   type WealthGoalScope,
+  type WealthQuote,
   type WealthTx,
   type WealthTxKind,
 } from "@/lib/wealth/types";
@@ -27,6 +28,7 @@ type AssetRow = {
   name: string;
   ticker: string;
   kind: string;
+  account_id: string | null;
   quantity: number;
   price: number;
   cost_basis: number;
@@ -35,6 +37,9 @@ type AssetRow = {
   updated_at: number;
   archived: number;
 };
+
+const ASSET_SELECT =
+  "id, name, ticker, kind, account_id, quantity, price, cost_basis, currency, created_at, updated_at, archived";
 
 type GoalRow = {
   id: string;
@@ -83,12 +88,17 @@ function mapAccount(row: AccountRow): WealthAccount {
 
 function mapAsset(row: AssetRow): WealthAsset {
   const kind: WealthAssetKind =
-    row.kind === "stock" || row.kind === "crypto" || row.kind === "fund" ? row.kind : "other";
+    row.kind === "stock" ||
+    row.kind === "etf" ||
+    row.kind === "crypto" ||
+    row.kind === "fund" ||
+    row.kind === "portfolio" ? row.kind : "other";
   return {
     id: row.id,
     name: row.name,
     ticker: row.ticker,
     kind,
+    accountId: row.account_id || null,
     quantity: row.quantity,
     price: row.price,
     costBasis: row.cost_basis,
@@ -212,31 +222,32 @@ export async function listAssets(opts?: { includeArchived?: boolean }): Promise<
   const db = await getDb();
   const rows = opts?.includeArchived
     ? await db.getAllAsync<AssetRow>(
-        "SELECT id, name, ticker, kind, quantity, price, cost_basis, currency, created_at, updated_at, archived FROM wealth_assets ORDER BY archived ASC, name ASC",
+        `SELECT ${ASSET_SELECT} FROM wealth_assets ORDER BY archived ASC, name ASC`,
       )
     : await db.getAllAsync<AssetRow>(
-        "SELECT id, name, ticker, kind, quantity, price, cost_basis, currency, created_at, updated_at, archived FROM wealth_assets WHERE archived = 0 ORDER BY name ASC",
+        `SELECT ${ASSET_SELECT} FROM wealth_assets WHERE archived = 0 ORDER BY name ASC`,
       );
   return rows.map(mapAsset);
 }
 
 export async function getAsset(id: string): Promise<WealthAsset | null> {
   const db = await getDb();
-  const row = await db.getFirstAsync<AssetRow>(
-    "SELECT id, name, ticker, kind, quantity, price, cost_basis, currency, created_at, updated_at, archived FROM wealth_assets WHERE id = ?",
-    id,
-  );
+  const row = await db.getFirstAsync<AssetRow>(`SELECT ${ASSET_SELECT} FROM wealth_assets WHERE id = ?`, id);
   return row ? mapAsset(row) : null;
 }
 
-export async function createAsset(input: {
-  name: string;
-  ticker?: string;
-  kind?: WealthAssetKind;
-  quantity?: number;
-  price?: number;
-  costBasis?: number;
-}): Promise<WealthAsset> {
+export async function createAsset(
+  input: {
+    name: string;
+    ticker?: string;
+    kind?: WealthAssetKind;
+    accountId?: string | null;
+    quantity?: number;
+    price?: number;
+    costBasis?: number;
+  },
+  opts?: { quote?: boolean },
+): Promise<WealthAsset> {
   const name = input.name.trim();
   if (!name) throw new Error("La inversión necesita un nombre.");
   const db = await getDb();
@@ -244,27 +255,30 @@ export async function createAsset(input: {
   const now = Date.now();
   const ticker = input.ticker?.trim().toUpperCase() ?? "";
   const kind = input.kind ?? "other";
+  const accountId = input.accountId || null;
   const quantity = input.quantity ?? 0;
   const price = input.price ?? 0;
   const costBasis = input.costBasis ?? quantity * price;
   await db.runAsync(
-    `INSERT INTO wealth_assets (id, name, ticker, kind, quantity, price, cost_basis, currency, created_at, updated_at, archived)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'EUR', ?, ?, 0)`,
+    `INSERT INTO wealth_assets (id, name, ticker, kind, account_id, quantity, price, cost_basis, currency, created_at, updated_at, archived)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'EUR', ?, ?, 0)`,
     id,
     name,
     ticker,
     kind,
+    accountId,
     quantity,
     price,
     costBasis,
     now,
     now,
   );
-  return {
+  const created: WealthAsset = {
     id,
     name,
     ticker,
     kind,
+    accountId,
     quantity,
     price,
     costBasis,
@@ -273,6 +287,10 @@ export async function createAsset(input: {
     updatedAt: now,
     archived: false,
   };
+  if (opts?.quote !== false && price > 0.004) {
+    await insertQuote(id, price, now, now);
+  }
+  return created;
 }
 
 export async function updateAsset(
@@ -281,29 +299,130 @@ export async function updateAsset(
     name?: string;
     ticker?: string;
     kind?: WealthAssetKind;
+    accountId?: string | null;
     quantity?: number;
     price?: number;
     costBasis?: number;
     archived?: boolean;
   },
+  opts?: { quote?: boolean },
 ): Promise<void> {
   const current = await getAsset(id);
   if (!current) return;
   const db = await getDb();
+  const accountId = patch.accountId !== undefined ? patch.accountId || null : current.accountId;
+  const nextPrice = patch.price ?? current.price;
   await db.runAsync(
     `UPDATE wealth_assets
-     SET name = ?, ticker = ?, kind = ?, quantity = ?, price = ?, cost_basis = ?, archived = ?, updated_at = ?
+     SET name = ?, ticker = ?, kind = ?, account_id = ?, quantity = ?, price = ?, cost_basis = ?, archived = ?, updated_at = ?
      WHERE id = ?`,
     patch.name !== undefined ? patch.name.trim() || current.name : current.name,
     patch.ticker !== undefined ? patch.ticker.trim().toUpperCase() : current.ticker,
     patch.kind ?? current.kind,
+    accountId,
     patch.quantity ?? current.quantity,
-    patch.price ?? current.price,
+    nextPrice,
     patch.costBasis ?? current.costBasis,
     (patch.archived ?? current.archived) ? 1 : 0,
     Date.now(),
     id,
   );
+  if (opts?.quote !== false && patch.price != null && Math.abs(patch.price - current.price) > 0.0005) {
+    await insertQuote(id, patch.price, Date.now());
+  }
+}
+
+type QuoteRow = {
+  id: string;
+  asset_id: string;
+  price: number;
+  booked_at: number;
+  created_at: number;
+};
+
+function mapQuote(row: QuoteRow): WealthQuote {
+  return {
+    id: row.id,
+    assetId: row.asset_id,
+    price: row.price,
+    bookedAt: row.booked_at,
+    createdAt: row.created_at,
+  };
+}
+
+async function insertQuote(assetId: string, price: number, bookedAt: number, createdAt = Date.now()): Promise<WealthQuote> {
+  const db = await getDb();
+  const id = newId("qte");
+  await db.runAsync(
+    "INSERT INTO wealth_quotes (id, asset_id, price, booked_at, created_at) VALUES (?, ?, ?, ?, ?)",
+    id,
+    assetId,
+    price,
+    bookedAt,
+    createdAt,
+  );
+  return { id, assetId, price, bookedAt, createdAt };
+}
+
+async function syncAssetPriceFromMarks(assetId: string): Promise<void> {
+  const db = await getDb();
+  const quote = await db.getFirstAsync<{ price: number; booked_at: number; created_at: number }>(
+    "SELECT price, booked_at, created_at FROM wealth_quotes WHERE asset_id = ? ORDER BY booked_at DESC, created_at DESC LIMIT 1",
+    assetId,
+  );
+  const tx = await db.getFirstAsync<{ unit_price: number; booked_at: number; created_at: number }>(
+    `SELECT unit_price, booked_at, created_at FROM wealth_tx
+     WHERE asset_id = ? AND (kind = 'buy' OR kind = 'sell') AND unit_price IS NOT NULL
+     ORDER BY booked_at DESC, created_at DESC LIMIT 1`,
+    assetId,
+  );
+  let price: number | null = null;
+  if (quote && tx) {
+    if (quote.booked_at !== tx.booked_at) price = quote.booked_at > tx.booked_at ? quote.price : tx.unit_price;
+    else price = quote.created_at >= tx.created_at ? quote.price : tx.unit_price;
+  } else if (quote) price = quote.price;
+  else if (tx) price = tx.unit_price;
+  if (price == null) return;
+  await db.runAsync("UPDATE wealth_assets SET price = ?, updated_at = ? WHERE id = ?", price, Date.now(), assetId);
+}
+
+export async function listQuotes(assetId?: string): Promise<WealthQuote[]> {
+  const db = await getDb();
+  const rows = assetId
+    ? await db.getAllAsync<QuoteRow>(
+        "SELECT id, asset_id, price, booked_at, created_at FROM wealth_quotes WHERE asset_id = ? ORDER BY booked_at DESC, created_at DESC",
+        assetId,
+      )
+    : await db.getAllAsync<QuoteRow>(
+        "SELECT id, asset_id, price, booked_at, created_at FROM wealth_quotes ORDER BY booked_at DESC, created_at DESC",
+      );
+  return rows.map(mapQuote);
+}
+
+export async function createQuote(input: {
+  assetId: string;
+  price: number;
+  bookedAt?: number;
+}): Promise<WealthQuote> {
+  if (!(input.price > 0)) throw new Error("El precio tiene que ser mayor que cero.");
+  const asset = await getAsset(input.assetId);
+  if (!asset) throw new Error("No encuentro esa inversión.");
+  const now = Date.now();
+  const bookedAt = input.bookedAt ?? now;
+  const quote = await insertQuote(input.assetId, input.price, bookedAt, now);
+  await syncAssetPriceFromMarks(input.assetId);
+  return quote;
+}
+
+export async function deleteQuote(id: string): Promise<void> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<QuoteRow>(
+    "SELECT id, asset_id, price, booked_at, created_at FROM wealth_quotes WHERE id = ?",
+    id,
+  );
+  if (!row) return;
+  await db.runAsync("DELETE FROM wealth_quotes WHERE id = ?", id);
+  await syncAssetPriceFromMarks(row.asset_id);
 }
 
 export async function listTx(): Promise<WealthTx[]> {
@@ -358,6 +477,7 @@ export async function createTx(input: CreateTxInput): Promise<WealthTx> {
     quantity,
     unitPrice,
     assetId: input.assetId ?? null,
+    accountId: input.accountId ?? null,
     assetName: input.assetName?.trim() || title,
     assetTicker: input.assetTicker,
     assetKind: input.assetKind,
@@ -394,15 +514,23 @@ async function reverseAssetImpact(tx: WealthTx): Promise<void> {
   const asset = await getAsset(tx.assetId);
   if (!asset) return;
   if (tx.kind === "buy") {
-    await updateAsset(tx.assetId, {
-      quantity: Math.max(0, asset.quantity - tx.quantity),
-      costBasis: Math.max(0, asset.costBasis - tx.amount),
-    });
+    await updateAsset(
+      tx.assetId,
+      {
+        quantity: Math.max(0, asset.quantity - tx.quantity),
+        costBasis: Math.max(0, asset.costBasis - tx.amount),
+      },
+      { quote: false },
+    );
   } else if (tx.kind === "sell") {
-    await updateAsset(tx.assetId, {
-      quantity: asset.quantity + tx.quantity,
-      costBasis: asset.costBasis + tx.amount,
-    });
+    await updateAsset(
+      tx.assetId,
+      {
+        quantity: asset.quantity + tx.quantity,
+        costBasis: asset.costBasis + tx.amount,
+      },
+      { quote: false },
+    );
   }
 }
 
@@ -412,6 +540,7 @@ async function applyAssetImpact(input: {
   quantity: number | null;
   unitPrice: number | null;
   assetId: string | null;
+  accountId?: string | null;
   assetName?: string;
   assetTicker?: string;
   assetKind?: WealthAssetKind;
@@ -421,34 +550,46 @@ async function applyAssetImpact(input: {
   const unitPrice = input.unitPrice;
   if ((input.kind === "buy" || input.kind === "sell") && !assetId) {
     if (input.kind === "sell") throw new Error("Elige la inversión que vendes.");
-    const asset = await createAsset({
-      name: input.assetName?.trim() || "Inversión",
-      ticker: input.assetTicker,
-      kind: input.assetKind,
-      quantity: 0,
-      price: unitPrice ?? 0,
-      costBasis: 0,
-    });
+    const asset = await createAsset(
+      {
+        name: input.assetName?.trim() || "Inversión",
+        ticker: input.assetTicker,
+        kind: input.assetKind,
+        accountId: input.accountId,
+        quantity: 0,
+        price: unitPrice ?? 0,
+        costBasis: 0,
+      },
+      { quote: false },
+    );
     assetId = asset.id;
   }
   if (assetId && quantity != null) {
     const asset = await getAsset(assetId);
     if (asset) {
       if (input.kind === "buy") {
-        await updateAsset(assetId, {
-          quantity: asset.quantity + quantity,
-          price: unitPrice ?? asset.price,
-          costBasis: asset.costBasis + input.amount,
-        });
+        await updateAsset(
+          assetId,
+          {
+            quantity: asset.quantity + quantity,
+            price: unitPrice ?? asset.price,
+            costBasis: asset.costBasis + input.amount,
+          },
+          { quote: false },
+        );
       } else if (input.kind === "sell") {
         const nextQty = Math.max(0, asset.quantity - quantity);
         const soldCost =
           asset.quantity > 0 ? (asset.costBasis * Math.min(quantity, asset.quantity)) / asset.quantity : 0;
-        await updateAsset(assetId, {
-          quantity: nextQty,
-          price: unitPrice ?? asset.price,
-          costBasis: Math.max(0, asset.costBasis - soldCost),
-        });
+        await updateAsset(
+          assetId,
+          {
+            quantity: nextQty,
+            price: unitPrice ?? asset.price,
+            costBasis: Math.max(0, asset.costBasis - soldCost),
+          },
+          { quote: false },
+        );
       }
     }
   }
@@ -471,6 +612,7 @@ export async function updateTx(id: string, input: CreateTxInput): Promise<Wealth
     quantity,
     unitPrice,
     assetId: input.assetId ?? null,
+    accountId: input.accountId ?? null,
     assetName: input.assetName?.trim() || title,
     assetTicker: input.assetTicker,
     assetKind: input.assetKind,
@@ -618,14 +760,16 @@ export type WealthDump = {
   updatedAt: number;
   accounts: WealthAccount[];
   assets: WealthAsset[];
+  quotes?: WealthQuote[];
   txs: WealthTx[];
   goals: WealthGoal[];
 };
 
 export async function dumpWealth(): Promise<WealthDump> {
-  const [accounts, assets, txs, goals] = await Promise.all([
+  const [accounts, assets, quotes, txs, goals] = await Promise.all([
     listAccounts({ includeArchived: true }),
     listAssets({ includeArchived: true }),
+    listQuotes(),
     listTx(),
     listGoals({ includeArchived: true }),
   ]);
@@ -633,16 +777,18 @@ export async function dumpWealth(): Promise<WealthDump> {
     0,
     ...accounts.map((item) => item.createdAt),
     ...assets.map((item) => Math.max(item.createdAt, item.updatedAt)),
+    ...quotes.map((item) => Math.max(item.bookedAt, item.createdAt)),
     ...txs.map((item) => Math.max(item.bookedAt, item.createdAt)),
     ...goals.map((item) => Math.max(item.createdAt, item.updatedAt)),
   );
-  return { version: 1, updatedAt, accounts, assets, txs, goals };
+  return { version: 1, updatedAt, accounts, assets, quotes, txs, goals };
 }
 
 export async function replaceWealth(dump: WealthDump): Promise<void> {
   const db = await getDb();
   await db.withTransactionAsync(async () => {
     await db.runAsync("DELETE FROM wealth_goals");
+    await db.runAsync("DELETE FROM wealth_quotes");
     await db.runAsync("DELETE FROM wealth_tx");
     await db.runAsync("DELETE FROM wealth_assets");
     await db.runAsync("DELETE FROM wealth_accounts");
@@ -659,12 +805,13 @@ export async function replaceWealth(dump: WealthDump): Promise<void> {
     }
     for (const asset of dump.assets) {
       await db.runAsync(
-        `INSERT INTO wealth_assets (id, name, ticker, kind, quantity, price, cost_basis, currency, created_at, updated_at, archived)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO wealth_assets (id, name, ticker, kind, account_id, quantity, price, cost_basis, currency, created_at, updated_at, archived)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         asset.id,
         asset.name,
         asset.ticker,
         asset.kind,
+        asset.accountId ?? null,
         asset.quantity,
         asset.price,
         asset.costBasis,
@@ -672,6 +819,16 @@ export async function replaceWealth(dump: WealthDump): Promise<void> {
         asset.createdAt,
         asset.updatedAt,
         asset.archived ? 1 : 0,
+      );
+    }
+    for (const quote of dump.quotes ?? []) {
+      await db.runAsync(
+        "INSERT INTO wealth_quotes (id, asset_id, price, booked_at, created_at) VALUES (?, ?, ?, ?, ?)",
+        quote.id,
+        quote.assetId,
+        quote.price,
+        quote.bookedAt,
+        quote.createdAt,
       );
     }
     for (const tx of dump.txs) {

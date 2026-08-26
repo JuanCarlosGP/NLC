@@ -3,18 +3,28 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { AccountActivitySheet } from "@/components/wealth/account-activity-sheet";
-import { AccountComposerSheet } from "@/components/wealth/account-composer-sheet";
+import { AccountComposerSheet, AssetComposerSheet } from "@/components/wealth/account-composer-sheet";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { formatEuro } from "@/lib/wealth/money";
-import { ACCOUNT_KIND_LABEL, type WealthAccount } from "@/lib/wealth/types";
+import { ACCOUNT_KIND_LABEL, type WealthAccount, type WealthAsset } from "@/lib/wealth/types";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 
 export default function WealthAccountsScreen() {
-  const { balanceOf } = useWealth();
+  const { balanceOf, holdingsOf, totalOf } = useWealth();
   const accounts = useLiveAccounts();
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<WealthAccount | null>(null);
+  const [assetOpen, setAssetOpen] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<WealthAsset | null>(null);
+  const [assetAccountId, setAssetAccountId] = useState<string | null>(null);
+
+  function openAsset(next?: WealthAsset | null, accountId?: string | null) {
+    triggerUiHaptic();
+    setEditingAsset(next ?? null);
+    setAssetAccountId(accountId ?? next?.accountId ?? null);
+    setAssetOpen(true);
+  }
 
   return (
     <>
@@ -32,30 +42,55 @@ export default function WealthAccountsScreen() {
             <Plus size={24} color={colors.ink} strokeWidth={1.8} />
           </Pressable>
         </View>
-        {accounts.map((account) => (
-          <Pressable
-            key={account.id}
-            accessibilityRole="button"
-            accessibilityLabel={`${account.name}, ${formatEuro(balanceOf(account.id))}`}
-            onPress={() => {
-              triggerUiHaptic();
-              setPreview(account);
-            }}
-            style={({ pressed }) => [styles.row, { opacity: pressed ? 0.72 : 1 }]}
-          >
-            <View>
-              <Text style={styles.name}>{account.name}</Text>
-              <Text style={type.meta}>{ACCOUNT_KIND_LABEL[account.kind]}</Text>
-            </View>
-            <Text style={styles.value}>{formatEuro(balanceOf(account.id))}</Text>
-          </Pressable>
-        ))}
+        {accounts.map((account) => {
+          const cash = balanceOf(account.id);
+          const invested = holdingsOf(account.id);
+          const total = totalOf(account.id);
+          const meta =
+            invested > 0.004
+              ? `Efectivo ${formatEuro(cash)} · Invertido ${formatEuro(invested)}`
+              : ACCOUNT_KIND_LABEL[account.kind];
+          return (
+            <Pressable
+              key={account.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${account.name}, ${formatEuro(total)}`}
+              onPress={() => {
+                triggerUiHaptic();
+                setPreview(account);
+              }}
+              style={({ pressed }) => [styles.row, { opacity: pressed ? 0.72 : 1 }]}
+            >
+              <View style={styles.meta}>
+                <Text style={styles.name}>{account.name}</Text>
+                <Text style={type.meta}>{meta}</Text>
+              </View>
+              <Text style={styles.value}>{formatEuro(total)}</Text>
+            </Pressable>
+          );
+        })}
       </Screen>
       <AccountComposerSheet open={open} onOpenChange={setOpen} />
+      <AssetComposerSheet
+        open={assetOpen}
+        asset={editingAsset}
+        defaultAccountId={assetAccountId}
+        onOpenChange={(next) => {
+          setAssetOpen(next);
+          if (!next) {
+            setEditingAsset(null);
+            setAssetAccountId(null);
+          }
+        }}
+      />
       <AccountActivitySheet
         account={preview}
         onOpenChange={(next) => {
           if (!next) setPreview(null);
+        }}
+        onEditAsset={(asset) => {
+          if (!preview) return;
+          openAsset(asset, preview.id);
         }}
       />
     </>
@@ -80,5 +115,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.rule,
   },
   name: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
+  meta: { flex: 1, paddingRight: 12, gap: 2 },
   value: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
 });

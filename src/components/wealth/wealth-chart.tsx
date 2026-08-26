@@ -33,15 +33,18 @@ export function WealthChart({
   up,
   range,
   onScrub,
+  height = 156,
+  fromZero = true,
 }: {
   points: ChartPoint[];
   up: boolean;
   range: WealthRange;
   onScrub?: (point: ChartPoint | null) => void;
+  height?: number;
+  fromZero?: boolean;
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const width = Math.max(280, windowWidth - 40);
-  const height = 156;
   const innerW = width - PAD_X * 2;
   const innerH = height - PAD_Y * 2;
   const onScrubRef = useRef(onScrub);
@@ -51,8 +54,8 @@ export function WealthChart({
     const values = points.map((point) => point.value);
     const rawMin = Math.min(...values);
     const rawMax = Math.max(...values);
-    const min = rawMin > 0 ? 0 : rawMin;
-    const max = rawMax < 0 ? 0 : rawMax;
+    const min = fromZero && rawMin > 0 ? 0 : rawMin;
+    const max = fromZero && rawMax < 0 ? 0 : rawMax;
     const span = max - min || 1;
     const t0 = points[0]!.at;
     const t1 = points[points.length - 1]!.at;
@@ -62,7 +65,7 @@ export function WealthChart({
       y: PAD_Y + (1 - (point.value - min) / span) * innerH,
     }));
     return { min, max, t0, t1, timeSpan, coords, innerW };
-  }, [innerH, innerW, points]);
+  }, [fromZero, innerH, innerW, points]);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   const pointsRef = useRef(points);

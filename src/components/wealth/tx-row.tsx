@@ -3,7 +3,8 @@ import { colors, fonts } from "@/lib/theme";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { formatEuro, formatSignedEuro } from "@/lib/wealth/money";
 import { useTxActions } from "@/lib/wealth/tx-actions-context";
-import { TX_KIND_LABEL, type WealthTx } from "@/lib/wealth/types";
+import { TX_KIND_LABEL, type WealthAccount, type WealthTx } from "@/lib/wealth/types";
+import { useWealth } from "@/lib/wealth/wealth-context";
 
 function signedAmount(tx: WealthTx, accountId?: string): number {
   if (accountId && tx.kind === "transfer") {
@@ -16,6 +17,22 @@ function signedAmount(tx: WealthTx, accountId?: string): number {
   return -tx.amount;
 }
 
+function accountName(accounts: WealthAccount[], id: string | null): string | null {
+  if (!id) return null;
+  return accounts.find((item) => item.id === id)?.name ?? null;
+}
+
+function accountLine(tx: WealthTx, accounts: WealthAccount[], focusedAccountId?: string): string | null {
+  if (focusedAccountId) return null;
+  if (tx.kind === "transfer") {
+    const from = accountName(accounts, tx.accountId);
+    const to = accountName(accounts, tx.counterAccountId);
+    if (from && to) return `${from} → ${to}`;
+    return from ?? to;
+  }
+  return accountName(accounts, tx.accountId);
+}
+
 export function TxRow({
   tx,
   accountId,
@@ -25,10 +42,12 @@ export function TxRow({
   accountId?: string;
   onPress?: () => void;
 }) {
+  const { accounts } = useWealth();
   const { openTxActions } = useTxActions();
   const signed = signedAmount(tx, accountId);
   const when = new Date(tx.bookedAt);
   const date = when.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  const account = accountLine(tx, accounts, accountId);
   return (
     <Pressable
       accessibilityRole="button"
@@ -50,8 +69,7 @@ export function TxRow({
           {tx.title}
         </Text>
         <Text numberOfLines={1} style={styles.sub}>
-          {TX_KIND_LABEL[tx.kind]}
-          {tx.category ? ` · ${tx.category}` : ""} · {date}
+          {[TX_KIND_LABEL[tx.kind], account, tx.category || null, date].filter(Boolean).join(" · ")}
         </Text>
       </View>
       <Text style={[styles.amount, signed > 0 ? styles.in : signed < 0 ? styles.out : styles.flat]}>

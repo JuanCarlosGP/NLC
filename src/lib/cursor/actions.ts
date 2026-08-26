@@ -40,6 +40,7 @@ import {
   createAccount,
   createAsset,
   createGoal,
+  createQuote,
   createTx,
   deleteGoal,
   deleteTx,
@@ -201,7 +202,17 @@ function parseAssetKind(raw: string | undefined): WealthAssetKind | undefined {
   const value = normalize(raw ?? "");
   if (value === "stock" || value === "accion" || value === "acciones") return "stock";
   if (value === "crypto" || value === "cripto" || value === "criptomoneda") return "crypto";
+  if (value === "etf" || value === "etfs") return "etf";
   if (value === "fund" || value === "fondo") return "fund";
+  if (
+    value === "portfolio" ||
+    value === "cartera" ||
+    value === "cartera automatica" ||
+    value === "robo" ||
+    value === "pasiva"
+  ) {
+    return "portfolio";
+  }
   if (value === "other" || value === "otro") return "other";
   return undefined;
 }
@@ -661,10 +672,17 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     if (!name) return { ok: false, message: "Falta el nombre de la inversión." };
     const quantity = parseMoney(action.quantity, 8) ?? 0;
     const price = parseMoney(action.price) ?? 0;
+    let accountId: string | null = null;
+    if (action.account) {
+      const account = await resolveAccount(action.account);
+      if (!account) return { ok: false, message: `No encuentro la cuenta «${action.account}».` };
+      accountId = account.id;
+    }
     const asset = await createAsset({
       name,
       ticker: action.ticker,
       kind: parseAssetKind(action.kind) ?? parseAssetKind(action.asset_kind) ?? "other",
+      accountId,
       quantity,
       price,
       costBasis: parseMoney(action.cost_basis) ?? quantity * price,
@@ -674,16 +692,39 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   if (op === "update_asset" || op === "archive_asset") {
     const asset = await resolveAsset(action.match || action.name || action.ticker || action.title);
     if (!asset) return { ok: false, message: `No encuentro la inversión «${action.match || action.name}».` };
+    let accountId: string | null | undefined;
+    if (op === "update_asset" && action.account != null) {
+      const raw = String(action.account).trim();
+      if (!raw || raw === "none" || raw === "ninguna") accountId = null;
+      else {
+        const account = await resolveAccount(raw);
+        if (!account) return { ok: false, message: `No encuentro la cuenta «${action.account}».` };
+        accountId = account.id;
+      }
+    }
     await updateAsset(asset.id, {
       name: action.name || action.title,
       ticker: action.ticker,
       kind: parseAssetKind(action.asset_kind || (op === "update_asset" ? action.kind : undefined)),
+      accountId,
       quantity: parseMoney(action.quantity, 8),
       price: parseMoney(action.price),
       costBasis: parseMoney(action.cost_basis),
       archived: op === "archive_asset" ? action.archived !== false : action.archived,
     });
     return { ok: true, message: `Inversión «${asset.name}» actualizada.` };
+  }
+  if (op === "quote_asset") {
+    const asset = await resolveAsset(action.match || action.name || action.ticker || action.title);
+    if (!asset) return { ok: false, message: `No encuentro la inversión «${action.match || action.name}».` };
+    const price = parseMoney(action.price);
+    if (price == null || !(price > 0)) return { ok: false, message: "Falta el precio." };
+    await createQuote({
+      assetId: asset.id,
+      price,
+      bookedAt: parseDue(action.due) ?? undefined,
+    });
+    return { ok: true, message: `Valor de «${asset.name}» registrado: ${price} €.` };
   }
   if (op === "create_goal") {
     const name = action.name?.trim() || action.title?.trim();

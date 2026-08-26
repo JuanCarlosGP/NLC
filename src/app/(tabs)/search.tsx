@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { AlbumRow } from "@/components/library/album-row";
 import { ArtistRow } from "@/components/library/artist-row";
 import { TrackRow } from "@/components/library/track-row";
 import { TaskRow, taskListStyle } from "@/components/productivity/task-row";
-import { TxRow, txListStyle } from "@/components/wealth/tx-row";
-import { GoalRow, goalListStyle } from "@/components/wealth/goal-row";
+import { AccountActivitySheet } from "@/components/wealth/account-activity-sheet";
+import { AssetComposerSheet } from "@/components/wealth/account-composer-sheet";
 import { AssetRow, assetListStyle } from "@/components/wealth/asset-row";
+import { GoalComposerSheet } from "@/components/wealth/goal-composer-sheet";
+import { GoalRow, goalListStyle } from "@/components/wealth/goal-row";
+import { TxRow, txListStyle } from "@/components/wealth/tx-row";
 import { Screen } from "@/components/ui/screen";
 import { SeriesRow, seriesListStyle } from "@/components/video/series-row";
-import { albumHref, artistHref, assetHref, projectHref, taskHref } from "@/lib/library/href";
+import { albumHref, artistHref, projectHref, taskHref } from "@/lib/library/href";
 import { useExitingList } from "@/hooks/use-exiting-list";
 import { useSearch } from "@/hooks/use-search";
 import { isPodcastAlbum, isPodcastArtist, isPodcastTrack } from "@/lib/nas/webdav";
@@ -21,9 +24,19 @@ import { listVideoShows, type VideoShow } from "@/lib/video/catalog";
 import { watchRoute } from "@/lib/video/onepiece";
 import { useActiveProjects, useVisibleTasks } from "@/lib/productivity/productivity-context";
 import { useWealth } from "@/lib/wealth/wealth-context";
-import { assetPosition } from "@/lib/wealth/compute";
 import { useTaskActions } from "@/lib/productivity/task-actions-context";
 import { colors, fonts, type } from "@/lib/theme";
+import { triggerUiHaptic } from "@/lib/ui-haptics";
+import { assetPosition } from "@/lib/wealth/compute";
+import { formatEuro } from "@/lib/wealth/money";
+import {
+  ACCOUNT_KIND_LABEL,
+  ASSET_KIND_LABEL,
+  TX_KIND_LABEL,
+  type WealthAccount,
+  type WealthAsset,
+  type WealthGoal,
+} from "@/lib/wealth/types";
 import { useZone } from "@/lib/zone/zone-context";
 
 export default function SearchScreen() {
@@ -211,108 +224,194 @@ function VideoSearch() {
   );
 }
 
+function hay(q: string, ...parts: Array<string | null | undefined>): boolean {
+  if (!q) return true;
+  return parts.some((part) => Boolean(part && part.toLowerCase().includes(q)));
+}
+
 function WealthSearch() {
-  const router = useRouter();
   const [query, setQuery] = useState("");
-  const { assets, txs, accounts, goalProgress } = useWealth();
+  const { txs, assets, liveAccounts, goalProgress, totalOf } = useWealth();
+  const [preview, setPreview] = useState<WealthAccount | null>(null);
+  const [editingAsset, setEditingAsset] = useState<WealthAsset | null>(null);
+  const [assetOpen, setAssetOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<WealthGoal | null>(null);
+  const [goalOpen, setGoalOpen] = useState(false);
   const q = query.trim().toLowerCase();
 
+  const matchedAccounts = useMemo(
+    () =>
+      liveAccounts.filter((account) =>
+        hay(q, account.name, ACCOUNT_KIND_LABEL[account.kind], "cuenta", "efectivo"),
+      ),
+    [liveAccounts, q],
+  );
   const matchedAssets = useMemo(() => {
-    const live = assets.filter((asset) => !asset.archived);
-    if (!q) return live;
-    return live.filter(
-      (asset) => asset.name.toLowerCase().includes(q) || asset.ticker.toLowerCase().includes(q),
-    );
-  }, [assets, q]);
+    const live = assets.filter((asset) => !asset.archived).map(assetPosition);
+    return live.filter((position) => {
+      const account = liveAccounts.find((item) => item.id === position.asset.accountId)?.name;
+      return hay(
+        q,
+        position.asset.name,
+        position.asset.ticker,
+        ASSET_KIND_LABEL[position.asset.kind],
+        account,
+        "inversion",
+        "inversión",
+      );
+    });
+  }, [assets, liveAccounts, q]);
+  const matchedGoals = useMemo(
+    () =>
+      goalProgress.filter((item) =>
+        hay(q, item.goal.name, item.scopeLabel, "objetivo"),
+      ),
+    [goalProgress, q],
+  );
   const matchedTx = useMemo(() => {
-    if (!q) return txs;
-    return txs.filter(
-      (tx) =>
-        tx.title.toLowerCase().includes(q) ||
-        tx.category.toLowerCase().includes(q) ||
-        tx.notes.toLowerCase().includes(q),
-    );
-  }, [q, txs]);
-  const matchedAccounts = useMemo(() => {
-    const live = accounts.filter((account) => !account.archived);
-    if (!q) return live;
-    return live.filter((account) => account.name.toLowerCase().includes(q));
-  }, [accounts, q]);
-  const matchedGoals = useMemo(() => {
-    if (!q) return goalProgress;
-    return goalProgress.filter((item) => item.goal.name.toLowerCase().includes(q));
-  }, [goalProgress, q]);
+    const chronological = [...txs].sort((a, b) => b.bookedAt - a.bookedAt || b.createdAt - a.createdAt);
+    return chronological.filter((tx) => {
+      const account = liveAccounts.find((item) => item.id === tx.accountId)?.name ?? "";
+      const counter = liveAccounts.find((item) => item.id === tx.counterAccountId)?.name ?? "";
+      const asset = assets.find((item) => item.id === tx.assetId);
+      return hay(
+        q,
+        tx.title,
+        tx.category,
+        tx.notes,
+        account,
+        counter,
+        TX_KIND_LABEL[tx.kind],
+        asset?.name,
+        asset?.ticker,
+      );
+    });
+  }, [assets, liveAccounts, q, txs]);
+
   const empty =
     Boolean(q) &&
-    !matchedAssets.length &&
-    !matchedTx.length &&
     !matchedAccounts.length &&
-    !matchedGoals.length;
+    !matchedAssets.length &&
+    !matchedGoals.length &&
+    !matchedTx.length;
 
   return (
-    <Screen>
-      <Text style={type.pageTitle}>Buscar</Text>
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Inversión, movimiento, cuenta u objetivo"
-        placeholderTextColor={colors.muted}
-        autoCorrect={false}
-        style={styles.input}
+    <>
+      <Screen>
+        <Text style={type.pageTitle}>Buscar</Text>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Cuenta, inversión o movimiento"
+          placeholderTextColor={colors.muted}
+          autoCorrect={false}
+          style={styles.input}
+        />
+        {empty ? <Text style={type.body}>Nada para «{query.trim()}».</Text> : null}
+
+        {matchedAccounts.length ? (
+          <View style={styles.block}>
+            <Text style={type.sectionTitle}>Cuentas</Text>
+            {matchedAccounts.map((account) => (
+              <Pressable
+                key={account.id}
+                accessibilityRole="button"
+                accessibilityLabel={`${account.name}, ${formatEuro(totalOf(account.id))}`}
+                onPress={() => {
+                  triggerUiHaptic();
+                  setPreview(account);
+                }}
+                style={({ pressed }) => [styles.accountRow, { opacity: pressed ? 0.72 : 1 }]}
+              >
+                <View>
+                  <Text style={styles.accountName}>{account.name}</Text>
+                  <Text style={type.meta}>{ACCOUNT_KIND_LABEL[account.kind]}</Text>
+                </View>
+                <Text style={styles.accountBal}>{formatEuro(totalOf(account.id))}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {matchedAssets.length ? (
+          <View style={styles.block}>
+            <Text style={type.sectionTitle}>Inversiones</Text>
+            <View style={assetListStyle}>
+              {matchedAssets.map((position) => (
+                <AssetRow
+                  key={position.asset.id}
+                  position={position}
+                  onPress={() => {
+                    triggerUiHaptic();
+                    setEditingAsset(position.asset);
+                    setAssetOpen(true);
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {matchedGoals.length ? (
+          <View style={styles.block}>
+            <Text style={type.sectionTitle}>Objetivos</Text>
+            <View style={goalListStyle}>
+              {matchedGoals.map((item) => (
+                <GoalRow
+                  key={item.goal.id}
+                  progress={item}
+                  onPress={() => {
+                    triggerUiHaptic();
+                    setEditingGoal(item.goal);
+                    setGoalOpen(true);
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {matchedTx.length ? (
+          <View style={styles.block}>
+            <Text style={type.sectionTitle}>Movimientos</Text>
+            <View style={txListStyle}>
+              {matchedTx.map((tx) => (
+                <TxRow key={tx.id} tx={tx} />
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </Screen>
+      <AccountActivitySheet
+        account={preview}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null);
+        }}
+        onEditAsset={(asset) => {
+          if (!preview) return;
+          triggerUiHaptic();
+          setEditingAsset(asset);
+          setAssetOpen(true);
+        }}
       />
-      {empty ? <Text style={type.body}>Nada para «{query.trim()}».</Text> : null}
-      {matchedGoals.length ? (
-        <View>
-          <Text style={type.sectionTitle}>Objetivos</Text>
-          <View style={goalListStyle}>
-            {matchedGoals.map((item) => (
-              <GoalRow
-                key={item.goal.id}
-                progress={item}
-                onPress={() => router.push("/wealth/goals")}
-              />
-            ))}
-          </View>
-        </View>
-      ) : null}
-      {matchedAccounts.length ? (
-        <View>
-          <Text style={type.sectionTitle}>Cuentas</Text>
-          {matchedAccounts.map((account) => (
-            <SeriesRow
-              key={account.id}
-              title={account.name}
-              subtitle="Cuenta"
-              onPress={() => router.push("/wealth/accounts")}
-            />
-          ))}
-        </View>
-      ) : null}
-      {matchedAssets.length ? (
-        <View>
-          <Text style={type.sectionTitle}>Inversiones</Text>
-          <View style={assetListStyle}>
-            {matchedAssets.map((asset) => (
-              <AssetRow
-                key={asset.id}
-                position={assetPosition(asset)}
-                onPress={() => router.push(assetHref(asset.id))}
-              />
-            ))}
-          </View>
-        </View>
-      ) : null}
-      {matchedTx.length ? (
-        <View>
-          <Text style={type.sectionTitle}>Movimientos</Text>
-          <View style={txListStyle}>
-            {matchedTx.map((tx) => (
-              <TxRow key={tx.id} tx={tx} />
-            ))}
-          </View>
-        </View>
-      ) : null}
-    </Screen>
+      <AssetComposerSheet
+        open={assetOpen}
+        asset={editingAsset}
+        defaultAccountId={editingAsset?.accountId ?? preview?.id ?? null}
+        onOpenChange={(open) => {
+          setAssetOpen(open);
+          if (!open) setEditingAsset(null);
+        }}
+      />
+      <GoalComposerSheet
+        open={goalOpen}
+        goal={editingGoal}
+        onOpenChange={(open) => {
+          setGoalOpen(open);
+          if (!open) setEditingGoal(null);
+        }}
+      />
+    </>
   );
 }
 
@@ -399,4 +498,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
   },
+  block: { gap: 4, paddingTop: 8 },
+  accountRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.rule,
+  },
+  accountName: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
+  accountBal: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
 });

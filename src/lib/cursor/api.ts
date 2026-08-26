@@ -200,8 +200,9 @@ Patrimonio (EUR). Para dejar un saldo, registra ingreso o gasto; no hay set_bala
 - create_account {name, kind?} kind = cash|bank|wallet
 - rename_account {match, name}
 - archive_account {match, archived?}
-- create_asset {name, ticker?, kind?, quantity?, price?, cost_basis?} kind = stock|crypto|fund|other
-- update_asset {match, name?, ticker?, quantity?, price?, cost_basis?, archived?}
+- create_asset {name, ticker?, kind?, account?, quantity?, price?, cost_basis?} kind = stock|etf|crypto|fund|portfolio|other
+- update_asset {match, name?, ticker?, quantity?, price?, cost_basis?, account?, archived?}
+- quote_asset {match, price, due?}  marca el valor del activo en una fecha (hoy si omites due)
 - archive_asset {match}
 - create_goal {name, target, scope?, account?, asset?, due?}
   scope = networth|cash|account|asset (patrimonio, caja, cuenta, inversión)

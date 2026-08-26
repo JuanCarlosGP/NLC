@@ -10,7 +10,7 @@ import { LibrarySortSheet, librarySortLabel, type LibrarySort } from "@/componen
 import { LibraryTile } from "@/components/library/library-tile";
 import { TrackRow } from "@/components/library/track-row";
 import { FocusBoard } from "@/components/productivity/focus-board";
-import { WealthLedger } from "@/components/wealth/wealth-ledger";
+import { WealthCatalog } from "@/components/wealth/wealth-catalog";
 import { Screen } from "@/components/ui/screen";
 import { SeriesRow, seriesListStyle } from "@/components/video/series-row";
 import { albumHref, artistHref } from "@/lib/library/href";
@@ -296,7 +296,7 @@ export default function LibraryScreen() {
   }
 
   if (zone === "focus") return <FocusBoard />;
-  if (zone === "wealth") return <WealthLedger title="Movimientos" />;
+  if (zone === "wealth") return <WealthCatalog />;
 
   return (
     <>

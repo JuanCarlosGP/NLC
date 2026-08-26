@@ -13,27 +13,28 @@ import { AssetRow, assetListStyle } from "@/components/wealth/asset-row";
 import { TxComposerSheet } from "@/components/wealth/tx-composer-sheet";
 import { TxRow, txListStyle } from "@/components/wealth/tx-row";
 import { WealthChart } from "@/components/wealth/wealth-chart";
-import { assetHref } from "@/lib/library/href";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { changePct, formatChartScrub, visualChartRange, type ChartPoint } from "@/lib/wealth/compute";
 import { formatEuro, formatPct } from "@/lib/wealth/money";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
-import { RANGE_OPTIONS, type WealthAccount, type WealthGoal, type WealthHomeTab, type WealthRange, type WealthTxKind } from "@/lib/wealth/types";
+import { RANGE_OPTIONS, type WealthAccount, type WealthAsset, type WealthGoal, type WealthHomeTab, type WealthRange, type WealthTxKind } from "@/lib/wealth/types";
 
 export function WealthHome() {
   const router = useRouter();
-  const { total, cash, positions, txs, series, rangeChange, balanceOf, ready, goalProgress } = useWealth();
+  const { total, cash, positions, txs, series, rangeChange, balanceOf, holdingsOf, ready, goalProgress } = useWealth();
   const accounts = useLiveAccounts();
   const [tab, setTab] = useState<WealthHomeTab>("wealth");
   const [range, setRange] = useState<WealthRange>("max");
   const [txOpen, setTxOpen] = useState(false);
   const [txKind, setTxKind] = useState<WealthTxKind>("income");
   const [assetOpen, setAssetOpen] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<WealthAsset | null>(null);
   const [accountOpen, setAccountOpen] = useState(false);
   const [goalOpen, setGoalOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<WealthGoal | null>(null);
   const [previewAccount, setPreviewAccount] = useState<WealthAccount | null>(null);
+  const [assetAccountId, setAssetAccountId] = useState<string | null>(null);
   const [scrub, setScrub] = useState<ChartPoint | null>(null);
 
   const points = useMemo(() => series(range), [range, series]);
@@ -60,6 +61,13 @@ export function WealthHome() {
     setGoalOpen(true);
   }
 
+  function openAsset(next?: WealthAsset | null, accountId?: string | null) {
+    triggerUiHaptic();
+    setEditingAsset(next ?? null);
+    setAssetAccountId(accountId ?? next?.accountId ?? null);
+    setAssetOpen(true);
+  }
+
   return (
     <>
       <Screen>
@@ -69,13 +77,16 @@ export function WealthHome() {
         </View>
 
         <View style={styles.tabs}>
-          <Pressable onPress={() => setTab("wealth")} accessibilityRole="button">
-            <Text style={[styles.tab, tab === "wealth" && styles.tabOn]}>Patrimonio</Text>
-          </Pressable>
-          <Pressable onPress={() => setTab("cash")} accessibilityRole="button">
+          <Pressable
+            onPress={() => setTab(tab === "cash" ? "wealth" : "cash")}
+            accessibilityRole="button"
+          >
             <Text style={[styles.tab, tab === "cash" && styles.tabOn]}>Caja</Text>
           </Pressable>
-          <Pressable onPress={() => setTab("goals")} accessibilityRole="button">
+          <Pressable
+            onPress={() => setTab(tab === "goals" ? "wealth" : "goals")}
+            accessibilityRole="button"
+          >
             <Text style={[styles.tab, tab === "goals" && styles.tabOn]}>Objetivos</Text>
           </Pressable>
         </View>
@@ -146,10 +157,7 @@ export function WealthHome() {
             hint={`${positions.length}`}
             addLabel="Nueva inversión"
             onPress={() => router.push("/wealth/assets")}
-            onAdd={() => {
-              triggerUiHaptic();
-              setAssetOpen(true);
-            }}
+            onAdd={() => openAsset()}
           />
           <QuickCard
             title="Cuentas"
@@ -194,7 +202,7 @@ export function WealthHome() {
           <View style={styles.section}>
             <View style={styles.sectionHead}>
               <Text style={type.sectionTitle}>Inversiones</Text>
-              <Pressable onPress={() => setAssetOpen(true)}>
+              <Pressable onPress={() => openAsset()}>
                 <Text style={styles.link}>Añadir</Text>
               </Pressable>
             </View>
@@ -204,7 +212,7 @@ export function WealthHome() {
                   <AssetRow
                     key={position.asset.id}
                     position={position}
-                    onPress={() => router.push(assetHref(position.asset.id))}
+                    onPress={() => openAsset(position.asset)}
                   />
                 ))}
               </View>
@@ -220,11 +228,16 @@ export function WealthHome() {
                 <Text style={styles.link}>Añadir</Text>
               </Pressable>
             </View>
-            {accounts.map((account) => (
+            {accounts.map((account) => {
+              const cashBal = balanceOf(account.id);
+              const invested = holdingsOf(account.id);
+              const kindLabel = account.kind === "bank" ? "Banco" : account.kind === "wallet" ? "Monedero" : "Efectivo";
+              const meta = invested > 0.004 ? `${kindLabel} · Invertido ${formatEuro(invested)}` : kindLabel;
+              return (
               <Pressable
                 key={account.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${account.name}, ${formatEuro(balanceOf(account.id))}`}
+                accessibilityLabel={`${account.name}, ${formatEuro(cashBal)}`}
                 onPress={() => {
                   triggerUiHaptic();
                   setPreviewAccount(account);
@@ -233,11 +246,12 @@ export function WealthHome() {
               >
                 <View>
                   <Text style={styles.accountName}>{account.name}</Text>
-                  <Text style={type.meta}>{account.kind === "bank" ? "Banco" : account.kind === "wallet" ? "Monedero" : "Efectivo"}</Text>
+                  <Text style={type.meta}>{meta}</Text>
                 </View>
-                <Text style={styles.accountBal}>{formatEuro(balanceOf(account.id))}</Text>
+                <Text style={styles.accountBal}>{formatEuro(cashBal)}</Text>
               </Pressable>
-            ))}
+              );
+            })}
             {recent.length ? (
               <View style={styles.section}>
                 <Text style={type.sectionTitle}>Últimos movimientos</Text>
@@ -287,12 +301,27 @@ export function WealthHome() {
         </View>
       </Screen>
       <TxComposerSheet open={txOpen} onOpenChange={setTxOpen} defaultKind={txKind} />
-      <AssetComposerSheet open={assetOpen} onOpenChange={setAssetOpen} />
+      <AssetComposerSheet
+        open={assetOpen}
+        asset={editingAsset}
+        defaultAccountId={assetAccountId}
+        onOpenChange={(next) => {
+          setAssetOpen(next);
+          if (!next) {
+            setEditingAsset(null);
+            setAssetAccountId(null);
+          }
+        }}
+      />
       <AccountComposerSheet open={accountOpen} onOpenChange={setAccountOpen} />
       <AccountActivitySheet
         account={previewAccount}
         onOpenChange={(open) => {
           if (!open) setPreviewAccount(null);
+        }}
+        onEditAsset={(asset) => {
+          if (!previewAccount) return;
+          openAsset(asset, previewAccount.id);
         }}
       />
       <GoalComposerSheet

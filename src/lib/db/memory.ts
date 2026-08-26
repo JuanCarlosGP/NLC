@@ -13,6 +13,7 @@ const TABLES = [
   "playlist_tracks",
   "wealth_accounts",
   "wealth_assets",
+  "wealth_quotes",
   "wealth_tx",
   "wealth_goals",
 ] as const;
@@ -28,6 +29,7 @@ const PRIMARY: Record<string, string[]> = {
   playlist_tracks: ["playlist_id", "position"],
   wealth_accounts: ["id"],
   wealth_assets: ["id"],
+  wealth_quotes: ["id"],
   wealth_tx: ["id"],
   wealth_goals: ["id"],
 };

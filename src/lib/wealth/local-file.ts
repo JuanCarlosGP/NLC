@@ -15,6 +15,7 @@ export function parseWealthDump(raw: string): WealthDump | null {
       accounts: parsed.accounts,
       assets: parsed.assets,
       txs: parsed.txs,
+      quotes: Array.isArray(parsed.quotes) ? parsed.quotes : [],
       goals: Array.isArray(parsed.goals) ? parsed.goals : [],
     };
   } catch {

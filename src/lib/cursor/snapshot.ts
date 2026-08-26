@@ -2,7 +2,7 @@ import { getAlbums, getTracks, loadPlaylists } from "@/lib/db/catalog";
 import { listProjects, listTasks } from "@/lib/productivity/store";
 import { listAccounts, listAssets, listGoals, listTx } from "@/lib/wealth/store";
 import { formatEuro } from "@/lib/wealth/money";
-import { formatGoalEta, goalProgress, netWorth, cashTotal, holdingsValue, accountBalance } from "@/lib/wealth/compute";
+import { formatGoalEta, goalProgress, netWorth, cashTotal, holdingsValue, accountBalance, accountHoldings, accountTotal, assetValue, assetQty } from "@/lib/wealth/compute";
 import { STATUS_LABEL } from "@/lib/productivity/types";
 import { formatDue } from "@/lib/productivity/dates";
 import { listReminders } from "@/lib/reminders/store";
@@ -31,15 +31,22 @@ export async function buildAssistantSnapshot(zone: AppZone): Promise<string> {
   const cash = cashTotal(liveAccounts, txs);
   const invested = holdingsValue(liveAssets);
   const assetLines = liveAssets.slice(0, 20).map((asset) => {
-    const value = asset.quantity * asset.price;
-    return `- ${asset.name}${asset.ticker ? ` (${asset.ticker})` : ""} · ${formatEuro(value)} · ${asset.quantity} × ${formatEuro(asset.price)}`;
+    const value = assetValue(asset);
+    const account = liveAccounts.find((item) => item.id === asset.accountId)?.name;
+    return `- ${asset.name}${asset.ticker ? ` (${asset.ticker})` : ""}${account ? ` · ${account}` : ""} · ${formatEuro(value)} · ${assetQty(asset)} × ${formatEuro(asset.price)}`;
   });
   const txLines = txs.slice(0, 24).map(
     (tx) => `- ${TX_KIND_LABEL[tx.kind]} ${formatEuro(tx.amount)} · ${tx.title}${tx.category ? ` · ${tx.category}` : ""}`,
   );
-  const accountLines = liveAccounts.map(
-    (account) => `- ${account.name} · ${formatEuro(accountBalance(account.id, txs))}`,
-  );
+  const accountLines = liveAccounts.map((account) => {
+    const cash = accountBalance(account.id, txs);
+    const invested = accountHoldings(liveAssets, account.id);
+    const total = accountTotal(account.id, liveAssets, txs);
+    if (invested > 0.004) {
+      return `- ${account.name} · ${formatEuro(total)} (efectivo ${formatEuro(cash)} · invertido ${formatEuro(invested)})`;
+    }
+    return `- ${account.name} · ${formatEuro(cash)}`;
+  });
   const goalLines = goals.slice(0, 16).map((goal) => {
     const progress = goalProgress(goal, liveAccounts, liveAssets, txs);
     return `- ${goal.name} · ${formatEuro(progress.current)} / ${formatEuro(goal.target)} · ${formatGoalEta(progress)}`;

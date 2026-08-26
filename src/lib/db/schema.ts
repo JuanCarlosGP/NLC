@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS wealth_assets (
   name TEXT NOT NULL,
   ticker TEXT NOT NULL DEFAULT '',
   kind TEXT NOT NULL DEFAULT 'other',
+  account_id TEXT,
   quantity REAL NOT NULL DEFAULT 0,
   price REAL NOT NULL DEFAULT 0,
   cost_basis REAL NOT NULL DEFAULT 0,
@@ -142,6 +143,16 @@ CREATE TABLE IF NOT EXISTS wealth_assets (
   updated_at INTEGER NOT NULL,
   archived INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS wealth_quotes (
+  id TEXT PRIMARY KEY NOT NULL,
+  asset_id TEXT NOT NULL,
+  price REAL NOT NULL,
+  booked_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS wealth_quotes_asset ON wealth_quotes(asset_id, booked_at);
 
 CREATE TABLE IF NOT EXISTS wealth_tx (
   id TEXT PRIMARY KEY NOT NULL,
@@ -160,6 +171,7 @@ CREATE TABLE IF NOT EXISTS wealth_tx (
   created_at INTEGER NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS wealth_assets_account ON wealth_assets(account_id);
 CREATE INDEX IF NOT EXISTS wealth_tx_booked ON wealth_tx(booked_at);
 CREATE INDEX IF NOT EXISTS wealth_tx_account ON wealth_tx(account_id);
 CREATE INDEX IF NOT EXISTS wealth_tx_asset ON wealth_tx(asset_id);

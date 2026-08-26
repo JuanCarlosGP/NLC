@@ -3,7 +3,10 @@ import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
 import { useSettings } from "@/lib/settings/settings-context";
 import {
   accountBalance,
+  accountHoldings,
+  accountTotal,
   assetPosition,
+  assetValue,
   cashTotal,
   changePct,
   chartSeries,
@@ -19,13 +22,16 @@ import {
   createAccount as persistCreateAccount,
   createAsset as persistCreateAsset,
   createGoal as persistCreateGoal,
+  createQuote as persistCreateQuote,
   createTx as persistCreateTx,
   deleteGoal as persistDeleteGoal,
+  deleteQuote as persistDeleteQuote,
   deleteTx as persistDeleteTx,
   ensureCashAccount,
   listAccounts,
   listAssets,
   listGoals,
+  listQuotes,
   listTx,
   renameAccount as persistRenameAccount,
   updateAsset as persistUpdateAsset,
@@ -41,6 +47,7 @@ import type {
   WealthAssetKind,
   WealthGoal,
   WealthGoalScope,
+  WealthQuote,
   WealthRange,
   WealthTx,
 } from "@/lib/wealth/types";
@@ -69,6 +76,7 @@ type WealthContextValue = {
   accounts: WealthAccount[];
   liveAccounts: WealthAccount[];
   assets: WealthAsset[];
+  quotes: WealthQuote[];
   txs: WealthTx[];
   goals: WealthGoal[];
   cash: number;
@@ -79,6 +87,8 @@ type WealthContextValue = {
   series: (range: WealthRange) => ChartPoint[];
   rangeChange: (range: WealthRange) => number | null;
   balanceOf: (accountId: string) => number;
+  holdingsOf: (accountId: string) => number;
+  totalOf: (accountId: string) => number;
   refresh: () => Promise<void>;
   createAccount: (name: string, kind?: WealthAccountKind) => Promise<WealthAccount>;
   renameAccount: (id: string, name: string) => Promise<void>;
@@ -87,6 +97,7 @@ type WealthContextValue = {
     name: string;
     ticker?: string;
     kind?: WealthAssetKind;
+    accountId?: string | null;
     quantity?: number;
     price?: number;
     costBasis?: number;
@@ -97,6 +108,7 @@ type WealthContextValue = {
       name?: string;
       ticker?: string;
       kind?: WealthAssetKind;
+      accountId?: string | null;
       quantity?: number;
       price?: number;
       costBasis?: number;
@@ -106,6 +118,8 @@ type WealthContextValue = {
   createTx: (input: CreateTxInput) => Promise<WealthTx>;
   updateTx: (id: string, input: CreateTxInput) => Promise<WealthTx>;
   deleteTx: (id: string) => Promise<void>;
+  createQuote: (input: { assetId: string; price: number; bookedAt?: number }) => Promise<WealthQuote>;
+  deleteQuote: (id: string) => Promise<void>;
   createGoal: (input: CreateGoalInput) => Promise<WealthGoal>;
   updateGoal: (id: string, patch: UpdateGoalInput) => Promise<void>;
   deleteGoal: (id: string) => Promise<void>;
@@ -118,6 +132,7 @@ export function WealthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [accounts, setAccounts] = useState<WealthAccount[]>([]);
   const [assets, setAssets] = useState<WealthAsset[]>([]);
+  const [quotes, setQuotes] = useState<WealthQuote[]>([]);
   const [txs, setTxs] = useState<WealthTx[]>([]);
   const [goals, setGoals] = useState<WealthGoal[]>([]);
   const settingsRef = useRef(settings);
@@ -127,14 +142,16 @@ export function WealthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     await ensureCashAccount();
-    const [nextAccounts, nextAssets, nextTxs, nextGoals] = await Promise.all([
+    const [nextAccounts, nextAssets, nextQuotes, nextTxs, nextGoals] = await Promise.all([
       listAccounts({ includeArchived: true }),
       listAssets({ includeArchived: true }),
+      listQuotes(),
       listTx(),
       listGoals({ includeArchived: true }),
     ]);
     setAccounts(nextAccounts);
     setAssets(nextAssets);
+    setQuotes(nextQuotes);
     setTxs(nextTxs);
     setGoals(nextGoals);
     setReady(true);
@@ -174,7 +191,10 @@ export function WealthProvider({ children }: { children: ReactNode }) {
   }, [password, refresh, settings.wealthLocalFolderUri, settings.wealthSharePath, settingsReady]);
 
   const liveAccounts = useMemo(() => accounts.filter((item) => !item.archived), [accounts]);
-  const liveAssets = useMemo(() => assets.filter((item) => !item.archived && item.quantity > 0), [assets]);
+  const liveAssets = useMemo(
+    () => assets.filter((item) => !item.archived && assetValue(item) > 0.004),
+    [assets],
+  );
   const liveGoals = useMemo(() => goals.filter((item) => !item.archived), [goals]);
   const cash = useMemo(() => cashTotal(liveAccounts, txs), [liveAccounts, txs]);
   const positions = useMemo(() => liveAssets.map(assetPosition).sort((a, b) => b.value - a.value), [liveAssets]);
@@ -197,6 +217,7 @@ export function WealthProvider({ children }: { children: ReactNode }) {
       accounts,
       liveAccounts,
       assets,
+      quotes,
       txs,
       goals,
       cash,
@@ -204,9 +225,11 @@ export function WealthProvider({ children }: { children: ReactNode }) {
       total,
       positions,
       goalProgress: progress,
-      series: (range) => chartSeries(liveAccounts, liveAssets, txs, range),
-      rangeChange: (range) => changePct(chartSeries(liveAccounts, liveAssets, txs, range)),
+      series: (range) => chartSeries(liveAccounts, liveAssets, txs, range, quotes),
+      rangeChange: (range) => changePct(chartSeries(liveAccounts, liveAssets, txs, range, quotes)),
       balanceOf: (accountId) => accountBalance(accountId, txs),
+      holdingsOf: (accountId) => accountHoldings(liveAssets, accountId),
+      totalOf: (accountId) => accountTotal(accountId, liveAssets, txs),
       refresh,
       createAccount: async (name, kind) => {
         const created = await persistCreateAccount(name, kind);
@@ -252,6 +275,17 @@ export function WealthProvider({ children }: { children: ReactNode }) {
         await refresh();
         void mirror();
       },
+      createQuote: async (input) => {
+        const created = await persistCreateQuote(input);
+        await refresh();
+        void mirror();
+        return created;
+      },
+      deleteQuote: async (id) => {
+        await persistDeleteQuote(id);
+        await refresh();
+        void mirror();
+      },
       createGoal: async (input) => {
         const created = await persistCreateGoal(input);
         await refresh();
@@ -269,7 +303,7 @@ export function WealthProvider({ children }: { children: ReactNode }) {
         void mirror();
       },
     }),
-    [accounts, assets, cash, goals, invested, liveAccounts, liveAssets, mirror, positions, progress, ready, refresh, total, txs],
+    [accounts, assets, cash, goals, invested, liveAccounts, liveAssets, mirror, positions, progress, quotes, ready, refresh, total, txs],
   );
 
   return <WealthContext.Provider value={value}>{children}</WealthContext.Provider>;
