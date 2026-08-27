@@ -15,12 +15,31 @@ const TEN_MIN_MS = 10 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 const FOUR_HOURS_MS = 4 * HOUR_MS;
 
-const RANGE_MS: Record<Exclude<WealthRange, "max">, number> = {
-  "1d": 24 * 60 * 60 * 1000,
-  "1w": 7 * 24 * 60 * 60 * 1000,
-  "1m": 30 * 24 * 60 * 60 * 1000,
-  "1y": 365 * 24 * 60 * 60 * 1000,
+const RANGE_DAYS: Record<Exclude<WealthRange, "max">, number> = {
+  "1d": 0,
+  "1w": 6,
+  "1m": 29,
+  "1y": 364,
 };
+
+function startOfLocalDay(ts: number): number {
+  const next = new Date(ts);
+  next.setHours(0, 0, 0, 0);
+  return next.getTime();
+}
+
+export function rangeStart(range: WealthRange, now = Date.now()): number {
+  if (range === "max") return 0;
+  const date = new Date(startOfLocalDay(now));
+  date.setDate(date.getDate() - RANGE_DAYS[range]);
+  if (range === "1y") {
+    const yearAgo = new Date(now);
+    yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+    yearAgo.setHours(0, 0, 0, 0);
+    return yearAgo.getTime();
+  }
+  return date.getTime();
+}
 
 export function cashTotal(accounts: WealthAccount[], txs: WealthTx[]): number {
   let sum = 0;
@@ -117,16 +136,16 @@ export function priceMarks(
 
 export function priceAtMarks(marks: PriceMark[] | undefined, at: number, fallback: number): number {
   if (!marks?.length) return fallback;
-  let price = marks[0]!.price;
+  let price: number | null = null;
   for (const mark of marks) {
     if (mark.at > at) break;
     price = mark.price;
   }
-  return price;
+  return price ?? fallback;
 }
 
 export function assetQtyAt(asset: WealthAsset, txs: WealthTx[], at: number): number {
-  let qty = asset.quantity;
+  let qty = assetQty(asset);
   for (const tx of txs) {
     if (tx.assetId !== asset.id || tx.bookedAt <= at || tx.quantity == null) continue;
     if (tx.kind === "buy") qty -= tx.quantity;
@@ -144,9 +163,11 @@ function holdingsAtTime(
   let sum = 0;
   for (const asset of assets) {
     if (asset.archived) continue;
+    const list = marks.get(asset.id);
+    if (!list?.length || list[0]!.at > at) continue;
     const qty = assetQtyAt(asset, txs, at);
     if (qty <= 0.00000001) continue;
-    sum += qty * priceAtMarks(marks.get(asset.id), at, asset.price);
+    sum += qty * priceAtMarks(list, at, asset.price);
   }
   return roundMoney(sum);
 }
@@ -229,14 +250,14 @@ export function assetSeries(
     return { at, value: roundMoney(Math.max(0, qty) * price) };
   });
   if (points[0] && points[0].at > windowStart && range === "max") {
-    points.unshift({ at: Math.max(0, points[0].at - originLeadMs(points[0].at, now)), value: points[0].value });
+    points.unshift({ at: Math.max(0, points[0].at - 1000), value: 0 });
   }
   const last = points[points.length - 1];
   const current = assetValue(asset);
   if (!last || last.at !== now) points.push({ at: now, value: current });
   else points[points.length - 1] = { at: now, value: current };
   if (points.length < 2) points.unshift({ at: now - 60_000, value: points[0]?.value ?? 0 });
-  return sampleChartPoints(points, range, points[0]!.at, now);
+  return asLineSeries(points);
 }
 
 export function parseBookedDay(raw: string, now = Date.now()): number | null {
@@ -254,14 +275,70 @@ export function parseBookedDay(raw: string, now = Date.now()): number | null {
   return date.getTime();
 }
 
-export function rangeStart(range: WealthRange, now = Date.now()): number {
-  if (range === "max") return 0;
-  return now - RANGE_MS[range];
+function mergeStamps(times: number[]): number[] {
+  const sorted = [...times].sort((a, b) => a - b);
+  const stamps: number[] = [];
+  for (const at of sorted) {
+    const prev = stamps[stamps.length - 1];
+    if (prev == null || at - prev > 60_000) stamps.push(at);
+    else stamps[stamps.length - 1] = at;
+  }
+  return stamps;
 }
 
 function originLeadMs(firstAt: number, now: number): number {
   const span = Math.max(now - firstAt, 60_000);
   return Math.min(Math.max(span * 0.06, 60_000), 36 * HOUR_MS);
+}
+
+function chartBucketMs(range: WealthRange, start: number, now: number): number {
+  const span = Math.max(now - start, 1);
+  if (range === "1d" || span <= DAY_MS * 1.5) return 30 * 60 * 1000;
+  if (range === "1w" || span <= DAY_MS * 10) return 4 * HOUR_MS;
+  if (range === "1m" || span <= DAY_MS * 45) return DAY_MS;
+  return 7 * DAY_MS;
+}
+
+function withoutIsolatedSpikes(points: ChartPoint[]): ChartPoint[] {
+  if (points.length < 3) return points;
+  const last = Math.abs(points[points.length - 1]!.value);
+  const typical = Math.max(last, 1);
+  return points.filter((point, index) => {
+    if (index === 0 || index === points.length - 1) return true;
+    const prev = points[index - 1]!.value;
+    const next = points[index + 1]!.value;
+    const isolated =
+      Math.abs(point.value) > typical * 1.5 &&
+      Math.abs(point.value) > Math.abs(prev) * 1.4 &&
+      Math.abs(point.value) > Math.abs(next) * 1.4;
+    return !isolated;
+  });
+}
+
+function lastInBuckets(points: ChartPoint[], start: number, now: number, size: number): ChartPoint[] {
+  if (points.length < 2) return points;
+  const buckets = new Map<number, number>();
+  for (const point of points) {
+    const key = start + Math.floor(Math.max(0, point.at - start) / size) * size;
+    buckets.set(key, point.value);
+  }
+  buckets.set(now, points[points.length - 1]!.value);
+  const keys = [...buckets.keys()].sort((a, b) => a - b);
+  return keys.map((at) => ({ at, value: buckets.get(at)! }));
+}
+
+function asLineSeries(points: ChartPoint[]): ChartPoint[] {
+  if (points.length < 2) return points;
+  const line: ChartPoint[] = [];
+  for (const point of points) {
+    const prev = line[line.length - 1];
+    if (prev && prev.at === point.at) {
+      line[line.length - 1] = { ...point };
+      continue;
+    }
+    line.push({ ...point });
+  }
+  return line;
 }
 
 export function chartSeries(
@@ -281,50 +358,58 @@ export function chartSeries(
   const current = netWorth(accounts, assets, txs);
   if (!Number.isFinite(firstAt)) {
     return [
-      { at: now - 60_000, value: 0 },
+      { at: range === "max" ? now - 60_000 : windowStart, value: 0 },
       { at: now, value: current },
     ];
   }
 
-  const start = Math.max(windowStart, firstAt);
-  const times = new Set<number>();
+  const start = range === "max" ? firstAt : windowStart;
+  const times = new Set<number>([start, now]);
   for (const tx of ordered) {
     if (tx.bookedAt >= start && tx.bookedAt <= now) times.add(tx.bookedAt);
   }
   for (const quote of quotes) {
     if (quote.bookedAt >= start && quote.bookedAt <= now) times.add(quote.bookedAt);
   }
-  const stamps = [...times].sort((a, b) => a - b);
+  for (const asset of assets) {
+    if (!asset.archived && asset.createdAt >= start && asset.createdAt <= now) times.add(asset.createdAt);
+  }
+  const stamps = mergeStamps([...times]);
 
   let cash = 0;
-  for (const tx of ordered) {
-    if (tx.bookedAt >= start) break;
-    cash = applyCash(cash, tx);
-  }
-  const openValue = roundMoney(cash + holdingsAtTime(assets, txs, marks, start));
-  const events: ChartPoint[] = [];
   let txIndex = 0;
-  while (txIndex < ordered.length && ordered[txIndex]!.bookedAt < start) txIndex += 1;
+  while (txIndex < ordered.length && ordered[txIndex]!.bookedAt < start) {
+    cash = applyCash(cash, ordered[txIndex]!);
+    txIndex += 1;
+  }
+  while (txIndex < ordered.length && ordered[txIndex]!.bookedAt === start) {
+    cash = applyCash(cash, ordered[txIndex]!);
+    txIndex += 1;
+  }
+  const points: ChartPoint[] = [
+    { at: start, value: roundMoney(cash + holdingsAtTime(assets, txs, marks, start)) },
+  ];
   for (const at of stamps) {
+    if (at <= start) continue;
     while (txIndex < ordered.length && ordered[txIndex]!.bookedAt <= at) {
       cash = applyCash(cash, ordered[txIndex]!);
       txIndex += 1;
     }
-    events.push({ at, value: roundMoney(cash + holdingsAtTime(assets, txs, marks, at)) });
+    points.push({ at, value: roundMoney(cash + holdingsAtTime(assets, txs, marks, at)) });
   }
-
-  const points: ChartPoint[] = [];
-  if (firstAt >= windowStart) {
-    points.push({ at: firstAt - originLeadMs(firstAt, now), value: 0 });
-  } else {
-    points.push({ at: start, value: openValue });
-  }
-  points.push(...events);
   const last = points[points.length - 1];
   if (!last || last.at !== now) points.push({ at: now, value: current });
   else points[points.length - 1] = { at: now, value: current };
 
-  return sampleChartPoints(points, range, points[0]!.at, now);
+  const cleaned = withoutIsolatedSpikes(points);
+  const bucketed = lastInBuckets(cleaned, start, now, chartBucketMs(range, start, now));
+  if (range === "max" && firstAt >= windowStart && bucketed[0] && Math.abs(bucketed[0].value) >= 0.005) {
+    bucketed.unshift({
+      at: Math.max(0, bucketed[0].at - originLeadMs(bucketed[0].at, now)),
+      value: 0,
+    });
+  }
+  return asLineSeries(bucketed);
 }
 
 export function visualChartRange(start: number, now: number): WealthRange {
@@ -345,12 +430,6 @@ export function chartStepMs(_range: WealthRange, start: number, now: number): nu
   const days = Math.max(DAY_MS, now - start) / DAY_MS;
   if (days <= 365 * 3) return 7 * DAY_MS;
   return 14 * DAY_MS;
-}
-
-function startOfLocalDay(ts: number): number {
-  const next = new Date(ts);
-  next.setHours(0, 0, 0, 0);
-  return next.getTime();
 }
 
 export function alignChartTime(ts: number, _range: WealthRange, stepMs: number): number {
@@ -421,25 +500,36 @@ export function sampleChartPoints(
   return sampled;
 }
 
+function localeStamp(at: number, options: Intl.DateTimeFormatOptions): string {
+  return new Date(at)
+    .toLocaleDateString("es-ES", options)
+    .replaceAll(".", "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function localeTime(at: number): string {
+  return new Date(at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+}
+
 export function formatChartScrub(at: number, range: WealthRange): string {
-  const date = new Date(at);
-  if (range === "1d") {
-    return date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-  }
-  if (range === "1w") {
-    const day = date.toLocaleDateString("es-ES", { weekday: "short" });
-    const time = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-    return `${day} ${time}`;
-  }
-  if (range === "1m") {
-    const day = date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
-    const time = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-    return `${day} · ${time}`;
-  }
-  if (range === "1y") {
-    return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
-  }
-  return date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+  if (range === "1d") return localeTime(at);
+  if (range === "1w") return `${localeStamp(at, { weekday: "short", day: "numeric" })} · ${localeTime(at)}`;
+  if (range === "1m") return `${localeStamp(at, { day: "numeric", month: "short" })} · ${localeTime(at)}`;
+  if (range === "1y") return localeStamp(at, { day: "numeric", month: "short" });
+  return localeStamp(at, { day: "numeric", month: "short", year: "numeric" });
+}
+
+export function formatChartAxis(at: number, range: WealthRange, now = Date.now()): string {
+  if (range === "1d") return localeTime(at);
+  if (startOfLocalDay(at) === startOfLocalDay(now)) return "Hoy";
+  if (range === "1w") return localeStamp(at, { weekday: "short", day: "numeric", month: "short" });
+  const sameYear = new Date(at).getFullYear() === new Date(now).getFullYear();
+  return localeStamp(at, {
+    day: "numeric",
+    month: "short",
+    ...(range === "max" && !sameYear ? { year: "numeric" } : {}),
+  });
 }
 
 export function changePct(points: ChartPoint[]): number | null {
@@ -563,12 +653,6 @@ export function formatGoalEta(progress: GoalProgress, now = Date.now()): string 
   return parts.join(" · ");
 }
 
-function startOfDay(ts: number): number {
-  const next = new Date(ts);
-  next.setHours(0, 0, 0, 0);
-  return next.getTime();
-}
-
 function formatHorizon(at: number, now: number): string {
   const days = Math.round((at - now) / DAY_MS);
   if (days <= 10) return "en unos días";
@@ -581,7 +665,7 @@ function formatHorizon(at: number, now: number): string {
 }
 
 function formatDeadline(at: number, now: number): string {
-  const days = Math.ceil((startOfDay(at) - startOfDay(now)) / DAY_MS);
+  const days = Math.ceil((startOfLocalDay(at) - startOfLocalDay(now)) / DAY_MS);
   if (days < 0) return "La fecha ya pasó";
   if (days === 0) return "Fecha: hoy";
   if (days === 1) return "Fecha: mañana";

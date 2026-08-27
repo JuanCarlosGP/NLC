@@ -1,20 +1,77 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { PanResponder, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
-import Svg, { Line, Path } from "react-native-svg";
-import { colors } from "@/lib/theme";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { PanResponder, Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
+import { colors, fonts } from "@/lib/theme";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
-import { visualChartRange, type ChartPoint } from "@/lib/wealth/compute";
+import { formatChartAxis, formatChartScrub, type ChartPoint } from "@/lib/wealth/compute";
+import { formatEuro } from "@/lib/wealth/money";
 import type { WealthRange } from "@/lib/wealth/types";
 
-const PAD_X = 10;
-const PAD_Y = 14;
+const PAD_X = 12;
+const PAD_TOP = 18;
+const PAD_BOTTOM = 8;
 
-function isMajorTick(at: number, range: WealthRange): boolean {
-  const date = new Date(at);
-  if (range === "1d") return date.getMinutes() === 0;
-  if (range === "1w") return date.getHours() === 0 && date.getMinutes() === 0;
-  if (range === "1m") return date.getHours() === 0 && date.getMinutes() === 0;
-  return date.getDate() === 1;
+function linePath(coords: { x: number; y: number }[]): string {
+  if (!coords.length) return "";
+  const pts: { x: number; y: number }[] = [];
+  for (const point of coords) {
+    const prev = pts[pts.length - 1];
+    if (prev && Math.abs(prev.x - point.x) < 0.05) {
+      pts[pts.length - 1] = point;
+      continue;
+    }
+    pts.push(point);
+  }
+  if (pts.length === 1) return `M${fmt(pts[0]!.x)},${fmt(pts[0]!.y)}`;
+  if (pts.length === 2) {
+    return `M${fmt(pts[0]!.x)},${fmt(pts[0]!.y)} L${fmt(pts[1]!.x)},${fmt(pts[1]!.y)}`;
+  }
+
+  const last = pts.length - 1;
+  const dx: number[] = [];
+  const slope: number[] = [];
+  for (let i = 0; i < last; i += 1) {
+    const span = pts[i + 1]!.x - pts[i]!.x || 1;
+    dx.push(span);
+    slope.push((pts[i + 1]!.y - pts[i]!.y) / span);
+  }
+  const tan: number[] = new Array(pts.length);
+  tan[0] = slope[0]!;
+  tan[last] = slope[last - 1]!;
+  for (let i = 1; i < last; i += 1) {
+    tan[i] = slope[i - 1]! * slope[i]! <= 0 ? 0 : (slope[i - 1]! + slope[i]!) / 2;
+  }
+  for (let i = 0; i < last; i += 1) {
+    if (Math.abs(slope[i]!) < 1e-6) {
+      tan[i] = 0;
+      tan[i + 1] = 0;
+      continue;
+    }
+    const a = tan[i]! / slope[i]!;
+    const b = tan[i + 1]! / slope[i]!;
+    const s = a * a + b * b;
+    if (s > 9) {
+      const t = 3 / Math.sqrt(s);
+      tan[i] = t * a * slope[i]!;
+      tan[i + 1] = t * b * slope[i]!;
+    }
+  }
+
+  let d = `M${fmt(pts[0]!.x)},${fmt(pts[0]!.y)}`;
+  for (let i = 0; i < last; i += 1) {
+    const from = pts[i]!;
+    const to = pts[i + 1]!;
+    const c1x = from.x + dx[i]! / 3;
+    const c1y = from.y + (tan[i]! * dx[i]!) / 3;
+    const c2x = to.x - dx[i]! / 3;
+    const c2y = to.y - (tan[i + 1]! * dx[i]!) / 3;
+    d += ` C${fmt(c1x)},${fmt(c1y)} ${fmt(c2x)},${fmt(c2y)} ${fmt(to.x)},${fmt(to.y)}`;
+  }
+  return d;
+}
+
+function fmt(n: number): string {
+  return n.toFixed(1);
 }
 
 function indexAtTime(points: ChartPoint[], at: number): number {
@@ -33,8 +90,8 @@ export function WealthChart({
   up,
   range,
   onScrub,
-  height = 156,
-  fromZero = true,
+  height = 168,
+  fromZero = false,
 }: {
   points: ChartPoint[];
   up: boolean;
@@ -44,26 +101,35 @@ export function WealthChart({
   fromZero?: boolean;
 }) {
   const { width: windowWidth } = useWindowDimensions();
-  const width = Math.max(280, windowWidth - 40);
+  const [boxW, setBoxW] = useState(0);
+  const width = Math.max(220, boxW || windowWidth - 72);
   const innerW = width - PAD_X * 2;
-  const innerH = height - PAD_Y * 2;
+  const innerH = height - PAD_TOP - PAD_BOTTOM;
+  const fillId = `wealthFill${useId().replace(/:/g, "")}`;
   const onScrubRef = useRef(onScrub);
   onScrubRef.current = onScrub;
   const layout = useMemo(() => {
     if (points.length < 2) return null;
     const values = points.map((point) => point.value);
-    const rawMin = Math.min(...values);
-    const rawMax = Math.max(...values);
-    const min = fromZero && rawMin > 0 ? 0 : rawMin;
-    const max = fromZero && rawMax < 0 ? 0 : rawMax;
+    const last = values[values.length - 1] ?? 0;
+    const cap = Math.max(Math.abs(last) * 1.8, 1);
+    const usable = values.filter((value) => Math.abs(value) <= cap);
+    const rawMin = Math.min(...(usable.length ? usable : values));
+    const rawMax = Math.max(...(usable.length ? usable : values), last);
+    const pad = (rawMax - rawMin) * 0.12 || Math.max(Math.abs(rawMax) * 0.06, 1);
+    const min = fromZero && rawMin > 0 ? 0 : rawMin - pad;
+    const max = fromZero && rawMax < 0 ? 0 : rawMax + pad;
     const span = max - min || 1;
     const t0 = points[0]!.at;
     const t1 = points[points.length - 1]!.at;
     const timeSpan = t1 - t0 || 1;
-    const coords = points.map((point) => ({
-      x: PAD_X + ((point.at - t0) / timeSpan) * innerW,
-      y: PAD_Y + (1 - (point.value - min) / span) * innerH,
-    }));
+    const coords = points.map((point) => {
+      const y = PAD_TOP + (1 - (point.value - min) / span) * innerH;
+      return {
+        x: PAD_X + ((point.at - t0) / timeSpan) * innerW,
+        y: Math.min(PAD_TOP + innerH, Math.max(PAD_TOP, y)),
+      };
+    });
     return { min, max, t0, t1, timeSpan, coords, innerW };
   }, [fromZero, innerH, innerW, points]);
   const layoutRef = useRef(layout);
@@ -83,14 +149,13 @@ export function WealthChart({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onStartShouldSetPanResponderCapture: () => true,
-        onMoveShouldSetPanResponderCapture: () => true,
-        onPanResponderTerminationRequest: () => false,
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > 8 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderTerminationRequest: () => true,
         onPanResponderGrant: (event) => inspect(event.nativeEvent.locationX),
         onPanResponderMove: (event) => inspect(event.nativeEvent.locationX),
-        onPanResponderRelease: () => clear(),
-        onPanResponderTerminate: () => clear(),
+        onPanResponderRelease: () => undefined,
+        onPanResponderTerminate: () => undefined,
       }),
     [],
   );
@@ -105,6 +170,12 @@ export function WealthChart({
     const point = series[idx];
     const coord = current.coords[idx];
     if (!point || !coord) return;
+    if (idx === series.length - 1) {
+      lastIdx.current = null;
+      setCursor(null);
+      onScrubRef.current?.(null);
+      return;
+    }
     if (lastIdx.current !== idx) {
       lastIdx.current = idx;
       triggerSelectionUiHaptic();
@@ -113,101 +184,83 @@ export function WealthChart({
     onScrubRef.current?.(point);
   }
 
-  function clear() {
-    lastIdx.current = null;
-    setCursor(null);
-    onScrubRef.current?.(null);
-  }
-
   if (!layout) {
     return <View style={[styles.frame, { height }]} />;
   }
 
-  const { min, max, coords, t0, t1 } = layout;
-  const tickRange = visualChartRange(t0, t1);
-  const d = coords
-    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`)
-    .join(" ");
+  const { coords } = layout;
+  const last = coords[coords.length - 1]!;
+  const first = coords[0]!;
+  const line = linePath(coords);
+  const floorY = PAD_TOP + innerH;
+  const area = `${line} L${fmt(last.x)},${fmt(floorY)} L${fmt(first.x)},${fmt(floorY)} Z`;
   const stroke = up ? colors.ok : colors.danger;
-  const zeroY = PAD_Y + (1 - (0 - min) / (max - min || 1)) * innerH;
+  const startLabel = formatChartAxis(points[0]!.at, range);
+  const endLabel = formatChartAxis(points[points.length - 1]!.at, range);
+  const marked = cursor?.point;
+  const live = !marked;
 
   return (
-    <View
-      collapsable={false}
-      style={[
-        styles.frame,
-        { height, width },
-        Platform.OS === "web" ? ({ cursor: "ew-resize", userSelect: "none" } as object) : null,
-      ]}
-      {...pan.panHandlers}
-    >
-      <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} pointerEvents="none">
-        {coords.map((coord, index) => {
-          const point = points[index];
-          if (!point || !isMajorTick(point.at, tickRange)) return null;
-          return (
-            <Line
-              key={`${point.at}-${index}`}
-              x1={coord.x}
-              x2={coord.x}
-              y1={PAD_Y}
-              y2={height - PAD_Y}
-              stroke={colors.rule}
-              strokeWidth={1}
-            />
-          );
-        })}
-        {min < 0 && max > 0 ? (
-          <Line
-            x1={PAD_X}
-            x2={width - PAD_X}
-            y1={zeroY}
-            y2={zeroY}
-            stroke={colors.ruleLight}
-            strokeDasharray="4 6"
-            strokeWidth={1}
-          />
-        ) : null}
-        <Path d={d} fill="none" stroke={stroke} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
-        {cursor ? (
-          <Line
-            x1={cursor.x}
-            x2={cursor.x}
-            y1={PAD_Y}
-            y2={height - PAD_Y}
-            stroke={colors.ink}
-            strokeWidth={1.2}
-          />
-        ) : null}
-      </Svg>
-      {cursor ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.cursorDot,
-            {
-              left: cursor.x - 6,
-              top: cursor.y - 6,
-              backgroundColor: stroke,
-            },
-          ]}
-        />
-      ) : null}
+    <View style={styles.wrap} onLayout={(event) => setBoxW(event.nativeEvent.layout.width)}>
+      <View
+        collapsable={false}
+        style={[styles.frame, { height, width }]}
+        {...pan.panHandlers}
+      >
+        <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} pointerEvents="none">
+          <Defs>
+            <LinearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={stroke} stopOpacity={0.28} />
+              <Stop offset="1" stopColor={stroke} stopOpacity={0} />
+            </LinearGradient>
+          </Defs>
+          <Path d={area} fill={`url(#${fillId})`} />
+          <Path d={line} fill="none" stroke={stroke} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          {cursor ? (
+            <Circle cx={cursor.x} cy={cursor.y} r={4.5} fill={colors.ink} stroke={stroke} strokeWidth={2} />
+          ) : (
+            <Circle cx={last.x} cy={last.y} r={3.5} fill={stroke} />
+          )}
+        </Svg>
+      </View>
+      <View style={[styles.meta, { width }]}>
+        <Text style={styles.metaSide}>{startLabel}</Text>
+        <Text style={[styles.metaMid, live ? styles.metaLive : styles.metaPin]} numberOfLines={1}>
+          {live ? " " : `${formatChartScrub(marked.at, range)} · ${formatEuro(marked.value)}`}
+        </Text>
+        <Text style={[styles.metaSide, styles.metaEnd]}>{endLabel}</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: { gap: 8, width: "100%" },
   frame: {
-    marginHorizontal: -4,
-    overflow: "visible",
+    overflow: "hidden",
+    ...(Platform.OS === "web" ? ({ userSelect: "none" } as object) : null),
   },
-  cursorDot: {
-    position: "absolute",
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.ink,
+  meta: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 8,
   },
+  metaSide: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    lineHeight: 14,
+    color: colors.muted,
+    flexShrink: 0,
+    minWidth: 52,
+  },
+  metaEnd: { textAlign: "right" },
+  metaMid: {
+    flex: 1,
+    textAlign: "center",
+    fontFamily: fonts.sansMedium,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  metaLive: { color: colors.inkSoft },
+  metaPin: { color: colors.ink },
 });
