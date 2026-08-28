@@ -123,7 +123,7 @@ async function writeHdSheet(factor) {
 async function main() {
   await paint(CREAM, "icon.png");
   await paint(CREAM, "adaptive-icon.png");
-  const notify = await silhouette(96, 0.82, "notification-icon.png");
+  const notify = await silhouette(256, 0.5, "notification-icon.png");
   await silhouette(1024, 0.7, "monochrome-icon.png");
   await writeHdSheet(6);
   const { scale, spriteW, spriteH } = await sprite();
