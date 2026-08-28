@@ -9,6 +9,7 @@ import { withTrackArtwork } from "@/lib/library/artwork-cache";
 import type { Track } from "@/lib/nas/types";
 import { useTrackActions } from "@/lib/player/track-actions-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts } from "@/lib/theme";
 
 function formatDuration(ms: number): string {
@@ -34,6 +35,7 @@ export function TrackRow({
   playlistId?: string;
   onPress: () => void;
 }) {
+  const { t } = useI18n();
   const { openTrackActions } = useTrackActions();
   const cover = useTrackArtwork(track);
   const display = withTrackArtwork(track);
@@ -69,7 +71,7 @@ export function TrackRow({
           {time ? <Text style={styles.time}>{time}</Text> : null}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Más opciones"
+            accessibilityLabel={t("common.moreOptions")}
             hitSlop={10}
             onPress={() => {
               triggerUiHaptic();

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
+import { useI18n } from "@/lib/i18n/context";
 import { AccountActivitySheet } from "@/components/wealth/account-activity-sheet";
 import { AccountComposerSheet, AssetComposerSheet, CashComposerSheet } from "@/components/wealth/account-composer-sheet";
 import { AssetRow, assetListStyle } from "@/components/wealth/asset-row";
@@ -9,10 +10,11 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { assetPosition } from "@/lib/wealth/compute";
 import { formatEuro } from "@/lib/wealth/money";
-import { ACCOUNT_KIND_LABEL, type WealthAccount, type WealthAsset } from "@/lib/wealth/types";
+import { ACCOUNT_KIND_LABEL, accountDisplayName, type WealthAccount, type WealthAsset } from "@/lib/wealth/types";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 
 export function WealthCatalog() {
+  const { t } = useI18n();
   const { assets, balanceOf, totalOf } = useWealth();
   const accounts = useLiveAccounts();
   const [accountOpen, setAccountOpen] = useState(false);
@@ -61,13 +63,13 @@ export function WealthCatalog() {
   return (
     <>
       <Screen>
-        <Text style={type.pageTitle}>Libro</Text>
+        <Text style={type.pageTitle}>{t("chrome.ledger")}</Text>
 
         <View style={styles.section}>
           <View style={styles.sectionHead}>
-            <Text style={type.sectionTitle}>Cuentas</Text>
+            <Text style={type.sectionTitle}>{t("wealth.accounts")}</Text>
             <Pressable
-              accessibilityLabel="Nueva cuenta"
+              accessibilityLabel={t("wealth.newAccount")}
               onPress={() => {
                 triggerUiHaptic();
                 setAccountOpen(true);
@@ -89,12 +91,12 @@ export function WealthCatalog() {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityState={{ expanded: hasBody ? open : undefined }}
-                    accessibilityLabel={`${account.name}, ${formatEuro(total)}`}
+                    accessibilityLabel={`${accountDisplayName(account)}, ${formatEuro(total)}`}
                     accessibilityHint={
                       hasBody
                         ? open
-                          ? "Pulsa para plegar. Mantén pulsado para abrir la cuenta."
-                          : "Pulsa para desplegar. Mantén pulsado para abrir la cuenta."
+                          ? t("wealth.expandA11y")
+                          : t("wealth.collapseA11y")
                         : undefined
                     }
                     delayLongPress={350}
@@ -113,7 +115,7 @@ export function WealthCatalog() {
                       )
                     ) : null}
                     <View style={styles.accountMeta}>
-                      <Text style={styles.accountName}>{account.name}</Text>
+                      <Text style={styles.accountName}>{accountDisplayName(account)}</Text>
                       <Text style={type.meta}>{ACCOUNT_KIND_LABEL[account.kind]}</Text>
                     </View>
                     <Text style={styles.accountBal}>{formatEuro(total)}</Text>
@@ -137,15 +139,15 @@ export function WealthCatalog() {
               );
             })
           ) : (
-            <Text style={type.body}>Aún no hay cuentas.</Text>
+            <Text style={type.body}>{t("wealth.emptyAccounts")}</Text>
           )}
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHead}>
-            <Text style={type.sectionTitle}>{unassigned.length ? "Sin cuenta" : "Inversiones"}</Text>
+            <Text style={type.sectionTitle}>{unassigned.length ? t("wealth.noAccount") : t("wealth.assets")}</Text>
             <Pressable
-              accessibilityLabel="Nueva inversión"
+              accessibilityLabel={t("wealth.newAsset")}
               onPress={() => openAsset(null)}
             >
               <Plus size={20} color={colors.ink} strokeWidth={1.8} />
@@ -163,9 +165,7 @@ export function WealthCatalog() {
               ))}
             </View>
           ) : holdings.length ? null : (
-            <Text style={type.body}>
-              Añade una inversión y asígnala a una cuenta (MyInvestor, etc.) para agrupar efectivo y posiciones.
-            </Text>
+            <Text style={type.body}>{t("wealth.emptyUnassignedHint")}</Text>
           )}
         </View>
       </Screen>
@@ -203,10 +203,11 @@ export function WealthCatalog() {
 }
 
 function CashRow({ amount, onPress }: { amount: number; onPress: () => void }) {
+  const { t } = useI18n();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Efectivo, ${formatEuro(amount)}`}
+      accessibilityLabel={`${t("wealth.cashEuro")}, ${formatEuro(amount)}`}
       onPress={onPress}
       style={({ pressed }) => [styles.cashRow, { opacity: pressed ? 0.72 : 1 }]}
     >
@@ -214,8 +215,8 @@ function CashRow({ amount, onPress }: { amount: number; onPress: () => void }) {
         <Text style={styles.cashMarkText}>€</Text>
       </View>
       <View style={styles.cashMeta}>
-        <Text style={styles.cashName}>Efectivo</Text>
-        <Text style={styles.cashSub}>Disponible</Text>
+        <Text style={styles.cashName}>{t("wealth.cashA11y")}</Text>
+        <Text style={styles.cashSub}>{t("wealth.available")}</Text>
       </View>
       <Text style={styles.cashValue}>{formatEuro(amount)}</Text>
     </Pressable>

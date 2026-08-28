@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { Platform } from "react-native";
 import type { NasSettings } from "@/lib/settings/storage";
 import { nasBaseUrl, videoSourceSettings } from "@/lib/settings/storage";
@@ -28,7 +29,7 @@ async function webGet(nasUrl: string, headers: Record<string, string>, method = 
     }
     return response;
   }
-  return last ?? new Response("No hay proxy del NAS.", { status: 502 });
+  return last ?? new Response(t("nasExtra.noNasProxy"), { status: 502 });
 }
 
 function encodeDavPath(path: string): string {
@@ -93,14 +94,14 @@ export function createVideoDavClient(settings: NasSettings, password: string) {
 
     const listed = await davFetch(dirPath);
     const listedBody = await listed.text();
-    if (listed.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+    if (listed.status === 401) throw new Error(t("nas.badAuth"));
     if (!listed.ok) {
       if (listed.status === 404) {
         throw new Error(
-          `No se encuentra «${path.replace(/\/+$/, "") || "/"}» en el NAS. Comprueba la carpeta de vídeo en Ajustes.`,
+          t("nasExtra.videoPathMissing", { path: path.replace(/\/+$/, "") || "/" }),
         );
       }
-      throw new Error(`El NAS respondió HTTP ${listed.status}.`);
+      throw new Error(t("nasExtra.httpResponded", { status: listed.status }));
     }
     return parseHtmlIndex(listedBody, davPath.replace(/\/+$/, "") || "/");
   }

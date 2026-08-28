@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
+import { useI18n } from "@/lib/i18n/context";
 import { dueToday, dueTomorrow } from "@/lib/productivity/dates";
 import { useActiveProjects, useProductivity } from "@/lib/productivity/productivity-context";
-import { INBOX_PROJECT_ID } from "@/lib/productivity/types";
+import { INBOX_PROJECT_ID, projectDisplayName } from "@/lib/productivity/types";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
@@ -19,11 +20,12 @@ export function TaskComposerSheet({
   defaultProjectId?: string | null;
   defaultDue?: "none" | "today" | "tomorrow";
 }) {
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar nueva tarea"
+      accessibilityCloseLabel={t("focus.closeNewTask")}
       viewportRatio={0.72}
     >
       <TaskComposerBody
@@ -47,6 +49,7 @@ function TaskComposerBody({
   defaultDue: "none" | "today" | "tomorrow";
   onDone: () => void;
 }) {
+  const { t } = useI18n();
   const { createTask } = useProductivity();
   const projects = useActiveProjects();
   const [title, setTitle] = useState("");
@@ -83,11 +86,11 @@ function TaskComposerBody({
 
   return (
     <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Text style={type.sectionTitle}>Nueva tarea</Text>
+      <Text style={type.sectionTitle}>{t("focus.newTask")}</Text>
       <TextInput
         value={title}
         onChangeText={setTitle}
-        placeholder="Título"
+        placeholder={t("focus.title")}
         placeholderTextColor={colors.muted}
         autoFocus
         style={styles.input}
@@ -97,12 +100,12 @@ function TaskComposerBody({
       <TextInput
         value={notes}
         onChangeText={setNotes}
-        placeholder="Notas (opcional)"
+        placeholder={t("focus.notesOptional")}
         placeholderTextColor={colors.muted}
         multiline
         style={[styles.input, styles.notes]}
       />
-      <Text style={type.label}>Proyecto</Text>
+      <Text style={type.label}>{t("focus.project")}</Text>
       <View style={styles.chips}>
         {projects.map((project) => {
           const active = project.id === projectId;
@@ -116,18 +119,18 @@ function TaskComposerBody({
               style={[styles.chip, active && styles.chipOn]}
             >
               <View style={[styles.dot, { backgroundColor: project.color }]} />
-              <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{project.name}</Text>
+              <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{projectDisplayName(project)}</Text>
             </Pressable>
           );
         })}
       </View>
-      <Text style={type.label}>Fecha</Text>
+      <Text style={type.label}>{t("focus.date")}</Text>
       <View style={styles.chips}>
         {(
           [
-            ["none", "Sin fecha"],
-            ["today", "Hoy"],
-            ["tomorrow", "Mañana"],
+            ["none", t("dates.noDate")],
+            ["today", t("dates.today")],
+            ["tomorrow", t("dates.tomorrow")],
           ] as const
         ).map(([id, label]) => {
           const active = due === id;
@@ -154,7 +157,7 @@ function TaskComposerBody({
           { opacity: !title.trim() || busy ? 0.4 : pressed ? 0.86 : 1 },
         ]}
       >
-        <Text style={styles.submitText}>{busy ? "…" : "Crear"}</Text>
+        <Text style={styles.submitText}>{busy ? "…" : t("common.create")}</Text>
       </Pressable>
     </SheetScrollView>
   );

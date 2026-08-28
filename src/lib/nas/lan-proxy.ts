@@ -1,13 +1,15 @@
+import { t } from "@/lib/i18n/runtime";
+
 const LAN_HOST =
   /^(localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})$/;
 
 export function parseLanUrl(raw: string): URL {
   const url = new URL(raw);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Solo HTTP/HTTPS en la LAN.");
+    throw new Error(t("nasExtra.lanHttpOnly"));
   }
   if (!LAN_HOST.test(url.hostname)) {
-    throw new Error("El destino tiene que ser una IP de la LAN.");
+    throw new Error(t("nasExtra.lanIpOnly"));
   }
   return url;
 }
@@ -56,7 +58,7 @@ export async function relayLanGet(request: Request): Promise<Response | null> {
     return await relayLanRequest(target, "GET", headers);
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "Proxy del NAS no válido." },
+      { error: error instanceof Error ? error.message : t("nasExtra.nasProxyInvalid") },
       { status: 400 },
     );
   }

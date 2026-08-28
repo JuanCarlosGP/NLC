@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useActiveProjects, useProductivity } from "@/lib/productivity/productivity-context";
 import { useWealth } from "@/lib/wealth/wealth-context";
 import { DownloadSheet } from "@/components/settings/download-sheet";
+import { NasExplorerSheet } from "@/components/settings/nas-explorer-sheet";
 import { OfflineSheet } from "@/components/settings/offline-sheet";
 import { LocalFolderSheet } from "@/components/settings/local-folder-sheet";
 import { SourceConfigSheet } from "@/components/settings/source-config-sheet";
@@ -28,6 +29,7 @@ import {
   videoSourceSettings,
   wealthSourceSettings,
 } from "@/lib/settings/storage";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts, type } from "@/lib/theme";
 import { USE_NATIVE_DRIVER } from "@/lib/use-native-driver";
 import { useZone, isMediaZone } from "@/lib/zone/zone-context";
@@ -44,14 +46,16 @@ export default function SettingsScreen() {
   const projects = useActiveProjects();
   const [clearOpen, setClearOpen] = useState(false);
   const [clearBusy, setClearBusy] = useState(false);
+  const { t, locale, setLocale } = useI18n();
   const { settings, setSettings, password, setPassword, feedback, connected, videoConnected, wealthConnected, focusConnected } = nas;
   const [configOpen, setConfigOpen] = useState(false);
   const [localOpen, setLocalOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [zonesOpen, setZonesOpen] = useState(false);
+  const [explorerOpen, setExplorerOpen] = useState(false);
   const [pushStatus, setPushStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
-  const [pushSummary, setPushSummary] = useState("Toca para enviar una prueba");
+  const [pushSummary, setPushSummary] = useState(() => t("settings.pushIdle"));
   const videoSettings = videoSourceSettings(settings);
   const podcastSettings = podcastSourceSettings(settings);
   const wealthSettings = wealthSourceSettings(settings);
@@ -60,48 +64,50 @@ export default function SettingsScreen() {
   const videoReady = videoConnected;
   const downloadSummary = download.settings.enabled
     ? `${download.settings.host}:${download.settings.port}`
-    : "Desactivado";
+    : t("common.disabled");
 
   useEffect(() => {
     if (settings.sourceKind === "webdav") return;
     setSettings({
       ...settings,
       sourceKind: "webdav",
-      host: settings.host || "192.168.1.106",
       port: settings.port === "4533" ? "5005" : settings.port || "5005",
-      username: settings.username || "Viewer",
-      sharePath: settings.sharePath,
       useHttps: false,
     });
-    if (!password) setPassword("Viewer");
-  }, [password, setPassword, setSettings, settings]);
+  }, [setSettings, settings]);
 
   const localSummary = settings.localFolderUri
-    ? settings.localFolderName || "Carpeta del teléfono"
-    : "Ninguna";
+    ? settings.localFolderName || t("common.phoneFolder")
+    : t("common.none");
   const podcastLocalSummary = settings.podcastLocalFolderUri
-    ? settings.podcastLocalFolderName || "Carpeta del teléfono"
+    ? settings.podcastLocalFolderName || t("common.phoneFolder")
     : settings.localFolderUri
-      ? `${settings.localFolderName || "Música"} / Podcasts`
-      : "Ninguna";
+      ? `${settings.localFolderName || t("settings.music")} / ${t("explorer.podcasts")}`
+      : t("common.none");
   const videoLocalSummary = settings.videoLocalFolderUri
-    ? settings.videoLocalFolderName || "Carpeta del teléfono"
-    : "Ninguna";
+    ? settings.videoLocalFolderName || t("common.phoneFolder")
+    : t("common.none");
   const wealthLocalSummary = settings.wealthLocalFolderUri
-    ? settings.wealthLocalFolderName || "Carpeta del teléfono"
-    : "Ninguna";
+    ? settings.wealthLocalFolderName || t("common.phoneFolder")
+    : t("common.none");
   const focusLocalSummary = settings.focusLocalFolderUri
-    ? settings.focusLocalFolderName || "Carpeta del teléfono"
-    : "Ninguna";
+    ? settings.focusLocalFolderName || t("common.phoneFolder")
+    : t("common.none");
   const nasFeedback = feedback?.text;
   const downloadFeedback = download.feedback && !downloadOpen ? download.feedback.text : null;
   const mediaZone = zone === "focus" || zone === "wealth" ? "music" : zone;
   const zoneReady = offline.readyTracks.filter((item) => item.kind === mediaZone).length;
+  const offlineCountLabel = (n: number) =>
+    mediaZone === "podcast"
+      ? t(n === 1 ? "settings.podcastOne" : "settings.podcastMany", { count: n })
+      : mediaZone === "video"
+        ? t(n === 1 ? "settings.chapterOne" : "settings.chapterMany", { count: n })
+        : t(n === 1 ? "settings.songOne" : "settings.songMany", { count: n });
   const offlineSummary = zoneReady
-    ? `${zoneReady} ${mediaZone === "podcast" ? (zoneReady === 1 ? "podcast" : "podcasts") : mediaZone === "video" ? (zoneReady === 1 ? "capítulo" : "capítulos") : zoneReady === 1 ? "canción" : "canciones"} · ${formatOfflineBytes(offline.readyTracks.filter((item) => item.kind === mediaZone).reduce((sum, item) => sum + item.localBytes, 0))}`
+    ? `${offlineCountLabel(zoneReady)} · ${formatOfflineBytes(offline.readyTracks.filter((item) => item.kind === mediaZone).reduce((sum, item) => sum + item.localBytes, 0))}`
     : mediaZone === "video"
-      ? "Ningún capítulo en NLC"
-      : "Nada guardado";
+      ? t("settings.offlineEmptyVideo")
+      : t("settings.offlineEmpty");
   const hasLocalFolder =
     zone === "video"
       ? Boolean(settings.videoLocalFolderUri)
@@ -110,13 +116,13 @@ export default function SettingsScreen() {
         : Boolean(settings.localFolderUri);
   const offlineHint =
     zone === "video"
-      ? "La videoteca es la carpeta de vídeo. Aquí solo lo que guardas en NLC, capítulo a capítulo."
+      ? t("settings.offlineHintVideo")
       : hasLocalFolder
-        ? "Lo que NLC guarda del NAS en el teléfono. La carpeta local no entra: ya está aquí."
-        : "Lo que NLC guarda del NAS en el teléfono, para oír sin estar en casa.";
+        ? t("settings.offlineHintLocal")
+        : t("settings.offlineHintNas");
 
   const pathSummary = (host: string, port: string, path: string) =>
-    path ? `${host}:${port} · ${path}` : `${host}:${port} · Sin ruta`;
+    path ? `${host}:${port} · ${path}` : `${host}:${port} · ${t("common.noPath")}`;
   const musicSummary = pathSummary(settings.host, settings.port, settings.sharePath);
   const podcastSummary = pathSummary(podcastSettings.host, podcastSettings.port, podcastSettings.sharePath);
   const videoSummary = pathSummary(videoSettings.host, videoSettings.port, videoSettings.sharePath);
@@ -126,7 +132,7 @@ export default function SettingsScreen() {
   const sendTest = async () => {
     if (pushStatus === "sending") return;
     setPushStatus("sending");
-    setPushSummary("Enviando prueba…");
+    setPushSummary(t("settings.pushSending"));
     const result = await sendTestPush();
     setPushStatus(result.ok ? "ok" : "error");
     setPushSummary(result.message);
@@ -135,16 +141,16 @@ export default function SettingsScreen() {
   return (
     <Screen>
       <View style={styles.heading}>
-        <Text style={[type.pageTitle, styles.title]}>Ajustes</Text>
+        <Text style={[type.pageTitle, styles.title]}>{t("settings.title")}</Text>
         <ZoneSwitch />
       </View>
 
       <View style={styles.groups}>
         {zone === "focus" ? (
           <>
-            <SettingsGroup label="Fuente" hint={nasFeedback} hintColor={feedback?.color}>
+            <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
               <SettingsRow
-                title="Carpeta compartida"
+                title={t("settings.shareFolder")}
                 summary={focusSummary}
                 ready={focusConnected}
                 showStatus
@@ -155,7 +161,7 @@ export default function SettingsScreen() {
               />
               <View style={styles.divider} />
               <SettingsRow
-                title="Carpeta local"
+                title={t("settings.localFolder")}
                 summary={focusLocalSummary}
                 ready={Boolean(settings.focusLocalFolderUri)}
                 showStatus
@@ -165,16 +171,15 @@ export default function SettingsScreen() {
                 }}
               />
             </SettingsGroup>
-            <SettingsGroup
-              label="Datos"
-              hint="Las tareas, proyectos y recordatorios viven en el teléfono. Si hay fuente, se copia nlc-tasks.json al NAS o a la carpeta del móvil."
-            >
+            <SettingsGroup label={t("settings.data")} hint={t("settings.focusDataHint")}>
               <SettingsRow
-                title="Proyectos"
+                title={t("settings.projects")}
                 summary={
                   projects.length
-                    ? `${projects.length} ${projects.length === 1 ? "proyecto" : "proyectos"}`
-                    : "Solo la bandeja"
+                    ? t(projects.length === 1 ? "settings.projectOne" : "settings.projectMany", {
+                        count: projects.length,
+                      })
+                    : t("settings.inboxOnly")
                 }
                 onPress={() => {
                   triggerUiHaptic();
@@ -183,8 +188,8 @@ export default function SettingsScreen() {
               />
               <View style={styles.divider} />
               <SettingsRow
-                title="Vaciar hechas"
-                summary="Borra las tareas marcadas como hechas"
+                title={t("settings.clearDone")}
+                summary={t("settings.clearDoneSummary")}
                 onPress={() => {
                   triggerUiHaptic();
                   setClearOpen(true);
@@ -196,9 +201,9 @@ export default function SettingsScreen() {
 
         {zone === "wealth" ? (
           <>
-            <SettingsGroup label="Fuente" hint={nasFeedback} hintColor={feedback?.color}>
+            <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
               <SettingsRow
-                title="Carpeta compartida"
+                title={t("settings.shareFolder")}
                 summary={wealthSummary}
                 ready={wealthConnected}
                 showStatus
@@ -209,7 +214,7 @@ export default function SettingsScreen() {
               />
               <View style={styles.divider} />
               <SettingsRow
-                title="Carpeta local"
+                title={t("settings.localFolder")}
                 summary={wealthLocalSummary}
                 ready={Boolean(settings.wealthLocalFolderUri)}
                 showStatus
@@ -219,16 +224,15 @@ export default function SettingsScreen() {
                 }}
               />
             </SettingsGroup>
-            <SettingsGroup
-              label="Datos"
-              hint="Cuentas, movimientos, inversiones y objetivos viven en el teléfono. Si hay fuente, se copia nlc-wealth.json al NAS o a la carpeta del móvil."
-            >
+            <SettingsGroup label={t("settings.data")} hint={t("settings.wealthDataHint")}>
             <SettingsRow
-              title="Inversiones"
+              title={t("settings.assets")}
               summary={
                 positions.length
-                  ? `${positions.length} ${positions.length === 1 ? "posición" : "posiciones"}`
-                  : "Ninguna"
+                  ? t(positions.length === 1 ? "settings.positionOne" : "settings.positionMany", {
+                      count: positions.length,
+                    })
+                  : t("common.none")
               }
               onPress={() => {
                 triggerUiHaptic();
@@ -237,11 +241,11 @@ export default function SettingsScreen() {
             />
             <View style={styles.divider} />
             <SettingsRow
-              title="Movimientos"
+              title={t("settings.activity")}
               summary={
                 txs.length
-                  ? `${txs.length} ${txs.length === 1 ? "apunte" : "apuntes"}`
-                  : "Ninguno"
+                  ? t(txs.length === 1 ? "settings.txOne" : "settings.txMany", { count: txs.length })
+                  : t("common.noneMasc")
               }
               onPress={() => {
                 triggerUiHaptic();
@@ -250,8 +254,13 @@ export default function SettingsScreen() {
             />
             <View style={styles.divider} />
             <SettingsRow
-              title="Cuentas"
-              summary={`${accounts.filter((item) => !item.archived).length} ${accounts.filter((item) => !item.archived).length === 1 ? "cuenta" : "cuentas"}`}
+              title={t("settings.accounts")}
+              summary={t(
+                accounts.filter((item) => !item.archived).length === 1
+                  ? "settings.accountOne"
+                  : "settings.accountMany",
+                { count: accounts.filter((item) => !item.archived).length },
+              )}
               onPress={() => {
                 triggerUiHaptic();
                 router.push("/wealth/accounts");
@@ -259,11 +268,13 @@ export default function SettingsScreen() {
             />
             <View style={styles.divider} />
             <SettingsRow
-              title="Objetivos"
+              title={t("settings.goals")}
               summary={
                 goalProgress.length
-                  ? `${goalProgress.length} ${goalProgress.length === 1 ? "objetivo" : "objetivos"}`
-                  : "Ninguno"
+                  ? t(goalProgress.length === 1 ? "settings.goalOne" : "settings.goalMany", {
+                      count: goalProgress.length,
+                    })
+                  : t("common.noneMasc")
               }
               onPress={() => {
                 triggerUiHaptic();
@@ -275,9 +286,9 @@ export default function SettingsScreen() {
         ) : null}
 
         {zone === "music" ? (
-          <SettingsGroup label="Fuente" hint={nasFeedback} hintColor={feedback?.color}>
+          <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
             <SettingsRow
-              title="Carpeta compartida"
+              title={t("settings.shareFolder")}
               summary={musicSummary}
               ready={shareReady}
               showStatus
@@ -288,7 +299,7 @@ export default function SettingsScreen() {
             />
             <View style={styles.divider} />
             <SettingsRow
-              title="Carpeta local"
+              title={t("settings.localFolder")}
               summary={localSummary}
               ready={Boolean(settings.localFolderUri)}
               showStatus
@@ -302,9 +313,9 @@ export default function SettingsScreen() {
 
         {zone === "podcast" ? (
           <>
-            <SettingsGroup label="Fuente" hint={nasFeedback} hintColor={feedback?.color}>
+            <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
               <SettingsRow
-                title="Carpeta compartida"
+                title={t("settings.shareFolder")}
                 summary={podcastSummary}
                 ready={shareReady}
                 showStatus
@@ -315,7 +326,7 @@ export default function SettingsScreen() {
               />
               <View style={styles.divider} />
               <SettingsRow
-                title="Carpeta local"
+                title={t("settings.localFolder")}
                 summary={podcastLocalSummary}
                 ready={Boolean(settings.podcastLocalFolderUri || settings.localFolderUri)}
                 showStatus
@@ -329,9 +340,9 @@ export default function SettingsScreen() {
         ) : null}
 
         {zone === "video" ? (
-          <SettingsGroup label="Fuente" hint={nasFeedback} hintColor={feedback?.color}>
+          <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
             <SettingsRow
-              title="Carpeta de vídeo"
+              title={t("settings.videoFolder")}
               summary={videoSummary}
               ready={videoReady}
               showStatus
@@ -342,7 +353,7 @@ export default function SettingsScreen() {
             />
             <View style={styles.divider} />
             <SettingsRow
-              title="Carpeta local"
+              title={t("settings.localFolder")}
               summary={videoLocalSummary}
               ready={Boolean(settings.videoLocalFolderUri)}
               showStatus
@@ -356,9 +367,9 @@ export default function SettingsScreen() {
 
         {isMediaZone(zone) ? (
           <>
-            <SettingsGroup label="Descargar" hint={downloadFeedback} hintColor={download.feedback?.color}>
+            <SettingsGroup label={t("settings.download")} hint={downloadFeedback} hintColor={download.feedback?.color}>
               <SettingsRow
-                title="yt-dlp"
+                title={t("settings.ytdlp")}
                 summary={downloadSummary}
                 ready={download.settings.enabled}
                 onPress={() => {
@@ -368,9 +379,15 @@ export default function SettingsScreen() {
               />
             </SettingsGroup>
 
-            <SettingsGroup label="Espacio interno" hint={offlineHint}>
+            <SettingsGroup label={t("settings.offline")} hint={offlineHint}>
               <SettingsRow
-                title={zone === "video" ? "En el teléfono" : zone === "podcast" ? "Episodios" : "Música"}
+                title={
+                  zone === "video"
+                    ? t("settings.onPhone")
+                    : zone === "podcast"
+                      ? t("settings.episodes")
+                      : t("settings.music")
+                }
                 summary={offlineSummary}
                 ready={zoneReady > 0}
                 showStatus
@@ -383,10 +400,10 @@ export default function SettingsScreen() {
           </>
         ) : null}
 
-        <SettingsGroup label="Apartados">
+        <SettingsGroup label={t("settings.zones")}>
           <SettingsRow
-            title="Selector de zona"
-            summary={zoneVisibilitySummary(enabled)}
+            title={t("settings.zonePicker")}
+            summary={zoneVisibilitySummary(enabled, t)}
             onPress={() => {
               triggerUiHaptic();
               setZonesOpen(true);
@@ -395,17 +412,17 @@ export default function SettingsScreen() {
         </SettingsGroup>
 
         <SettingsGroup
-          label="App"
+          label={t("settings.app")}
           hint={
             update.apkStatus === "apk"
-              ? "La app baja NLC.apk de GitHub y abre el instalador. Hay que confirmar en el teléfono."
+              ? t("settings.apkHint")
               : update.otaStatus === "available"
-                ? "La OTA actualiza la app sin instalar otra APK."
+                ? t("settings.otaHint")
                 : null
           }
         >
           <SettingsRow
-            title="Versión"
+            title={t("settings.version")}
             summary={update.buildLabel}
             chevron={false}
             onPress={() => {
@@ -415,7 +432,7 @@ export default function SettingsScreen() {
           />
           <View style={styles.divider} />
           <SettingsRow
-            title="APK"
+            title={t("settings.apk")}
             summary={update.apkSummary}
             ready={update.apkStatus === "current"}
             showStatus={update.apkStatus === "current" || update.apkStatus === "apk"}
@@ -429,7 +446,7 @@ export default function SettingsScreen() {
           />
           <View style={styles.divider} />
           <SettingsRow
-            title="OTA"
+            title={t("settings.ota")}
             summary={update.otaSummary}
             ready={update.otaStatus === "current"}
             showStatus={update.otaStatus === "current" || update.otaStatus === "available"}
@@ -443,7 +460,7 @@ export default function SettingsScreen() {
           />
           <View style={styles.divider} />
           <SettingsRow
-            title="Notificaciones"
+            title={t("settings.notifications")}
             summary={pushSummary}
             ready={pushStatus === "ok"}
             showStatus={pushStatus === "ok" || pushStatus === "error"}
@@ -452,6 +469,33 @@ export default function SettingsScreen() {
             onPress={() => {
               triggerUiHaptic();
               void sendTest();
+            }}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            title={t("language.title")}
+            summary={locale === "es" ? t("language.spanish") : t("language.english")}
+            onPress={() => {
+              triggerUiHaptic();
+              setLocale(locale === "en" ? "es" : "en");
+            }}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            title={t("settings.folders")}
+            summary={t("settings.foldersHint")}
+            onPress={() => {
+              triggerUiHaptic();
+              setExplorerOpen(true);
+            }}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            title={t("settings.onboarding")}
+            summary={t("settings.onboardingReplay")}
+            onPress={() => {
+              triggerUiHaptic();
+              void nas.replayOnboarding();
             }}
           />
         </SettingsGroup>
@@ -545,12 +589,18 @@ export default function SettingsScreen() {
       <DownloadSheet open={downloadOpen} onOpenChange={setDownloadOpen} download={download} zone={zone} />
       <OfflineSheet open={offlineOpen} onOpenChange={setOfflineOpen} lockedKind={zone === "focus" || zone === "wealth" ? "music" : zone} />
       <ZoneVisibilitySheet open={zonesOpen} onOpenChange={setZonesOpen} />
+      <NasExplorerSheet
+        open={explorerOpen}
+        onOpenChange={setExplorerOpen}
+        settings={settings}
+        password={password}
+      />
       <ConfirmDialog
         open={clearOpen}
-        title="Vaciar hechas"
-        message="Se borran las tareas en Hecho. No se pueden recuperar."
-        confirmLabel="Vaciar"
-        cancelLabel="Cancelar"
+        title={t("settings.clearDoneTitle")}
+        message={t("settings.clearDoneMessage")}
+        confirmLabel={t("settings.clearDoneAction")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={clearBusy}
         onCancel={() => {
@@ -637,6 +687,7 @@ function SettingsRow({
 }
 
 function StatusDot({ on }: { on: boolean }) {
+  const { t } = useI18n();
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -656,7 +707,7 @@ function StatusDot({ on }: { on: boolean }) {
   }, [on, pulse]);
 
   return (
-    <View style={styles.statusWrap} accessibilityLabel={on ? "Conectado" : "Sin conexión"}>
+    <View style={styles.statusWrap} accessibilityLabel={on ? t("common.connected") : t("common.disconnected")}>
       {on ? (
         <Animated.View
           pointerEvents="none"

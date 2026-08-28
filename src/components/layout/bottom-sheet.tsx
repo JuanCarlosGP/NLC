@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheetProvider } from "@/components/layout/sheet-context";
 import { useSheetDragDismiss } from "@/components/layout/use-sheet-drag-dismiss";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
+import { t } from "@/lib/i18n/runtime";
 import { colors } from "@/lib/theme";
 
 const OPEN_FADE_MS = 180;
@@ -36,7 +37,7 @@ export function BottomSheet({
   open,
   onOpenChange,
   children,
-  accessibilityCloseLabel = "Cerrar",
+  accessibilityCloseLabel = t("sheet.close"),
   sheetBackgroundColor,
   viewportRatio = DEFAULT_VIEWPORT_RATIO,
   expandable = false,
@@ -187,7 +188,7 @@ export function BottomSheet({
 
   const handle = (
     <View
-      accessibilityLabel={expandable ? "Arrastrar para ampliar o cerrar" : "Arrastrar para cerrar"}
+      accessibilityLabel={expandable ? t("sheet.dragExpandOrClose") : t("sheet.dragClose")}
       accessibilityRole="adjustable"
       collapsable={false}
       {...(Platform.OS === "web" ? ({ "data-sheet-drag-handle": "true" } as object) : null)}

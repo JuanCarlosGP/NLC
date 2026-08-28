@@ -4,6 +4,7 @@ import { Play } from "lucide-react-native";
 import { useVideoContinue } from "@/hooks/use-video-continue";
 import { watchRoute } from "@/lib/video/onepiece";
 import { isWatchFinished, type VideoWatchEntry } from "@/lib/video/watch-history";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
@@ -14,24 +15,26 @@ function progressRatio(entry: VideoWatchEntry): number {
   return Math.min(1, Math.max(0, entry.positionSec / entry.durationSec));
 }
 
-function progressLabel(entry: VideoWatchEntry): string | null {
-  if (isWatchFinished(entry)) return "Terminado";
+function progressLabel(entry: VideoWatchEntry, t: (path: string, vars?: Record<string, string | number>) => string): string | null {
+  if (isWatchFinished(entry)) return t("videoUi.finished");
   if (entry.positionSec < 8 || entry.durationSec <= 0) return null;
   const left = Math.max(1, Math.round((entry.durationSec - entry.positionSec) / 60));
-  return `${left} min restantes`;
+  return t("videoUi.minLeft", { count: left });
 }
 
 function ContinueCard({
   label,
   entry,
   onPress,
+  t,
 }: {
   label: string;
   entry: VideoWatchEntry;
   onPress: () => void;
+  t: (path: string, vars?: Record<string, string | number>) => string;
 }) {
   const ratio = progressRatio(entry);
-  const remaining = progressLabel(entry);
+  const remaining = progressLabel(entry, t);
   const place = [entry.arcTitle].filter((value) => value && value !== entry.seriesTitle).join(" · ");
   return (
     <Pressable
@@ -67,6 +70,7 @@ function ContinueCard({
 }
 
 export function ContinueWatching() {
+  const { t } = useI18n();
   const router = useRouter();
   const { rows } = useVideoContinue();
 
@@ -82,20 +86,20 @@ export function ContinueWatching() {
   if (!rows.length) {
     return (
       <View style={styles.block}>
-        <Text style={type.label}>Continuar</Text>
-        <Text style={type.meta}>Cuando reproduzcas un capítulo, aparecerá aquí para continuar.</Text>
+        <Text style={type.label}>{t("videoUi.continue")}</Text>
+        <Text style={type.meta}>{t("videoUi.continueHint")}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.block}>
-      <Text style={type.label}>Continuar</Text>
+      <Text style={type.label}>{t("videoUi.continue")}</Text>
       {rows.map(({ last, next }) => (
         <View key={last.path} style={styles.series}>
           <Text style={styles.seriesTitle}>{last.seriesTitle}</Text>
-          <ContinueCard label="Seguir viendo" entry={last} onPress={() => open(last, true)} />
-          {next ? <ContinueCard label="Siguiente" entry={next} onPress={() => open(next, false)} /> : null}
+          <ContinueCard label={t("videoUi.resume")} entry={last} t={t} onPress={() => open(last, true)} />
+          {next ? <ContinueCard label={t("videoUi.next")} entry={next} t={t} onPress={() => open(next, false)} /> : null}
         </View>
       ))}
     </View>

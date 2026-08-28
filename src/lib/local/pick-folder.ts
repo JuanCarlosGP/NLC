@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { Platform } from "react-native";
 
 export type PickedFolder = {
@@ -21,9 +22,9 @@ function nameFromUri(uri: string): string {
   try {
     const decoded = decodeURIComponent(uri);
     const tail = decoded.split("/").pop() ?? decoded;
-    return tail.replace(/^.*:/, "") || "Carpeta";
+    return tail.replace(/^.*:/, "") || t("nasExtra.folderFallback");
   } catch {
-    return "Carpeta";
+    return t("nasExtra.folderFallback");
   }
 }
 
@@ -31,7 +32,7 @@ export async function pickLocalFolder(): Promise<PickedFolder | null> {
   if (Platform.OS === "web") {
     const picker = (globalThis as { showDirectoryPicker?: () => Promise<WebDirHandle> }).showDirectoryPicker;
     if (!picker) {
-      throw new Error("Este navegador no permite elegir carpetas. Usa Chrome o la APK.");
+      throw new Error(t("nasExtra.browserNoFolders"));
     }
     const handle = await picker();
     const uri = `webdir:${handle.name}`;
@@ -39,7 +40,7 @@ export async function pickLocalFolder(): Promise<PickedFolder | null> {
     return { uri, name: handle.name };
   }
   if (Platform.OS !== "android") {
-    throw new Error("Las carpetas locales se eligen en el teléfono.");
+    throw new Error(t("nasExtra.foldersOnPhone"));
   }
   const { StorageAccessFramework } = await import("expo-file-system/legacy");
   const result = await StorageAccessFramework.requestDirectoryPermissionsAsync();

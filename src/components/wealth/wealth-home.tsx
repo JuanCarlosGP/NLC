@@ -13,19 +13,25 @@ import { AssetRow, assetListStyle } from "@/components/wealth/asset-row";
 import { TxComposerSheet } from "@/components/wealth/tx-composer-sheet";
 import { TxRow, txListStyle } from "@/components/wealth/tx-row";
 import { WealthChart } from "@/components/wealth/wealth-chart";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { formatEuro, formatPct } from "@/lib/wealth/money";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
-import { RANGE_OPTIONS, type WealthAccount, type WealthAsset, type WealthGoal, type WealthHomeTab, type WealthRange, type WealthTxKind } from "@/lib/wealth/types";
-
-const HOME_TABS: { id: WealthHomeTab; label: string }[] = [
-  { id: "wealth", label: "Patrimonio" },
-  { id: "cash", label: "Caja" },
-  { id: "goals", label: "Objetivos" },
-];
+import {
+  ACCOUNT_KIND_LABEL,
+  accountDisplayName,
+  RANGE_OPTIONS,
+  type WealthAccount,
+  type WealthAsset,
+  type WealthGoal,
+  type WealthHomeTab,
+  type WealthRange,
+  type WealthTxKind,
+} from "@/lib/wealth/types";
 
 export function WealthHome() {
+  const { t } = useI18n();
   const router = useRouter();
   const { total, cash, positions, txs, series, rangeChange, balanceOf, holdingsOf, ready, goalProgress } = useWealth();
   const accounts = useLiveAccounts();
@@ -40,6 +46,15 @@ export function WealthHome() {
   const [editingGoal, setEditingGoal] = useState<WealthGoal | null>(null);
   const [previewAccount, setPreviewAccount] = useState<WealthAccount | null>(null);
   const [assetAccountId, setAssetAccountId] = useState<string | null>(null);
+
+  const homeTabs = useMemo(
+    (): { id: WealthHomeTab; label: string }[] => [
+      { id: "wealth", label: t("wealth.title") },
+      { id: "cash", label: t("wealth.cash") },
+      { id: "goals", label: t("wealth.goals") },
+    ],
+    [t],
+  );
 
   const points = useMemo(() => series(range), [range, series]);
   const change = rangeChange(range);
@@ -77,7 +92,7 @@ export function WealthHome() {
         </View>
 
         <View style={styles.tabs}>
-          {HOME_TABS.map((item) => {
+          {homeTabs.map((item) => {
             const on = tab === item.id;
             return (
               <Pressable
@@ -99,19 +114,19 @@ export function WealthHome() {
         <View style={styles.balanceBlock}>
           <Text style={type.label}>
             {tab === "wealth"
-              ? "Total"
+              ? t("wealth.total")
               : tab === "cash"
-                ? "Efectivo"
+                ? t("wealth.cashAmount")
                 : nextGoal
-                  ? `Faltan · ${nextGoal.goal.name}`
-                  : "Objetivos"}
+                  ? t("wealth.remainingGoal", { name: nextGoal.goal.name })
+                  : t("wealth.goals")}
           </Text>
           <View style={styles.balanceRow}>
             <Text style={styles.balance}>
               {ready
                 ? tab === "goals" && !nextGoal
                   ? goalProgress.length
-                    ? "Listo"
+                    ? t("wealth.ready")
                     : "—"
                   : formatEuro(headline)
                 : "…"}
@@ -151,23 +166,23 @@ export function WealthHome() {
 
         <View style={styles.cards}>
           <QuickCard
-            title="Movimientos"
+            title={t("wealth.activity")}
             hint={`${txs.length}`}
-            addLabel="Nuevo movimiento"
+            addLabel={t("wealth.newTx")}
             onPress={() => router.push("/wealth/activity")}
             onAdd={() => openTx("income")}
           />
           <QuickCard
-            title="Inversiones"
+            title={t("wealth.assets")}
             hint={`${positions.length}`}
-            addLabel="Nueva inversión"
+            addLabel={t("wealth.newAsset")}
             onPress={() => router.push("/wealth/assets")}
             onAdd={() => openAsset()}
           />
           <QuickCard
-            title="Cuentas"
+            title={t("wealth.accounts")}
             hint={`${accounts.length}`}
-            addLabel="Nueva cuenta"
+            addLabel={t("wealth.newAccount")}
             onPress={() => router.push("/wealth/accounts")}
             onAdd={() => {
               triggerUiHaptic();
@@ -175,9 +190,9 @@ export function WealthHome() {
             }}
           />
           <QuickCard
-            title="Objetivos"
+            title={t("wealth.goals")}
             hint={`${goalProgress.length}`}
-            addLabel="Nuevo objetivo"
+            addLabel={t("wealth.newGoal")}
             onPress={() => router.push("/wealth/goals")}
             onAdd={() => openGoal()}
           />
@@ -186,9 +201,9 @@ export function WealthHome() {
         {tab === "goals" ? (
           <View style={styles.section}>
             <View style={styles.sectionHead}>
-              <Text style={type.sectionTitle}>Objetivos</Text>
+              <Text style={type.sectionTitle}>{t("wealth.goals")}</Text>
               <Pressable onPress={() => openGoal()}>
-                <Text style={styles.link}>Añadir</Text>
+                <Text style={styles.link}>{t("wealth.add")}</Text>
               </Pressable>
             </View>
             {goalProgress.length ? (
@@ -198,17 +213,15 @@ export function WealthHome() {
                 ))}
               </View>
             ) : (
-              <Text style={type.body}>
-                Fija un importe y NLC estima cuándo llegas según el ritmo de los últimos meses.
-              </Text>
+              <Text style={type.body}>{t("wealth.goalsHint")}</Text>
             )}
           </View>
         ) : tab === "wealth" ? (
           <View style={styles.section}>
             <View style={styles.sectionHead}>
-              <Text style={type.sectionTitle}>Inversiones</Text>
+              <Text style={type.sectionTitle}>{t("wealth.assets")}</Text>
               <Pressable onPress={() => openAsset()}>
-                <Text style={styles.link}>Añadir</Text>
+                <Text style={styles.link}>{t("wealth.add")}</Text>
               </Pressable>
             </View>
             {positions.length ? (
@@ -222,27 +235,27 @@ export function WealthHome() {
                 ))}
               </View>
             ) : (
-              <Text style={type.body}>Aún no hay posiciones. Compra o registra una inversión.</Text>
+              <Text style={type.body}>{t("wealth.emptyPositionsBuy")}</Text>
             )}
           </View>
         ) : (
           <View style={styles.section}>
             <View style={styles.sectionHead}>
-              <Text style={type.sectionTitle}>Cuentas</Text>
+              <Text style={type.sectionTitle}>{t("wealth.accounts")}</Text>
               <Pressable onPress={() => setAccountOpen(true)}>
-                <Text style={styles.link}>Añadir</Text>
+                <Text style={styles.link}>{t("wealth.add")}</Text>
               </Pressable>
             </View>
             {accounts.map((account) => {
               const cashBal = balanceOf(account.id);
               const invested = holdingsOf(account.id);
-              const kindLabel = account.kind === "bank" ? "Banco" : account.kind === "wallet" ? "Monedero" : "Efectivo";
-              const meta = invested > 0.004 ? `${kindLabel} · Invertido ${formatEuro(invested)}` : kindLabel;
+              const kindLabel = ACCOUNT_KIND_LABEL[account.kind];
+              const meta = invested > 0.004 ? `${kindLabel} · ${t("wealth.investedIn", { amount: formatEuro(invested) })}` : kindLabel;
               return (
               <Pressable
                 key={account.id}
                 accessibilityRole="button"
-                accessibilityLabel={`${account.name}, ${formatEuro(cashBal)}`}
+                accessibilityLabel={`${accountDisplayName(account)}, ${formatEuro(cashBal)}`}
                 onPress={() => {
                   triggerUiHaptic();
                   setPreviewAccount(account);
@@ -250,7 +263,7 @@ export function WealthHome() {
                 style={({ pressed }) => [styles.accountRow, { opacity: pressed ? 0.72 : 1 }]}
               >
                 <View>
-                  <Text style={styles.accountName}>{account.name}</Text>
+                  <Text style={styles.accountName}>{accountDisplayName(account)}</Text>
                   <Text style={type.meta}>{meta}</Text>
                 </View>
                 <Text style={styles.accountBal}>{formatEuro(cashBal)}</Text>
@@ -259,7 +272,7 @@ export function WealthHome() {
             })}
             {recent.length ? (
               <View style={styles.section}>
-                <Text style={type.sectionTitle}>Últimos movimientos</Text>
+                <Text style={type.sectionTitle}>{t("wealth.recentActivity")}</Text>
                 <View style={txListStyle}>
                   {recent.map((tx) => (
                     <TxRow key={tx.id} tx={tx} />
@@ -267,7 +280,7 @@ export function WealthHome() {
                 </View>
               </View>
             ) : (
-              <Text style={type.body}>Registra un ingreso para empezar el saldo.</Text>
+              <Text style={type.body}>{t("wealth.registerIncomeHint")}</Text>
             )}
           </View>
         )}
@@ -279,7 +292,7 @@ export function WealthHome() {
               style={({ pressed }) => [styles.action, { opacity: pressed ? 0.86 : 1 }]}
             >
               <Plus size={18} color={colors.void} strokeWidth={2} />
-              <Text style={styles.actionLabel}>Nuevo objetivo</Text>
+              <Text style={styles.actionLabel}>{t("wealth.newGoal")}</Text>
             </Pressable>
           ) : (
             <>
@@ -288,7 +301,7 @@ export function WealthHome() {
                 style={({ pressed }) => [styles.action, { opacity: pressed ? 0.86 : 1 }]}
               >
                 <Search size={18} color={colors.void} strokeWidth={2} />
-                <Text style={styles.actionLabel}>Ingreso</Text>
+                <Text style={styles.actionLabel}>{t("wealth.income")}</Text>
               </Pressable>
               <Pressable
                 onPress={() => openTx(tab === "cash" ? "transfer" : "expense")}
@@ -299,7 +312,7 @@ export function WealthHome() {
                 ) : (
                   <Plus size={18} color={colors.void} strokeWidth={2} />
                 )}
-                <Text style={styles.actionLabel}>{tab === "cash" ? "Traspaso" : "Gasto"}</Text>
+                <Text style={styles.actionLabel}>{tab === "cash" ? t("wealth.transfer") : t("wealth.expense")}</Text>
               </Pressable>
             </>
           )}

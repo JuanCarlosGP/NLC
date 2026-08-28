@@ -1,3 +1,5 @@
+import { t } from "@/lib/i18n/runtime";
+
 export type TaskStatus = "todo" | "doing" | "done";
 
 export type ProdProject = {
@@ -26,8 +28,22 @@ export const INBOX_PROJECT_NAME = "Bandeja";
 
 export const TASK_STATUSES: TaskStatus[] = ["todo", "doing", "done"];
 
+export function statusLabel(status: TaskStatus): string {
+  return t(`focus.status.${status}`);
+}
+
 export const STATUS_LABEL: Record<TaskStatus, string> = {
-  todo: "Por hacer",
-  doing: "En curso",
-  done: "Hecho",
+  get todo() {
+    return statusLabel("todo");
+  },
+  get doing() {
+    return statusLabel("doing");
+  },
+  get done() {
+    return statusLabel("done");
+  },
 };
+
+export function projectDisplayName(project: { id: string; name: string }): string {
+  return project.id === INBOX_PROJECT_ID ? t("focus.inbox") : project.name;
+}

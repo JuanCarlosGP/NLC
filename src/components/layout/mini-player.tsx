@@ -11,6 +11,7 @@ import { useFavorites } from "@/lib/favorites/favorites-context";
 import type { Track } from "@/lib/nas/types";
 import { usePlayer } from "@/lib/player/player-context";
 import { usePlayerUi } from "@/lib/player/player-ui-context";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { USE_NATIVE_DRIVER } from "@/lib/use-native-driver";
 import { colors, fonts, layout } from "@/lib/theme";
@@ -40,6 +41,7 @@ function glassChrome() {
 }
 
 export function MiniPlayerTrack({ track }: { track: Track }) {
+  const { t } = useI18n();
   const { playing, buffering, togglePlay, skipQueue, pause } = usePlayer();
   const { openNowPlaying, dismissMiniPlayer } = usePlayerUi();
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -184,13 +186,13 @@ export function MiniPlayerTrack({ track }: { track: Track }) {
             {track.title}
           </Text>
           <Text numberOfLines={1} style={styles.artist}>
-            {buffering ? "Cargando…" : track.artistName}
+            {buffering ? t("common.loading") : track.artistName}
           </Text>
         </View>
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={liked ? "Quitar de favoritos" : "Añadir a favoritos"}
+        accessibilityLabel={liked ? t("player.favoriteRemove") : t("player.favoriteAdd")}
         hitSlop={8}
         onPress={() => {
           triggerUiHaptic();
@@ -202,7 +204,7 @@ export function MiniPlayerTrack({ track }: { track: Track }) {
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={playing ? "Pausar" : "Reproducir"}
+        accessibilityLabel={playing ? t("common.pause") : t("common.play")}
         hitSlop={12}
         delayLongPress={LONG_PRESS_MS}
         onLongPress={hideAndStop}

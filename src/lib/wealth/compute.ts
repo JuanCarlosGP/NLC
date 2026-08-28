@@ -1,4 +1,5 @@
 import { roundMoney } from "@/lib/wealth/money";
+import { dateLocale, t } from "@/lib/i18n/runtime";
 import { GOAL_SCOPE_LABEL, type WealthAccount, type WealthAsset, type WealthGoal, type WealthQuote, type WealthRange, type WealthTx } from "@/lib/wealth/types";
 
 export type AssetPosition = {
@@ -502,14 +503,14 @@ export function sampleChartPoints(
 
 function localeStamp(at: number, options: Intl.DateTimeFormatOptions): string {
   return new Date(at)
-    .toLocaleDateString("es-ES", options)
+    .toLocaleDateString(dateLocale(), options)
     .replaceAll(".", "")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function localeTime(at: number): string {
-  return new Date(at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  return new Date(at).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit" });
 }
 
 export function formatChartScrub(at: number, range: WealthRange): string {
@@ -522,7 +523,7 @@ export function formatChartScrub(at: number, range: WealthRange): string {
 
 export function formatChartAxis(at: number, range: WealthRange, now = Date.now()): string {
   if (range === "1d") return localeTime(at);
-  if (startOfLocalDay(at) === startOfLocalDay(now)) return "Hoy";
+  if (startOfLocalDay(at) === startOfLocalDay(now)) return t("common.today");
   if (range === "1w") return localeStamp(at, { weekday: "short", day: "numeric", month: "short" });
   const sameYear = new Date(at).getFullYear() === new Date(now).getFullYear();
   return localeStamp(at, {
@@ -637,40 +638,42 @@ export function goalScopeLabel(
 }
 
 export function formatGoalEta(progress: GoalProgress, now = Date.now()): string {
-  if (progress.reached) return "Objetivo alcanzado";
+  if (progress.reached) return t("wealth.reached");
   const parts: string[] = [];
-  if (progress.etaAt) parts.push(`A este ritmo, ${formatHorizon(progress.etaAt, now)}`);
+  if (progress.etaAt) parts.push(t("wealth.paceEta", { horizon: formatHorizon(progress.etaAt, now) }));
   else if (progress.pacePerMonth != null && progress.pacePerMonth <= 0.5) {
-    parts.push("A este ritmo no se acerca");
+    parts.push(t("wealth.paceStuck"));
   } else {
-    parts.push("Aún no hay ritmo para estimar");
+    parts.push(t("wealth.paceUnknown"));
   }
   if (progress.goal.deadlineAt != null) {
     parts.push(formatDeadline(progress.goal.deadlineAt, now));
-    if (progress.onTrack === false) parts.push("No llegas a esa fecha");
-    else if (progress.onTrack) parts.push("Vas a tiempo");
+    if (progress.onTrack === false) parts.push(t("wealth.offTrack"));
+    else if (progress.onTrack) parts.push(t("wealth.onTrack"));
   }
   return parts.join(" · ");
 }
 
 function formatHorizon(at: number, now: number): string {
   const days = Math.round((at - now) / DAY_MS);
-  if (days <= 10) return "en unos días";
+  if (days <= 10) return t("wealth.inDays");
   if (days <= 45) {
     const weeks = Math.max(1, Math.round(days / 7));
-    return weeks === 1 ? "en una semana" : `en ${weeks} semanas`;
+    return weeks === 1 ? t("wealth.inWeek") : t("wealth.inWeeks", { count: weeks });
   }
-  const month = new Date(at).toLocaleDateString("es", { month: "long", year: "numeric" });
-  return `hacia ${month}`;
+  const month = new Date(at).toLocaleDateString(dateLocale(), { month: "long", year: "numeric" });
+  return t("wealth.toward", { month });
 }
 
 function formatDeadline(at: number, now: number): string {
   const days = Math.ceil((startOfLocalDay(at) - startOfLocalDay(now)) / DAY_MS);
-  if (days < 0) return "La fecha ya pasó";
-  if (days === 0) return "Fecha: hoy";
-  if (days === 1) return "Fecha: mañana";
-  if (days < 45) return `Quedan ${days} días`;
-  return `Para ${new Date(at).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" })}`;
+  if (days < 0) return t("wealth.deadlinePast");
+  if (days === 0) return t("wealth.deadlineToday");
+  if (days === 1) return t("wealth.deadlineTomorrow");
+  if (days < 45) return t("wealth.daysLeft", { count: days });
+  return t("wealth.deadlineOn", {
+    date: new Date(at).toLocaleDateString(dateLocale(), { day: "numeric", month: "short", year: "numeric" }),
+  });
 }
 
 export function sortGoalProgress(items: GoalProgress[]): GoalProgress[] {

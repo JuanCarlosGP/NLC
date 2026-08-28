@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db/client";
+import { t } from "@/lib/i18n/runtime";
 import {
   CASH_ACCOUNT_ID,
   CASH_ACCOUNT_NAME,
@@ -190,7 +191,7 @@ export async function listAccounts(opts?: { includeArchived?: boolean }): Promis
 
 export async function createAccount(name: string, kind: WealthAccountKind = "bank"): Promise<WealthAccount> {
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("La cuenta necesita un nombre.");
+  if (!trimmed) throw new Error(t("wealth.errNeedAccountName"));
   await ensureCashAccount();
   const db = await getDb();
   const id = newId("acc");
@@ -249,7 +250,7 @@ export async function createAsset(
   opts?: { quote?: boolean },
 ): Promise<WealthAsset> {
   const name = input.name.trim();
-  if (!name) throw new Error("La inversión necesita un nombre.");
+  if (!name) throw new Error(t("wealth.errNeedAssetName"));
   const db = await getDb();
   const id = newId("ast");
   const now = Date.now();
@@ -404,9 +405,9 @@ export async function createQuote(input: {
   price: number;
   bookedAt?: number;
 }): Promise<WealthQuote> {
-  if (!(input.price > 0)) throw new Error("El precio tiene que ser mayor que cero.");
+  if (!(input.price > 0)) throw new Error(t("wealth.errPricePositive"));
   const asset = await getAsset(input.assetId);
-  if (!asset) throw new Error("No encuentro esa inversión.");
+  if (!asset) throw new Error(t("wealth.errAssetNotFound"));
   const now = Date.now();
   const bookedAt = input.bookedAt ?? now;
   const quote = await insertQuote(input.assetId, input.price, bookedAt, now);
@@ -462,9 +463,9 @@ export type CreateTxInput = {
 };
 
 export async function createTx(input: CreateTxInput): Promise<WealthTx> {
-  if (!(input.amount > 0)) throw new Error("El importe tiene que ser mayor que cero.");
+  if (!(input.amount > 0)) throw new Error(t("wealth.errAmountPositive"));
   const title = input.title.trim();
-  if (!title) throw new Error("El movimiento necesita un concepto.");
+  if (!title) throw new Error(t("wealth.errTxConcept"));
   await ensureCashAccount();
   const db = await getDb();
   const quantity =
@@ -505,7 +506,7 @@ export async function createTx(input: CreateTxInput): Promise<WealthTx> {
   );
 
   const created = await getTx(id);
-  if (!created) throw new Error("No se pudo guardar el movimiento.");
+  if (!created) throw new Error(t("wealth.errTxSave"));
   return created;
 }
 
@@ -549,10 +550,10 @@ async function applyAssetImpact(input: {
   const quantity = input.quantity;
   const unitPrice = input.unitPrice;
   if ((input.kind === "buy" || input.kind === "sell") && !assetId) {
-    if (input.kind === "sell") throw new Error("Elige la inversión que vendes.");
+    if (input.kind === "sell") throw new Error(t("wealth.errPickSellAsset"));
     const asset = await createAsset(
       {
-        name: input.assetName?.trim() || "Inversión",
+        name: input.assetName?.trim() || t("wealth.assetFallback"),
         ticker: input.assetTicker,
         kind: input.assetKind,
         accountId: input.accountId,
@@ -598,10 +599,10 @@ async function applyAssetImpact(input: {
 
 export async function updateTx(id: string, input: CreateTxInput): Promise<WealthTx> {
   const current = await getTx(id);
-  if (!current) throw new Error("No encuentro ese movimiento.");
-  if (!(input.amount > 0)) throw new Error("El importe tiene que ser mayor que cero.");
+  if (!current) throw new Error(t("wealth.errTxNotFound"));
+  if (!(input.amount > 0)) throw new Error(t("wealth.errAmountPositive"));
   const title = input.title.trim();
-  if (!title) throw new Error("El movimiento necesita un concepto.");
+  if (!title) throw new Error(t("wealth.errTxConcept"));
   await reverseAssetImpact(current);
   const quantity =
     input.quantity ?? (input.kind === "buy" || input.kind === "sell" ? 1 : null);
@@ -637,7 +638,7 @@ export async function updateTx(id: string, input: CreateTxInput): Promise<Wealth
     id,
   );
   const next = await getTx(id);
-  if (!next) throw new Error("No se pudo guardar el movimiento.");
+  if (!next) throw new Error(t("wealth.errTxSave"));
   return next;
 }
 
@@ -682,8 +683,8 @@ export async function createGoal(input: {
   deadlineAt?: number | null;
 }): Promise<WealthGoal> {
   const name = input.name.trim();
-  if (!name) throw new Error("El objetivo necesita un nombre.");
-  if (!(input.target > 0)) throw new Error("El importe del objetivo tiene que ser mayor que cero.");
+  if (!name) throw new Error(t("wealth.errGoalName"));
+  if (!(input.target > 0)) throw new Error(t("wealth.errGoalTargetPositive"));
   const scope = input.scope ?? "networth";
   const db = await getDb();
   const id = newId("gol");

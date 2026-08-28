@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { isRunningInExpoGo } from "expo";
 import * as Notifications from "expo-notifications";
+import { t } from "@/lib/i18n/runtime";
 import type { NasSettings } from "@/lib/settings/storage";
 import { applyOtaUpdate, isApkNotification, isOtaNotification } from "@/lib/ota/apply-update";
 import { downloadAndInstallApk } from "@/lib/ota/install-apk";
@@ -29,7 +30,7 @@ export async function registerOtaPush(settings: NasSettings, password: string): 
   if (isRunningInExpoGo()) return;
 
   await Notifications.setNotificationChannelAsync(OTA_CHANNEL, {
-    name: "Actualizaciones",
+    name: t("push.channel"),
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 160, 80, 160],
     lightColor: "#E4D5B8",

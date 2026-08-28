@@ -6,6 +6,7 @@ import { ProjectComposerSheet } from "@/components/productivity/project-composer
 import { SeriesRow, seriesListStyle } from "@/components/video/series-row";
 import { Screen } from "@/components/ui/screen";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n/context";
 import { projectHref } from "@/lib/library/href";
 import { useActiveProjects, useProductivity, useVisibleTasks } from "@/lib/productivity/productivity-context";
 import { INBOX_PROJECT_ID } from "@/lib/productivity/types";
@@ -13,6 +14,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, type } from "@/lib/theme";
 
 export default function ProjectsScreen() {
+  const { t } = useI18n();
   const router = useRouter();
   const projects = useActiveProjects();
   const { projects: allProjects, archiveProject } = useProductivity();
@@ -24,7 +26,7 @@ export default function ProjectsScreen() {
 
   function countFor(projectId: string) {
     const n = tasks.filter((task) => task.projectId === projectId && task.status !== "done").length;
-    return n ? `${n} ${n === 1 ? "tarea" : "tareas"}` : "Sin tareas abiertas";
+    return n ? t(n === 1 ? "projects.taskOne" : "projects.taskMany", { count: n }) : t("projects.noOpenTasks");
   }
 
   return (
@@ -36,16 +38,18 @@ export default function ProjectsScreen() {
           </View>
           <View style={styles.heading}>
             <View style={styles.headingText}>
-              <Text style={type.label}>Productividad</Text>
-              <Text style={type.pageTitle}>Proyectos</Text>
+              <Text style={type.label}>{t("focus.productivity")}</Text>
+              <Text style={type.pageTitle}>{t("projects.title")}</Text>
               <Text style={type.meta}>
                 {projects.length
-                  ? `${projects.length} ${projects.length === 1 ? "proyecto" : "proyectos"}`
-                  : "Sin proyectos"}
+                  ? t(projects.length === 1 ? "projects.projectOne" : "projects.projectMany", {
+                      count: projects.length,
+                    })
+                  : t("projects.none")}
               </Text>
             </View>
             <Pressable
-              accessibilityLabel="Nuevo proyecto"
+              accessibilityLabel={t("projects.newProject")}
               onPress={() => {
                 triggerUiHaptic();
                 setComposeOpen(true);
@@ -76,13 +80,13 @@ export default function ProjectsScreen() {
         </View>
         {archived.length ? (
           <View>
-            <Text style={type.sectionTitle}>Archivados</Text>
+            <Text style={type.sectionTitle}>{t("projects.archived")}</Text>
             <View style={seriesListStyle}>
               {archived.map((project) => (
                 <SeriesRow
                   key={project.id}
                   title={project.name}
-                  subtitle="Mantén pulsado para restaurar"
+                  subtitle={t("projects.restoreHint")}
                   onPress={() => void archiveProject(project.id, false)}
                   onLongPress={() => void archiveProject(project.id, false)}
                 />
@@ -94,14 +98,10 @@ export default function ProjectsScreen() {
       <ProjectComposerSheet open={composeOpen} onOpenChange={setComposeOpen} />
       <ConfirmDialog
         open={Boolean(target)}
-        title="Archivar proyecto"
-        message={
-          target
-            ? `«${target.name}» dejará de verse en el tablero. Las tareas no se borran.`
-            : ""
-        }
-        confirmLabel="Archivar"
-        cancelLabel="Cancelar"
+        title={t("projects.archive")}
+        message={target ? t("projects.archiveConfirm", { name: target.name }) : ""}
+        confirmLabel={t("projects.archive")}
+        cancelLabel={t("common.cancel")}
         destructive={false}
         onCancel={() => setArchiveId(null)}
         onConfirm={() => {

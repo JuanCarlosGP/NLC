@@ -19,16 +19,18 @@ import {
 import { clearLastWatch, loadWatchHistory, peekWatchHistory, watchMatchesPath } from "@/lib/video/watch-history";
 import { useVideoActions, type VideoActionsTarget } from "@/lib/video/video-actions-context";
 import type { VideoEpisode } from "@/lib/video/types";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
 export function VideoActionsSheet() {
   const { open, target, setOpen } = useVideoActions();
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={setOpen}
-      accessibilityCloseLabel="Cerrar opciones de vídeo"
+      accessibilityCloseLabel={t("sheet.close")}
       viewportRatio={0.62}
     >
       {target ? <VideoActionsBody target={target} onClose={() => setOpen(false)} /> : null}
@@ -43,6 +45,7 @@ function VideoActionsBody({
   target: VideoActionsTarget;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const { settings, password } = useSettings();
   const { onChanged } = useVideoActions();
@@ -52,7 +55,7 @@ function VideoActionsBody({
   const [readyCount, setReadyCount] = useState(0);
   const [canContinue, setCanContinue] = useState(false);
   const [liked, setLiked] = useState(false);
-  const meta = targetMeta(target);
+  const meta = targetMeta(target, t);
   const canDownload = offlineSupported();
 
   useEffect(() => {
@@ -156,7 +159,7 @@ function VideoActionsBody({
               <FolderOpen color={colors.ink} size={22} strokeWidth={1.8} />
             )
           }
-          label={target.kind === "episode" ? "Ver" : "Abrir"}
+          label={target.kind === "episode" ? t("videoUi.watch") : t("videoUi.open")}
           onPress={() =>
             closeAfter(() => {
               if (target.kind === "folder") {
@@ -183,7 +186,7 @@ function VideoActionsBody({
               strokeWidth={1.8}
             />
           }
-          label={liked ? "Quitar de favoritos" : "Añadir a favoritos"}
+          label={liked ? t("player.favoriteRemove") : t("player.favoriteAdd")}
           onPress={() =>
             closeAfter(async () => {
               await toggleVideoFavorite(favoriteFromTarget(target));
@@ -195,7 +198,9 @@ function VideoActionsBody({
           <ActionRow
             icon={<Download color={colors.ink} size={22} strokeWidth={1.8} />}
             label={
-              episodes.length > 1 ? `Descargar ${episodes.length} episodios` : "Descargar al teléfono"
+              episodes.length > 1
+                ? t("videoUi.downloadEpisodes", { count: episodes.length })
+                : t("videoUi.downloadPhone")
             }
             disabled={busy || (episodes.length > 0 && readyCount === episodes.length)}
             onPress={() => {
@@ -208,7 +213,11 @@ function VideoActionsBody({
         {readyCount > 0 ? (
           <ActionRow
             icon={<Smartphone color={colors.ink} size={22} strokeWidth={1.8} />}
-            label={readyCount > 1 ? `Quitar ${readyCount} del teléfono` : "Quitar del teléfono"}
+            label={
+              readyCount > 1
+                ? t("videoUi.removeEpisodes", { count: readyCount })
+                : t("videoUi.removePhone")
+            }
             onPress={() => {
               triggerUiHaptic();
               setConfirm("remove");
@@ -218,7 +227,7 @@ function VideoActionsBody({
         {canContinue ? (
           <ActionRow
             icon={<EyeOff color={colors.ink} size={22} strokeWidth={1.8} />}
-            label="Quitar de continuar viendo"
+            label={t("videoUi.removeContinue")}
             onPress={() =>
               closeAfter(async () => {
                 await clearLastWatch(meta.path);
@@ -229,7 +238,7 @@ function VideoActionsBody({
         ) : null}
         <ActionRow
           icon={<Trash2 color={colors.danger} size={22} strokeWidth={1.8} />}
-          label="Eliminar del NAS"
+          label={t("videoUi.deleteNas")}
           danger
           onPress={() => {
             triggerUiHaptic();
@@ -240,10 +249,10 @@ function VideoActionsBody({
 
       <ConfirmDialog
         open={confirm === "download"}
-        title="Descargar al teléfono"
-        message={`Se bajarán ${episodes.length} episodios de «${meta.title}». Pesan mucho.`}
-        confirmLabel="Descargar"
-        cancelLabel="Cancelar"
+        title={t("videoUi.downloadConfirmTitle")}
+        message={t("videoUi.downloadConfirmMessage", { count: episodes.length, title: meta.title })}
+        confirmLabel={t("videoUi.downloadPhone")}
+        cancelLabel={t("common.cancel")}
         destructive={false}
         busy={busy}
         onCancel={() => {
@@ -253,10 +262,10 @@ function VideoActionsBody({
       />
       <ConfirmDialog
         open={confirm === "remove"}
-        title="Quitar del teléfono"
-        message={`Se borran las copias locales de «${meta.title}». El NAS no se toca.`}
-        confirmLabel="Quitar"
-        cancelLabel="Cancelar"
+        title={t("videoUi.removeConfirmTitle")}
+        message={t("videoUi.removeConfirmMessage", { title: meta.title })}
+        confirmLabel={t("common.remove")}
+        cancelLabel={t("common.cancel")}
         busy={busy}
         onCancel={() => {
           if (!busy) setConfirm(null);
@@ -265,14 +274,14 @@ function VideoActionsBody({
       />
       <ConfirmDialog
         open={confirm === "delete"}
-        title="Eliminar del NAS"
+        title={t("videoUi.deleteNas")}
         message={
           episodes.length > 1
-            ? `Se borrarán ${episodes.length} episodios de «${meta.title}» del NAS.`
-            : `Se borrará «${meta.title}» del NAS.`
+            ? t("videoUi.deleteConfirmEpisodes", { count: episodes.length, title: meta.title })
+            : t("videoUi.deleteConfirmOne", { title: meta.title })
         }
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={busy}
         onCancel={() => {
@@ -284,13 +293,19 @@ function VideoActionsBody({
   );
 }
 
-function targetMeta(target: VideoActionsTarget): { title: string; subtitle: string; path: string } {
+function targetMeta(
+  target: VideoActionsTarget,
+  t: (path: string, vars?: Record<string, string | number>) => string,
+): { title: string; subtitle: string; path: string } {
   if (target.kind === "folder") {
-    return { title: target.title, subtitle: "Carpeta", path: target.path };
+    return { title: target.title, subtitle: t("videoUi.folder"), path: target.path };
   }
   return {
     title: target.episode.title,
-    subtitle: target.episode.number < 99_000 ? `Episodio ${target.episode.number}` : "Vídeo",
+    subtitle:
+      target.episode.number < 99_000
+        ? t("videoUi.episodeN", { n: target.episode.number })
+        : t("videoUi.videoKind"),
     path: target.episode.path,
   };
 }

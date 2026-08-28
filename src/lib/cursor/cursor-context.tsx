@@ -9,8 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import { colors } from "@/lib/theme";
+import { t } from "@/lib/i18n/runtime";
 import {
-  NLC_AGENT_PREAMBLE,
+  nlcAgentPreamble,
   createCursorAgent,
   createCursorRun,
   isTerminalRun,
@@ -101,10 +102,10 @@ export function CursorProvider({ children }: { children: ReactNode }) {
     setFeedback(null);
     try {
       await saveCursorApiKey(apiKey);
-      setFeedback({ text: "API key guardada en el dispositivo.", color: colors.ok });
+      setFeedback({ text: t("chat.keySaved"), color: colors.ok });
     } catch (error) {
       setFeedback({
-        text: error instanceof Error ? error.message : "No se pudo guardar.",
+        text: error instanceof Error ? error.message : t("chat.saveFail"),
         color: colors.danger,
       });
     } finally {
@@ -129,7 +130,7 @@ export function CursorProvider({ children }: { children: ReactNode }) {
       const text = raw.trim();
       if (!text) return;
       if (!apiKey.trim()) {
-        setFeedback({ text: "Pega la API key de Cursor y pulsa Guardar.", color: colors.danger });
+        setFeedback({ text: t("chat.needKey"), color: colors.danger });
         return;
       }
 
@@ -147,8 +148,8 @@ export function CursorProvider({ children }: { children: ReactNode }) {
       setFeedback(null);
 
       try {
-        const snapshot = await buildAssistantSnapshot(zone).catch(() => "Estado no disponible.");
-        const prompt = `${NLC_AGENT_PREAMBLE}\n\nEstado actual de la app:\n${snapshot}\n\nMensaje del usuario:\n${text}`;
+        const snapshot = await buildAssistantSnapshot(zone).catch(() => t("chat.noSnapshot"));
+        const prompt = `${nlcAgentPreamble()}\n\n${t("chat.promptState")}\n${snapshot}\n\n${t("chat.promptUser")}\n${text}`;
         let nextAgent = agentId;
         let runId = "";
         if (!nextAgent) {
@@ -166,8 +167,8 @@ export function CursorProvider({ children }: { children: ReactNode }) {
         const raw =
           done.result?.trim() ||
           (isTerminalRun(done.status) && done.status !== "FINISHED"
-            ? `El agente terminó en ${done.status}.`
-            : "El agente no devolvió texto.");
+            ? t("chat.agentStatusEnd", { status: done.status })
+            : t("chat.agentNoReply"));
         const parsed = extractAssistantActions(raw);
         const actions = parsed.actions.length ? parsed.actions : inferLocalActions(text);
         const results = actions.length
@@ -179,7 +180,7 @@ export function CursorProvider({ children }: { children: ReactNode }) {
         const reply = [visible, doneLines.length ? doneLines.join(" ") : "", failLines.length ? failLines.join(" ") : ""]
           .filter(Boolean)
           .join("\n\n")
-          .trim() || "Hecho.";
+          .trim() || t("chat.agentDone");
         setMessages((current) => {
           const next = [...current, { id: done.id, role: "assistant" as const, text: reply }];
           void saveCursorMessages(next);
@@ -188,7 +189,7 @@ export function CursorProvider({ children }: { children: ReactNode }) {
         if (!chatOpenRef.current) setChatUnread(true);
         setConnected(true);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "No se pudo hablar con Cursor.";
+        const message = error instanceof Error ? error.message : t("chat.talkFail");
         setFeedback({ text: message, color: colors.danger });
         setMessages((current) => {
           const next = [...current, { id: `e-${Date.now()}`, role: "assistant" as const, text: message }];

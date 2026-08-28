@@ -12,10 +12,12 @@ import { isLooseSongsAlbum, isPodcastAlbum } from "@/lib/nas/webdav";
 import type { Album, Track } from "@/lib/nas/types";
 import { usePlayer } from "@/lib/player/player-context";
 import { useSettings } from "@/lib/settings/settings-context";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function MusicScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const { source, ready } = useSettings();
   const { playTracks, current } = usePlayer();
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -42,11 +44,11 @@ export default function MusicScreen() {
         setTracks([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cargar la música.");
+      setError(err instanceof Error ? err.message : t("music.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [source]);
+  }, [source, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -69,13 +71,13 @@ export default function MusicScreen() {
         <View style={styles.art}>
           <Music2 color={colors.accent} size={36} strokeWidth={1.8} />
         </View>
-        <Text style={type.pageTitle}>Música</Text>
+        <Text style={type.pageTitle}>{t("music.title")}</Text>
         <Text style={type.meta}>
           {loading
-            ? "Cargando…"
+            ? t("common.loading")
             : trackCount
-              ? `${trackCount} canciones`
-              : "Aún no hay canciones en el NAS"}
+              ? t(trackCount === 1 ? "music.songOne" : "music.songMany", { count: trackCount })
+              : t("music.empty")}
         </Text>
       </View>
 
@@ -88,13 +90,13 @@ export default function MusicScreen() {
               onPress={() => void playTracks(tracks, 0)}
               style={({ pressed }) => [styles.btn, styles.solid, { opacity: pressed ? 0.8 : 1 }]}
             >
-              <Text style={styles.solidText}>Reproducir</Text>
+              <Text style={styles.solidText}>{t("common.play")}</Text>
             </Pressable>
             <Pressable
               onPress={() => void playTracks(tracks, Math.floor(Math.random() * tracks.length))}
               style={({ pressed }) => [styles.btn, styles.ghost, { opacity: pressed ? 0.8 : 1 }]}
             >
-              <Text style={styles.ghostText}>Aleatorio</Text>
+              <Text style={styles.ghostText}>{t("common.shuffle")}</Text>
             </Pressable>
           </View>
           {tracks.map((track, index) => (
@@ -112,7 +114,7 @@ export default function MusicScreen() {
           <AlbumRow
             key={album.id}
             album={album}
-            subtitle={`Álbum · ${album.artistName}`}
+            subtitle={t("music.albumBy", { artist: album.artistName })}
             onPress={() => router.push(albumHref(album.id))}
           />
         ))

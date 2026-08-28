@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { getDb } from "@/lib/db/client";
 import type { ProdReminder, ReminderFrequency } from "@/lib/reminders/types";
 
@@ -73,7 +74,7 @@ export async function getReminder(id: string): Promise<ProdReminder | null> {
 
 export async function createReminder(input: ReminderInput): Promise<ProdReminder> {
   const title = input.title.trim();
-  if (!title) throw new Error("El recordatorio necesita un mensaje.");
+  if (!title) throw new Error(t("reminders.needMessage"));
   const db = await getDb();
   const now = Date.now();
   const id = newId();

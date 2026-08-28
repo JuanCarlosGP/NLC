@@ -9,10 +9,12 @@ import { browseRoute } from "@/lib/video/browse";
 import { listVideoShows, type VideoShow } from "@/lib/video/catalog";
 import { useVideoActions } from "@/lib/video/video-actions-context";
 import { watchRoute } from "@/lib/video/onepiece";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, type } from "@/lib/theme";
 
 export default function VideosScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const { settings, password, ready } = useSettings();
   const { openVideoActions } = useVideoActions();
   const [shows, setShows] = useState<VideoShow[]>([]);
@@ -25,12 +27,12 @@ export default function VideosScreen() {
     try {
       setShows(await listVideoShows(settings, password));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron cargar los vídeos.");
+      setError(err instanceof Error ? err.message : t("videos.loadError"));
       setShows([]);
     } finally {
       setLoading(false);
     }
-  }, [password, settings]);
+  }, [password, settings, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -50,15 +52,19 @@ export default function VideosScreen() {
   }
 
   const countLabel = loading
-    ? "Cargando…"
+    ? t("common.loading")
     : shows.length
       ? [
-          series.length ? `${series.length} serie${series.length === 1 ? "" : "s"}` : "",
-          movies.length ? `${movies.length} película${movies.length === 1 ? "" : "s"}` : "",
+          series.length
+            ? t(series.length === 1 ? "videos.seriesOne" : "videos.seriesMany", { count: series.length })
+            : "",
+          movies.length
+            ? t(movies.length === 1 ? "videos.movieOne" : "videos.movieMany", { count: movies.length })
+            : "",
         ]
           .filter(Boolean)
           .join(" · ")
-      : `Aún no hay vídeos en ${settings.videoSharePath || "Popcorn"}`;
+      : t("videos.emptyInPath", { path: settings.videoSharePath || "Video" });
 
   return (
     <Screen>
@@ -66,8 +72,8 @@ export default function VideosScreen() {
         <View style={styles.art}>
           <Clapperboard color={colors.accent} size={36} strokeWidth={1.8} />
         </View>
-        <Text style={type.label}>Lista</Text>
-        <Text style={type.pageTitle}>Vídeos</Text>
+        <Text style={type.label}>{t("common.list")}</Text>
+        <Text style={type.pageTitle}>{t("videos.title")}</Text>
         <Text style={type.meta}>{countLabel}</Text>
       </View>
 
@@ -75,19 +81,19 @@ export default function VideosScreen() {
 
       {!loading && !shows.length ? (
         <Text style={type.body}>
-          Añade series o películas en {settings.videoSharePath || "/volume1/Popcorn"}.
+          {t("videos.emptyInPath", { path: settings.videoSharePath || "/Video" })}
         </Text>
       ) : null}
 
       {series.length ? (
         <View>
-          <Text style={type.sectionTitle}>Series</Text>
+          <Text style={type.sectionTitle}>{t("videos.series")}</Text>
           <View style={seriesListStyle}>
             {series.map((show) => (
               <SeriesRow
                 key={show.id}
                 title={show.title}
-                subtitle="Serie"
+                subtitle={t("videos.seriesKind")}
                 onPress={() => openShow(show)}
                 onLongPress={() =>
                   openVideoActions(
@@ -103,13 +109,13 @@ export default function VideosScreen() {
 
       {movies.length ? (
         <View>
-          <Text style={type.sectionTitle}>Películas</Text>
+          <Text style={type.sectionTitle}>{t("videos.movies")}</Text>
           <View style={seriesListStyle}>
             {movies.map((show) => (
               <SeriesRow
                 key={show.id}
                 title={show.title}
-                subtitle="Película"
+                subtitle={t("videos.movieKind")}
                 playable={show.file}
                 onPress={() => openShow(show)}
                 onLongPress={() =>

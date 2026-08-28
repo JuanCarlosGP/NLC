@@ -14,11 +14,13 @@ import { clearLibraryCache, removeRecent } from "@/lib/library/cache";
 import { useDock } from "@/lib/dock-context";
 import { usePlayerUi } from "@/lib/player/player-ui-context";
 import { useSettings } from "@/lib/settings/settings-context";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
 export function NowPlayingSheet() {
   const { nowPlayingOpen, setNowPlayingOpen } = usePlayerUi();
+  const { t } = useI18n();
   const dock = useDock();
 
   return (
@@ -28,7 +30,7 @@ export function NowPlayingSheet() {
         setNowPlayingOpen(open);
         if (!open) dock?.reveal();
       }}
-      accessibilityCloseLabel="Cerrar reproductor"
+      accessibilityCloseLabel={t("sheet.close")}
       viewportRatio={0.88}
     >
       <NowPlayingBody />
@@ -37,6 +39,7 @@ export function NowPlayingSheet() {
 }
 
 function NowPlayingBody() {
+  const { t } = useI18n();
   const {
     current,
     playing,
@@ -79,7 +82,7 @@ function NowPlayingBody() {
       await Promise.all([removeFavorite(trackId), removeRecent(trackId), clearLibraryCache(trackId)]);
       setConfirmOpen(false);
       await removeTrackFromQueue(trackId);
-      setFeedback("Eliminado.");
+      setFeedback(t("player.deletedNas"));
       if (willEmpty) setNowPlayingOpen(false);
     } catch (err) {
       // File already missing: still purge local lists.
@@ -88,10 +91,10 @@ function NowPlayingBody() {
         await Promise.all([removeFavorite(trackId), removeRecent(trackId), clearLibraryCache(trackId)]);
         setConfirmOpen(false);
         await removeTrackFromQueue(trackId);
-        setFeedback("Quitado (ya no estaba en el NAS).");
+        setFeedback(t("player.deletedNas"));
         if (willEmpty) setNowPlayingOpen(false);
       } else {
-        setFeedback(err instanceof Error ? err.message : "No se pudo eliminar.");
+        setFeedback(err instanceof Error ? err.message : t("nasExtra.deleteFail"));
       }
     } finally {
       setDeleting(false);
@@ -107,8 +110,8 @@ function NowPlayingBody() {
   if (!current) {
     return (
       <View style={styles.empty}>
-        <Text style={type.pageTitle}>Silencio</Text>
-        <Text style={type.body}>Elige una pista en la biblioteca para empezar.</Text>
+        <Text style={type.pageTitle}>{t("player.mute")}</Text>
+        <Text style={type.body}>{t("player.empty")}</Text>
       </View>
     );
   }
@@ -119,7 +122,7 @@ function NowPlayingBody() {
         <View style={styles.coverWrap}>
           <View style={styles.coverFrame}>
             <Pressable
-              accessibilityLabel={canDelete ? "Mantén pulsado para eliminar del NAS" : undefined}
+              accessibilityLabel={canDelete ? t("player.deleteNas") : undefined}
               delayLongPress={450}
               disabled={deleting || !canDelete}
               onLongPress={onCoverLongPress}
@@ -129,7 +132,7 @@ function NowPlayingBody() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={liked ? "Quitar de favoritos" : "Añadir a favoritos"}
+              accessibilityLabel={liked ? t("player.favoriteRemove") : t("player.favoriteAdd")}
               hitSlop={12}
               onPress={() => {
                 triggerUiHaptic();
@@ -150,13 +153,13 @@ function NowPlayingBody() {
           <Text style={type.body}>{current.artistName}</Text>
           <Text style={type.meta}>{current.albumName}</Text>
           {feedback ? (
-            <Text style={[type.meta, feedback.startsWith("Eliminado") ? styles.ok : styles.err]}>
+            <Text style={[type.meta, feedback === t("player.deletedNas") ? styles.ok : styles.err]}>
               {feedback}
             </Text>
           ) : null}
         </View>
         <SeekBar currentTime={currentTime} duration={duration} onSeek={(value) => void seek(value)} />
-        <Text style={type.meta}>{buffering ? "Cargando…" : " "}</Text>
+        <Text style={type.meta}>{buffering ? t("common.loading") : " "}</Text>
         <View style={styles.controls}>
           <Pressable
             onPress={() => {
@@ -191,8 +194,8 @@ function NowPlayingBody() {
           </Pressable>
         </View>
         <View style={styles.queue}>
-          <Text style={type.label}>Cola</Text>
-          {!queue.length ? <Text style={type.body}>La cola está vacía.</Text> : null}
+          <Text style={type.label}>{t("player.queue")}</Text>
+          {!queue.length ? <Text style={type.body}>{t("player.queueEmpty")}</Text> : null}
           {queue.map((track, i) => (
             <TrackRow
               key={`${track.id}-${i}`}
@@ -207,10 +210,10 @@ function NowPlayingBody() {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Eliminar del NAS"
-        message={`¿Borrar «${current.title}»?\nSe eliminará el archivo y no se puede deshacer.`}
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        title={t("player.deleteNas")}
+        message={t("player.deleteNasMessage")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={deleting}
         onCancel={() => {

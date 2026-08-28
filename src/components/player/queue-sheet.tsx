@@ -3,17 +3,19 @@ import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { TrackRow } from "@/components/library/track-row";
 import { useQueue } from "@/hooks/use-queue";
+import { useI18n } from "@/lib/i18n/context";
 import { usePlayerUi } from "@/lib/player/player-ui-context";
 import { type } from "@/lib/theme";
 
 export function QueueSheet() {
   const { queueOpen, setQueueOpen } = usePlayerUi();
+  const { t } = useI18n();
 
   return (
     <BottomSheet
       open={queueOpen}
       onOpenChange={setQueueOpen}
-      accessibilityCloseLabel="Cerrar cola"
+      accessibilityCloseLabel={t("sheet.close")}
       viewportRatio={0.75}
     >
       <QueueBody />
@@ -22,13 +24,14 @@ export function QueueSheet() {
 }
 
 function QueueBody() {
+  const { t } = useI18n();
   const { queue, index, playTracks, current } = useQueue();
 
   return (
     <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Text style={type.label}>Reproducción</Text>
-      <Text style={type.pageTitle}>Cola</Text>
-      {!queue.length ? <Text style={type.body}>La cola está vacía.</Text> : null}
+      <Text style={type.label}>{t("player.playback")}</Text>
+      <Text style={type.pageTitle}>{t("player.queue")}</Text>
+      {!queue.length ? <Text style={type.body}>{t("player.queueEmpty")}</Text> : null}
       <View>
         {queue.map((track, i) => (
           <TrackRow

@@ -4,24 +4,27 @@ import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { TxComposerSheet } from "@/components/wealth/tx-composer-sheet";
 import { TxRow, txListStyle } from "@/components/wealth/tx-row";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { useWealth } from "@/lib/wealth/wealth-context";
 import { TX_KIND_LABEL, TX_KINDS, type WealthTxKind } from "@/lib/wealth/types";
 
-export function WealthLedger({ title = "Movimientos" }: { title?: string }) {
+export function WealthLedger({ title }: { title?: string }) {
+  const { t } = useI18n();
   const { txs } = useWealth();
   const [filter, setFilter] = useState<WealthTxKind | null>(null);
   const [open, setOpen] = useState(false);
   const visible = useMemo(() => (filter ? txs.filter((tx) => tx.kind === filter) : txs), [filter, txs]);
+  const pageTitle = title ?? t("wealth.activity");
 
   return (
     <>
       <Screen>
         <View style={styles.header}>
-          <Text style={[type.pageTitle, styles.title]}>{title}</Text>
+          <Text style={[type.pageTitle, styles.title]}>{pageTitle}</Text>
           <Pressable
-            accessibilityLabel="Nuevo movimiento"
+            accessibilityLabel={t("wealth.newTx")}
             onPress={() => {
               triggerUiHaptic();
               setOpen(true);
@@ -33,7 +36,7 @@ export function WealthLedger({ title = "Movimientos" }: { title?: string }) {
         </View>
         <View style={styles.chips}>
           <Pressable onPress={() => setFilter(null)} style={[styles.chip, filter == null && styles.chipOn]}>
-            <Text style={[styles.chipLabel, filter == null && styles.chipLabelOn]}>Todos</Text>
+            <Text style={[styles.chipLabel, filter == null && styles.chipLabelOn]}>{t("wealth.all")}</Text>
           </Pressable>
           {TX_KINDS.map((kind) => {
             const active = filter === kind;
@@ -55,7 +58,7 @@ export function WealthLedger({ title = "Movimientos" }: { title?: string }) {
             ))}
           </View>
         ) : (
-          <Text style={type.body}>No hay movimientos en este filtro.</Text>
+          <Text style={type.body}>{t("wealth.emptyFilter")}</Text>
         )}
       </Screen>
       <TxComposerSheet open={open} onOpenChange={setOpen} />

@@ -1,5 +1,6 @@
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Bell, BellOff } from "lucide-react-native";
+import { useI18n } from "@/lib/i18n/context";
 import { formatReminderWhen, type ProdReminder } from "@/lib/reminders/types";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, layout } from "@/lib/theme";
@@ -15,6 +16,7 @@ export function ReminderRow({
   onPress: () => void;
   onToggle: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <Pressable
       accessibilityRole="button"
@@ -41,12 +43,12 @@ export function ReminderRow({
         </Text>
         <Text style={styles.sub} numberOfLines={1}>
           {formatReminderWhen(reminder)}
-          {reminder.enabled ? "" : " · pausado"}
+          {reminder.enabled ? "" : ` · ${t("reminders.paused")}`}
         </Text>
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={reminder.enabled ? "Pausar recordatorio" : "Activar recordatorio"}
+        accessibilityLabel={reminder.enabled ? t("reminders.pause") : t("reminders.resume")}
         hitSlop={10}
         onPress={() => {
           triggerSelectionUiHaptic();

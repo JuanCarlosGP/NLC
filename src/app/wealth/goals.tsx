@@ -4,12 +4,14 @@ import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { GoalComposerSheet } from "@/components/wealth/goal-composer-sheet";
 import { GoalRow, goalListStyle } from "@/components/wealth/goal-row";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, type } from "@/lib/theme";
 import { useWealth } from "@/lib/wealth/wealth-context";
 import type { WealthGoal } from "@/lib/wealth/types";
 
 export default function WealthGoalsScreen() {
+  const { t } = useI18n();
   const { goalProgress } = useWealth();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<WealthGoal | null>(null);
@@ -18,9 +20,9 @@ export default function WealthGoalsScreen() {
     <>
       <Screen>
         <View style={styles.header}>
-          <Text style={[type.pageTitle, styles.title]}>Objetivos</Text>
+          <Text style={[type.pageTitle, styles.title]}>{t("wealth.goals")}</Text>
           <Pressable
-            accessibilityLabel="Nuevo objetivo"
+            accessibilityLabel={t("wealth.newGoal")}
             onPress={() => {
               triggerUiHaptic();
               setEditing(null);
@@ -46,10 +48,7 @@ export default function WealthGoalsScreen() {
             ))}
           </View>
         ) : (
-          <Text style={type.body}>
-            Fija un importe (patrimonio, caja, una cuenta o una inversión). NLC estima cuándo llegas según el ritmo de
-            los últimos meses.
-          </Text>
+          <Text style={type.body}>{t("wealth.goalsHintLong")}</Text>
         )}
       </Screen>
       <GoalComposerSheet

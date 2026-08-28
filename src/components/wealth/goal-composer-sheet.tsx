@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n/context";
+import { dateLocale } from "@/lib/i18n/runtime";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { AmountInput } from "@/components/wealth/amount-input";
@@ -15,13 +17,13 @@ import {
   type WealthGoalScope,
 } from "@/lib/wealth/types";
 
-const DEADLINE_PRESETS: { id: string; label: string; months: number | null }[] = [
-  { id: "none", label: "Sin fecha", months: null },
-  { id: "3m", label: "3 meses", months: 3 },
-  { id: "6m", label: "6 meses", months: 6 },
-  { id: "1y", label: "1 año", months: 12 },
-  { id: "2y", label: "2 años", months: 24 },
-];
+const DEADLINE_PRESET_IDS = [
+  { id: "none", key: "dates.noDate", months: null },
+  { id: "3m", key: "wealth.in3m", months: 3 },
+  { id: "6m", key: "wealth.in6m", months: 6 },
+  { id: "1y", key: "wealth.in1y", months: 12 },
+  { id: "2y", key: "wealth.in2y", months: 24 },
+] as const;
 
 function addMonths(months: number, from = Date.now()): number {
   const next = new Date(from);
@@ -33,7 +35,7 @@ function addMonths(months: number, from = Date.now()): number {
 function presetIdFor(deadlineAt: number | null): string {
   if (deadlineAt == null) return "none";
   const now = Date.now();
-  for (const preset of DEADLINE_PRESETS) {
+  for (const preset of DEADLINE_PRESET_IDS) {
     if (preset.months == null) continue;
     if (Math.abs(addMonths(preset.months, now) - deadlineAt) < 2 * 86_400_000) return preset.id;
   }
@@ -49,11 +51,12 @@ export function GoalComposerSheet({
   onOpenChange: (open: boolean) => void;
   goal?: WealthGoal | null;
 }) {
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar objetivo"
+      accessibilityCloseLabel={t("wealth.closeGoal")}
       viewportRatio={0.82}
     >
       <GoalComposerBody open={open} goal={goal ?? null} onDone={() => onOpenChange(false)} />
@@ -70,6 +73,7 @@ function GoalComposerBody({
   goal: WealthGoal | null;
   onDone: () => void;
 }) {
+  const { t } = useI18n();
   const { assets, createGoal, updateGoal, deleteGoal } = useWealth();
   const accounts = useLiveAccounts();
   const liveAssets = useMemo(() => assets.filter((item) => !item.archived), [assets]);
@@ -106,7 +110,7 @@ function GoalComposerBody({
 
   function deadlineAt(): number | null {
     if (deadlineId === "custom") return customDeadline;
-    const preset = DEADLINE_PRESETS.find((item) => item.id === deadlineId);
+    const preset = DEADLINE_PRESET_IDS.find((item) => item.id === deadlineId);
     if (!preset || preset.months == null) return null;
     return addMonths(preset.months);
   }
@@ -135,23 +139,23 @@ function GoalComposerBody({
   return (
     <>
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text style={type.sectionTitle}>{goal ? "Objetivo" : "Nuevo objetivo"}</Text>
+        <Text style={type.sectionTitle}>{goal ? t("wealth.goals") : t("wealth.newGoal")}</Text>
         <TextInput
           value={name}
           onChangeText={setName}
-          placeholder="Fondo de emergencia, viaje…"
+          placeholder={t("wealth.goalNamePlaceholder")}
           placeholderTextColor={colors.muted}
           style={styles.input}
         />
         <AmountInput
           value={amount}
           onChangeText={setAmount}
-          placeholder="Importe, 20.000 o 20000"
-          accessibilityLabel="Importe del objetivo"
+          placeholder={t("wealth.amountPlaceholder")}
+          accessibilityLabel={t("wealth.goalAmountA11y")}
           style={styles.input}
         />
 
-        <Text style={styles.fieldLabel}>Sobre</Text>
+        <Text style={styles.fieldLabel}>{t("wealth.about")}</Text>
         <View style={styles.chips}>
           {GOAL_SCOPES.map((id) => {
             const active = scope === id;
@@ -207,14 +211,14 @@ function GoalComposerBody({
                 );
               })
             ) : (
-              <Text style={styles.hint}>Añade una inversión antes de fijar este objetivo.</Text>
+              <Text style={styles.hint}>{t("wealth.goalNeedAsset")}</Text>
             )}
           </View>
         ) : null}
 
-        <Text style={styles.fieldLabel}>Para cuándo</Text>
+        <Text style={styles.fieldLabel}>{t("wealth.deadline")}</Text>
         <View style={styles.chips}>
-          {DEADLINE_PRESETS.map((item) => {
+          {DEADLINE_PRESET_IDS.map((item) => {
             const active = deadlineId === item.id;
             return (
               <Pressable
@@ -225,26 +229,26 @@ function GoalComposerBody({
                 }}
                 style={[styles.chip, active && styles.chipOn]}
               >
-                <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{item.label}</Text>
+                <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{t(item.key)}</Text>
               </Pressable>
             );
           })}
           {deadlineId === "custom" && customDeadline ? (
             <View style={[styles.chip, styles.chipOn]}>
               <Text style={[styles.chipLabel, styles.chipLabelOn]}>
-                {new Date(customDeadline).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" })}
+                {new Date(customDeadline).toLocaleDateString(dateLocale(), { day: "numeric", month: "short", year: "numeric" })}
               </Text>
             </View>
           ) : null}
         </View>
-        <Text style={styles.hint}>NLC estima la llegada con el ritmo de los últimos tres meses.</Text>
+        <Text style={styles.hint}>{t("wealth.goalPaceHint")}</Text>
 
         <Pressable
           disabled={!canSave || busy}
           onPress={() => void submit()}
           style={({ pressed }) => [styles.submit, { opacity: !canSave || busy ? 0.4 : pressed ? 0.86 : 1 }]}
         >
-          <Text style={styles.submitText}>{busy ? "…" : goal ? "Guardar" : "Crear"}</Text>
+          <Text style={styles.submitText}>{busy ? "…" : goal ? t("common.save") : t("common.create")}</Text>
         </Pressable>
         {goal ? (
           <Pressable
@@ -254,16 +258,16 @@ function GoalComposerBody({
             }}
             style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={styles.removeText}>Eliminar</Text>
+            <Text style={styles.removeText}>{t("common.delete")}</Text>
           </Pressable>
         ) : null}
       </SheetScrollView>
       <ConfirmDialog
         open={confirmDelete}
-        title="Eliminar objetivo"
-        message={goal ? `Se borra «${goal.name}». El patrimonio no se toca.` : ""}
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        title={t("wealth.deleteGoal")}
+        message={goal ? t("wealth.goalDeleteConfirm", { name: goal.name }) : ""}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={busy}
         onCancel={() => {

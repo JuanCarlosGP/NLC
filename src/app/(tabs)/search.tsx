@@ -37,6 +37,7 @@ import {
   type WealthAsset,
   type WealthGoal,
 } from "@/lib/wealth/types";
+import { useI18n } from "@/lib/i18n/context";
 import { useZone } from "@/lib/zone/zone-context";
 
 export default function SearchScreen() {
@@ -49,6 +50,7 @@ export default function SearchScreen() {
 
 function CatalogSearch({ zone }: { zone: "music" | "podcast" }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const { results, loading } = useSearch(query);
   const { playTracks } = usePlayer();
@@ -73,21 +75,21 @@ function CatalogSearch({ zone }: { zone: "music" | "podcast" }) {
 
   return (
     <Screen>
-      <Text style={type.pageTitle}>Buscar</Text>
+      <Text style={type.pageTitle}>{t("search.title")}</Text>
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder={podcast ? "Episodio o podcast" : "Artista, álbum o pista"}
+        placeholder={podcast ? t("search.placeholderPodcast") : t("search.placeholderMusic")}
         placeholderTextColor={colors.muted}
         autoCorrect={false}
         style={styles.input}
       />
-      {loading ? <Text style={type.meta}>Buscando…</Text> : null}
-      {empty ? <Text style={type.body}>Nada en el índice para «{query.trim()}».</Text> : null}
+      {loading ? <Text style={type.meta}>{t("common.searching")}</Text> : null}
+      {empty ? <Text style={type.body}>{t("search.emptyIndex", { query: query.trim() })}</Text> : null}
 
       {artists.length ? (
         <View>
-          <Text style={type.sectionTitle}>Artistas</Text>
+          <Text style={type.sectionTitle}>{t("search.artists")}</Text>
           {artists.map((artist) => (
             <ArtistRow
               key={artist.id}
@@ -100,7 +102,7 @@ function CatalogSearch({ zone }: { zone: "music" | "podcast" }) {
 
       {albums.length ? (
         <View>
-          <Text style={type.sectionTitle}>{podcast ? "Podcasts" : "Álbumes"}</Text>
+          <Text style={type.sectionTitle}>{podcast ? t("search.podcasts") : t("search.albums")}</Text>
           {albums.map((album) => (
             <AlbumRow key={album.id} album={album} onPress={() => router.push(albumHref(album.id))} />
           ))}
@@ -131,6 +133,7 @@ function CatalogSearch({ zone }: { zone: "music" | "podcast" }) {
 
 function VideoSearch() {
   const router = useRouter();
+  const { t } = useI18n();
   const { settings, password, ready } = useSettings();
   const [query, setQuery] = useState("");
   const [shows, setShows] = useState<VideoShow[]>([]);
@@ -148,7 +151,7 @@ function VideoSearch() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "No se pudo buscar en el vídeo.");
+        setError(err instanceof Error ? err.message : t("search.videoError"));
         setShows([]);
       })
       .finally(() => {
@@ -175,29 +178,29 @@ function VideoSearch() {
 
   return (
     <Screen>
-      <Text style={type.pageTitle}>Buscar</Text>
+      <Text style={type.pageTitle}>{t("search.title")}</Text>
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder="Serie o película"
+        placeholder={t("search.placeholderVideo")}
         placeholderTextColor={colors.muted}
         autoCorrect={false}
         style={styles.input}
       />
-      {loading ? <Text style={type.meta}>Buscando…</Text> : null}
+      {loading ? <Text style={type.meta}>{t("common.searching")}</Text> : null}
       {error ? <Text style={[type.body, { color: colors.danger }]}>{error}</Text> : null}
       {!loading && q && !visible.length ? (
-        <Text style={type.body}>Nada para «{query.trim()}».</Text>
+        <Text style={type.body}>{t("search.emptyQuery", { query: query.trim() })}</Text>
       ) : null}
       {series.length ? (
         <View>
-          <Text style={type.sectionTitle}>Series</Text>
+          <Text style={type.sectionTitle}>{t("search.series")}</Text>
           <View style={seriesListStyle}>
             {series.map((show) => (
               <SeriesRow
                 key={show.id}
                 title={show.title}
-                subtitle="Serie"
+                subtitle={t("search.seriesKind")}
                 onPress={() => openShow(show)}
               />
             ))}
@@ -206,13 +209,13 @@ function VideoSearch() {
       ) : null}
       {movies.length ? (
         <View>
-          <Text style={type.sectionTitle}>Películas</Text>
+          <Text style={type.sectionTitle}>{t("search.movies")}</Text>
           <View style={seriesListStyle}>
             {movies.map((show) => (
               <SeriesRow
                 key={show.id}
                 title={show.title}
-                subtitle="Película"
+                subtitle={t("search.movieKind")}
                 playable={show.file}
                 onPress={() => openShow(show)}
               />
@@ -230,6 +233,7 @@ function hay(q: string, ...parts: Array<string | null | undefined>): boolean {
 }
 
 function WealthSearch() {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const { txs, assets, liveAccounts, goalProgress, totalOf } = useWealth();
   const [preview, setPreview] = useState<WealthAccount | null>(null);
@@ -242,7 +246,7 @@ function WealthSearch() {
   const matchedAccounts = useMemo(
     () =>
       liveAccounts.filter((account) =>
-        hay(q, account.name, ACCOUNT_KIND_LABEL[account.kind], "cuenta", "efectivo"),
+        hay(q, account.name, ACCOUNT_KIND_LABEL[account.kind], "cuenta", "efectivo", "account", "cash"),
       ),
     [liveAccounts, q],
   );
@@ -258,13 +262,14 @@ function WealthSearch() {
         account,
         "inversion",
         "inversión",
+        "investment",
       );
     });
   }, [assets, liveAccounts, q]);
   const matchedGoals = useMemo(
     () =>
       goalProgress.filter((item) =>
-        hay(q, item.goal.name, item.scopeLabel, "objetivo"),
+        hay(q, item.goal.name, item.scopeLabel, "objetivo", "goal"),
       ),
     [goalProgress, q],
   );
@@ -298,20 +303,20 @@ function WealthSearch() {
   return (
     <>
       <Screen>
-        <Text style={type.pageTitle}>Buscar</Text>
+        <Text style={type.pageTitle}>{t("search.title")}</Text>
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Cuenta, inversión o movimiento"
+          placeholder={t("search.placeholderWealth")}
           placeholderTextColor={colors.muted}
           autoCorrect={false}
           style={styles.input}
         />
-        {empty ? <Text style={type.body}>Nada para «{query.trim()}».</Text> : null}
+        {empty ? <Text style={type.body}>{t("search.emptyQuery", { query: query.trim() })}</Text> : null}
 
         {matchedAccounts.length ? (
           <View style={styles.block}>
-            <Text style={type.sectionTitle}>Cuentas</Text>
+            <Text style={type.sectionTitle}>{t("search.accounts")}</Text>
             {matchedAccounts.map((account) => (
               <Pressable
                 key={account.id}
@@ -335,7 +340,7 @@ function WealthSearch() {
 
         {matchedAssets.length ? (
           <View style={styles.block}>
-            <Text style={type.sectionTitle}>Inversiones</Text>
+            <Text style={type.sectionTitle}>{t("search.assets")}</Text>
             <View style={assetListStyle}>
               {matchedAssets.map((position) => (
                 <AssetRow
@@ -354,7 +359,7 @@ function WealthSearch() {
 
         {matchedGoals.length ? (
           <View style={styles.block}>
-            <Text style={type.sectionTitle}>Objetivos</Text>
+            <Text style={type.sectionTitle}>{t("search.goals")}</Text>
             <View style={goalListStyle}>
               {matchedGoals.map((item) => (
                 <GoalRow
@@ -373,7 +378,7 @@ function WealthSearch() {
 
         {matchedTx.length ? (
           <View style={styles.block}>
-            <Text style={type.sectionTitle}>Movimientos</Text>
+            <Text style={type.sectionTitle}>{t("search.txs")}</Text>
             <View style={txListStyle}>
               {matchedTx.map((tx) => (
                 <TxRow key={tx.id} tx={tx} />
@@ -417,6 +422,7 @@ function WealthSearch() {
 
 function FocusSearch() {
   const router = useRouter();
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const projects = useActiveProjects();
   const tasks = useVisibleTasks();
@@ -441,25 +447,25 @@ function FocusSearch() {
 
   return (
     <Screen>
-      <Text style={type.pageTitle}>Buscar</Text>
+      <Text style={type.pageTitle}>{t("search.title")}</Text>
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder="Tarea o proyecto"
+        placeholder={t("search.placeholderFocus")}
         placeholderTextColor={colors.muted}
         autoCorrect={false}
         style={styles.input}
       />
-      {empty ? <Text style={type.body}>Nada para «{query.trim()}».</Text> : null}
+      {empty ? <Text style={type.body}>{t("search.emptyQuery", { query: query.trim() })}</Text> : null}
       {matchedProjects.length ? (
         <View>
-          <Text style={type.sectionTitle}>Proyectos</Text>
+          <Text style={type.sectionTitle}>{t("search.projects")}</Text>
           <View style={seriesListStyle}>
             {matchedProjects.map((project) => (
               <SeriesRow
                 key={project.id}
                 title={project.name}
-                subtitle="Proyecto"
+                subtitle={t("search.projectKind")}
                 onPress={() => router.push(projectHref(project.id))}
               />
             ))}
@@ -468,7 +474,7 @@ function FocusSearch() {
       ) : null}
       {matchedTasks.length ? (
         <View>
-          <Text style={type.sectionTitle}>Tareas</Text>
+          <Text style={type.sectionTitle}>{t("search.tasks")}</Text>
           <View style={taskListStyle}>
             {matchedTasks.map((task) => (
               <TaskRow

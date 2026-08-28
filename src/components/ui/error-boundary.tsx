@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { t } from "@/lib/i18n/runtime";
 import { colors, fonts } from "@/lib/theme";
 
 type Props = { children: ReactNode };
@@ -20,8 +21,8 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children;
     return (
       <View style={styles.fill}>
-        <Text style={styles.title}>NLC no pudo abrir</Text>
-        <Text style={styles.body}>Copia este texto y lo vemos. No es el NAS: falló al arrancar.</Text>
+        <Text style={styles.title}>{t("errors.bootTitle")}</Text>
+        <Text style={styles.body}>{t("errors.bootBody")}</Text>
         <ScrollView style={styles.box} contentContainerStyle={styles.boxInner}>
           <Text selectable style={styles.stack}>
             {this.state.error.message}
@@ -33,7 +34,7 @@ export class ErrorBoundary extends Component<Props, State> {
           onPress={() => this.setState({ error: null })}
           style={({ pressed }) => [styles.btn, { opacity: pressed ? 0.8 : 1 }]}
         >
-          <Text style={styles.btnText}>Reintentar</Text>
+          <Text style={styles.btnText}>{t("errors.retry")}</Text>
         </Pressable>
       </View>
     );

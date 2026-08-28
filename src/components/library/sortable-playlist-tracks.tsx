@@ -15,6 +15,7 @@ import { useTrackActions } from "@/lib/player/track-actions-context";
 import type { ImportedTrack } from "@/lib/spotify/types";
 import { formatDurationMs } from "@/lib/spotify/txt";
 import { triggerLongPressUiHaptic, triggerSelectionUiHaptic, triggerUiHaptic } from "@/lib/ui-haptics";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts } from "@/lib/theme";
 
 const ROW = 64;
@@ -197,6 +198,7 @@ function SortableRow({
   onHover: (index: number) => void;
   onDragEnd: (to: number) => void;
 }) {
+  const { t } = useI18n();
   const { openTrackActions } = useTrackActions();
   const local = track.matched;
   const coverUri = useTrackArtwork(
@@ -317,7 +319,7 @@ function SortableRow({
         </GestureDetector>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Más opciones"
+          accessibilityLabel={t("common.moreOptions")}
           disabled={!local}
           hitSlop={10}
           onPress={() => {

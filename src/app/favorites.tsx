@@ -7,6 +7,7 @@ import { Screen } from "@/components/ui/screen";
 import { SeriesRow, seriesListStyle } from "@/components/video/series-row";
 import { useExitingList } from "@/hooks/use-exiting-list";
 import { useVideoFavorites } from "@/hooks/use-video-favorites";
+import { useI18n } from "@/lib/i18n/context";
 import { useFavorites } from "@/lib/favorites/favorites-context";
 import { isPodcastTrack } from "@/lib/nas/webdav";
 import { usePlayer } from "@/lib/player/player-context";
@@ -32,6 +33,7 @@ export default function FavoritesScreen() {
 
 function AudioFavorites({ kind }: { kind: "music" | "podcast" }) {
   const podcast = kind === "podcast";
+  const { t } = useI18n();
   const { favorites } = useFavorites();
   const { playTracks, current } = usePlayer();
 
@@ -41,17 +43,22 @@ function AudioFavorites({ kind }: { kind: "music" | "podcast" }) {
   );
   const { items: visibleList, isExiting } = useExitingList(list);
 
-  const title = podcast ? "Favoritos podcast" : "Favoritos música";
-  const emptyHint = podcast
-    ? "Marca un episodio con el corazón mientras suena para guardarlo aquí."
-    : "Marca una canción con el corazón mientras suena para guardarla aquí.";
-  const countLabel = podcast
-    ? list.length
-      ? `${list.length} episodios`
-      : "Aún no hay episodios guardados"
-    : list.length
-      ? `${list.length} canciones`
-      : "Aún no hay canciones guardadas";
+  const title = podcast ? t("favorites.podcast") : t("favorites.music");
+  const emptyHint = podcast ? t("favorites.podcastHint") : t("favorites.musicHint");
+  const countLabel = list.length
+    ? t(
+        podcast
+          ? list.length === 1
+            ? "favorites.episodeOne"
+            : "favorites.episodeMany"
+          : list.length === 1
+            ? "favorites.songOne"
+            : "favorites.songMany",
+        { count: list.length },
+      )
+    : podcast
+      ? t("favorites.emptyPodcast")
+      : t("favorites.emptyMusic");
 
   return (
     <Screen>
@@ -59,7 +66,7 @@ function AudioFavorites({ kind }: { kind: "music" | "podcast" }) {
         <View style={[styles.art, podcast ? styles.artPodcast : styles.artMusic]}>
           <Heart color={colors.accent} fill={colors.accent} size={36} />
         </View>
-        <Text style={type.label}>Lista</Text>
+        <Text style={type.label}>{t("common.list")}</Text>
         <Text style={type.pageTitle}>{title}</Text>
         <Text style={type.meta}>{countLabel}</Text>
       </View>
@@ -70,13 +77,13 @@ function AudioFavorites({ kind }: { kind: "music" | "podcast" }) {
             onPress={() => void playTracks(list, 0)}
             style={({ pressed }) => [styles.btn, styles.solid, { opacity: pressed ? 0.8 : 1 }]}
           >
-            <Text style={styles.solidText}>Reproducir</Text>
+            <Text style={styles.solidText}>{t("common.play")}</Text>
           </Pressable>
           <Pressable
             onPress={() => void playTracks(list, Math.floor(Math.random() * list.length))}
             style={({ pressed }) => [styles.btn, styles.ghost, { opacity: pressed ? 0.8 : 1 }]}
           >
-            <Text style={styles.ghostText}>Aleatorio</Text>
+            <Text style={styles.ghostText}>{t("common.shuffle")}</Text>
           </Pressable>
         </View>
       ) : (
@@ -104,6 +111,7 @@ function AudioFavorites({ kind }: { kind: "music" | "podcast" }) {
 
 function VideoFavorites() {
   const router = useRouter();
+  const { t } = useI18n();
   const { favorites, refresh } = useVideoFavorites();
   const { openVideoActions } = useVideoActions();
   const series = favorites.filter((item) => item.kind === "series");
@@ -123,30 +131,28 @@ function VideoFavorites() {
         <View style={[styles.art, styles.artVideo]}>
           <Heart color={colors.accent} fill={colors.accent} size={36} />
         </View>
-        <Text style={type.label}>Lista</Text>
-        <Text style={type.pageTitle}>Favoritos vídeo</Text>
+        <Text style={type.label}>{t("common.list")}</Text>
+        <Text style={type.pageTitle}>{t("favorites.video")}</Text>
         <Text style={type.meta}>
           {favorites.length
-            ? `${favorites.length} ${favorites.length === 1 ? "título" : "títulos"}`
-            : "Aún no hay vídeos guardados"}
+            ? t(favorites.length === 1 ? "favorites.titleOne" : "favorites.titleMany", {
+                count: favorites.length,
+              })
+            : t("favorites.emptyVideo")}
         </Text>
       </View>
 
-      {!favorites.length ? (
-        <Text style={type.body}>
-          Mantén pulsada una serie o película y márcala con el corazón para guardarla aquí.
-        </Text>
-      ) : null}
+      {!favorites.length ? <Text style={type.body}>{t("favorites.videoHint")}</Text> : null}
 
       {series.length ? (
         <View>
-          <Text style={type.sectionTitle}>Series</Text>
+          <Text style={type.sectionTitle}>{t("favorites.series")}</Text>
           <View style={seriesListStyle}>
             {series.map((show) => (
               <SeriesRow
                 key={show.path}
                 title={show.title}
-                subtitle="Serie"
+                subtitle={t("videos.seriesKind")}
                 onPress={() => openShow(show.path, show.kind, show.file)}
                 onLongPress={() =>
                   openVideoActions(
@@ -162,13 +168,13 @@ function VideoFavorites() {
 
       {movies.length ? (
         <View>
-          <Text style={type.sectionTitle}>Películas</Text>
+          <Text style={type.sectionTitle}>{t("favorites.movies")}</Text>
           <View style={seriesListStyle}>
             {movies.map((show) => (
               <SeriesRow
                 key={show.path}
                 title={show.title}
-                subtitle="Película"
+                subtitle={t("videos.movieKind")}
                 playable={show.file}
                 onPress={() => openShow(show.path, show.kind, show.file)}
                 onLongPress={() =>

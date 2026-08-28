@@ -5,14 +5,16 @@ import { Plus } from "lucide-react-native";
 import { TaskComposerSheet } from "@/components/productivity/task-composer-sheet";
 import { TaskRow } from "@/components/productivity/task-row";
 import { Screen } from "@/components/ui/screen";
+import { useI18n } from "@/lib/i18n/context";
 import { taskHref } from "@/lib/library/href";
 import { useActiveProjects, useVisibleTasks } from "@/lib/productivity/productivity-context";
 import { useTaskActions } from "@/lib/productivity/task-actions-context";
-import { STATUS_LABEL, TASK_STATUSES, type TaskStatus } from "@/lib/productivity/types";
+import { projectDisplayName, STATUS_LABEL, TASK_STATUSES, type TaskStatus } from "@/lib/productivity/types";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, layout, type } from "@/lib/theme";
 
 export function FocusBoard() {
+  const { t } = useI18n();
   const router = useRouter();
   const projects = useActiveProjects();
   const tasks = useVisibleTasks();
@@ -37,9 +39,9 @@ export function FocusBoard() {
     <>
       <Screen scroll={false}>
         <View style={styles.header}>
-          <Text style={[type.pageTitle, styles.title]}>Biblioteca</Text>
+          <Text style={[type.pageTitle, styles.title]}>{t("chrome.library")}</Text>
           <Pressable
-            accessibilityLabel="Nueva tarea"
+            accessibilityLabel={t("focus.newTask")}
             onPress={() => {
               triggerUiHaptic();
               setComposeOpen(true);
@@ -61,7 +63,7 @@ export function FocusBoard() {
             onPress={() => setFilter(null)}
             style={[styles.tab, filter == null && styles.tabActive]}
           >
-            <Text style={[styles.tabLabel, filter == null && styles.tabLabelActive]}>Todos</Text>
+            <Text style={[styles.tabLabel, filter == null && styles.tabLabelActive]}>{t("focus.all")}</Text>
           </Pressable>
           {projects.map((project) => {
             const active = filter === project.id;
@@ -72,7 +74,7 @@ export function FocusBoard() {
                 style={[styles.tab, active && styles.tabActive]}
               >
                 <View style={[styles.dot, { backgroundColor: project.color }]} />
-                <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{project.name}</Text>
+                <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{projectDisplayName(project)}</Text>
               </Pressable>
             );
           })}
@@ -107,7 +109,7 @@ export function FocusBoard() {
                   />
                 ))}
                 {!byStatus[status].length ? (
-                  <Text style={styles.empty}>Nada aquí.</Text>
+                  <Text style={styles.empty}>{t("focus.emptyBoard")}</Text>
                 ) : null}
               </ScrollView>
             </View>

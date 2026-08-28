@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Cover } from "@/components/ui/cover";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import type { Artist } from "@/lib/nas/types";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts } from "@/lib/theme";
 
 export function ArtistRow({
@@ -13,13 +14,21 @@ export function ArtistRow({
   subtitle?: string;
   onPress: () => void;
 }) {
+  const { t } = useI18n();
   const cover = useCoverUrl(artist.coverId);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.8 : 1 }]}>
       <Cover id={artist.id} label={artist.name} uri={cover} size={56} radius={28} />
       <View style={styles.meta}>
         <Text style={styles.name}>{artist.name}</Text>
-        <Text style={styles.sub}>{subtitle ?? (artist.albumCount ? `${artist.albumCount} álbumes` : "Artista")}</Text>
+        <Text style={styles.sub}>
+          {subtitle ??
+            (artist.albumCount
+              ? t(artist.albumCount === 1 ? "library.albumOne" : "library.albumMany", {
+                  count: artist.albumCount,
+                })
+              : t("library.artist"))}
+        </Text>
       </View>
     </Pressable>
   );

@@ -1,3 +1,5 @@
+import { t } from "@/lib/i18n/runtime";
+
 export type WealthAccountKind = "cash" | "bank" | "wallet";
 export type WealthAssetKind = "stock" | "etf" | "crypto" | "fund" | "portfolio" | "other";
 export type WealthTxKind = "income" | "expense" | "buy" | "sell" | "transfer";
@@ -73,40 +75,80 @@ export const CASH_ACCOUNT_NAME = "Caja";
 export const TX_KINDS: WealthTxKind[] = ["income", "expense", "buy", "sell", "transfer"];
 
 export const TX_KIND_LABEL: Record<WealthTxKind, string> = {
-  income: "Ingreso",
-  expense: "Gasto",
-  buy: "Compra",
-  sell: "Venta",
-  transfer: "Traspaso",
+  get income() {
+    return t("wealth.tx.income");
+  },
+  get expense() {
+    return t("wealth.tx.expense");
+  },
+  get buy() {
+    return t("wealth.tx.buy");
+  },
+  get sell() {
+    return t("wealth.tx.sell");
+  },
+  get transfer() {
+    return t("wealth.tx.transfer");
+  },
 };
 
 export const ASSET_KINDS: WealthAssetKind[] = ["stock", "etf", "crypto", "fund", "portfolio", "other"];
 
 export const ASSET_KIND_LABEL: Record<WealthAssetKind, string> = {
-  stock: "Acción",
-  etf: "ETF",
-  crypto: "Cripto",
-  fund: "Fondo",
-  portfolio: "Cartera",
-  other: "Otro",
+  get stock() {
+    return t("wealth.assetKind.stock");
+  },
+  get etf() {
+    return t("wealth.assetKind.etf");
+  },
+  get crypto() {
+    return t("wealth.assetKind.crypto");
+  },
+  get fund() {
+    return t("wealth.assetKind.fund");
+  },
+  get portfolio() {
+    return t("wealth.assetKind.portfolio");
+  },
+  get other() {
+    return t("wealth.assetKind.other");
+  },
 };
 
 export const ACCOUNT_KINDS: WealthAccountKind[] = ["cash", "bank", "wallet"];
 
 export const ACCOUNT_KIND_LABEL: Record<WealthAccountKind, string> = {
-  cash: "Efectivo",
-  bank: "Banco",
-  wallet: "Monedero",
+  get cash() {
+    return t("wealth.accountKind.cash");
+  },
+  get bank() {
+    return t("wealth.accountKind.bank");
+  },
+  get wallet() {
+    return t("wealth.accountKind.wallet");
+  },
 };
 
 export const GOAL_SCOPES: WealthGoalScope[] = ["networth", "cash", "account", "asset"];
 
 export const GOAL_SCOPE_LABEL: Record<WealthGoalScope, string> = {
-  networth: "Patrimonio",
-  cash: "Caja",
-  account: "Cuenta",
-  asset: "Inversión",
+  get networth() {
+    return t("wealth.scope.networth");
+  },
+  get cash() {
+    return t("wealth.scope.cash");
+  },
+  get account() {
+    return t("wealth.scope.account");
+  },
+  get asset() {
+    return t("wealth.scope.asset");
+  },
 };
+
+export function accountDisplayName(account: { id: string; name: string }): string {
+  return account.id === CASH_ACCOUNT_ID ? t("wealth.cash") : account.name;
+}
 
 export function parseGoalScope(value?: string | null): WealthGoalScope | null {
   const raw = value?.trim().toLowerCase();
@@ -119,11 +161,11 @@ export function parseGoalScope(value?: string | null): WealthGoalScope | null {
 }
 
 export const RANGE_OPTIONS: { id: WealthRange; label: string }[] = [
-  { id: "1d", label: "1D" },
-  { id: "1w", label: "1S" },
-  { id: "1m", label: "1M" },
-  { id: "1y", label: "1A" },
-  { id: "max", label: "Máx" },
+  { id: "1d", get label() { return t("wealth.range.1d"); } },
+  { id: "1w", get label() { return t("wealth.range.1w"); } },
+  { id: "1m", get label() { return t("wealth.range.1m"); } },
+  { id: "1y", get label() { return t("wealth.range.1y"); } },
+  { id: "max", get label() { return t("wealth.range.max"); } },
 ];
 
 export const EXPENSE_CATEGORIES = [

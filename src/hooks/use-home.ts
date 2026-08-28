@@ -5,6 +5,7 @@ import { loadRecents, pruneMissingLibraryTracks, subscribeLibraryChanged } from 
 import { hydrateTrackArtworkCache, withTracksArtwork } from "@/lib/library/artwork-cache";
 import { persistLibraryCovers } from "@/lib/library/persist-covers";
 import type { Album, Track } from "@/lib/nas/types";
+import { t } from "@/lib/i18n/runtime";
 import { useSettings } from "@/lib/settings/settings-context";
 
 /** Keep last home payload across tab remounts (APK) to avoid skeleton flashes. */
@@ -54,10 +55,10 @@ export function useHome() {
       setPodcastAlbums(nextPodcasts);
       if (online) persistLibraryCovers(source, libraryTracks);
       if (offlineOnly && !(await catalogTrackCount())) {
-        setError("Sin conexión al NAS y sin copias en el teléfono.");
+        setError(t("home.nasOfflineNoCache"));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cargar el inicio.");
+      setError(err instanceof Error ? err.message : t("home.loadError"));
     } finally {
       setLoading(false);
     }

@@ -4,12 +4,14 @@ import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { AssetComposerSheet } from "@/components/wealth/account-composer-sheet";
 import { AssetRow, assetListStyle } from "@/components/wealth/asset-row";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, type } from "@/lib/theme";
 import type { WealthAsset } from "@/lib/wealth/types";
 import { useWealth } from "@/lib/wealth/wealth-context";
 
 export default function WealthAssetsScreen() {
+  const { t } = useI18n();
   const { positions } = useWealth();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<WealthAsset | null>(null);
@@ -24,9 +26,9 @@ export default function WealthAssetsScreen() {
     <>
       <Screen>
         <View style={styles.header}>
-          <Text style={[type.pageTitle, styles.title]}>Inversiones</Text>
+          <Text style={[type.pageTitle, styles.title]}>{t("wealth.assets")}</Text>
           <Pressable
-            accessibilityLabel="Nueva inversión"
+            accessibilityLabel={t("wealth.newAsset")}
             onPress={() => openAsset()}
             style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
           >
@@ -40,7 +42,7 @@ export default function WealthAssetsScreen() {
             ))}
           </View>
         ) : (
-          <Text style={type.body}>Todavía no hay posiciones. Añade una o registra una compra.</Text>
+          <Text style={type.body}>{t("wealth.emptyPositionsBuy")}</Text>
         )}
       </Screen>
       <AssetComposerSheet

@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { Platform } from "react-native";
 
 const CURSOR_API = "https://api.cursor.com/v1";
@@ -66,13 +67,13 @@ async function cursorFetch(
     }
     return response;
   }
-  return last ?? new Response("No hay proxy de Cursor.", { status: 502 });
+  return last ?? new Response(t("chat.noProxy"), { status: 502 });
 }
 
 async function readError(response: Response): Promise<string> {
   const type = response.headers.get("content-type") ?? "";
   if (type.includes("text/html")) {
-    return "El navegador no llega a la API de Cursor. Reinicia expo start y vuelve a probar.";
+    return t("chat.browserApi");
   }
   try {
     const data = (await response.json()) as { error?: string; message?: string; detail?: string };
@@ -84,7 +85,7 @@ async function readError(response: Response): Promise<string> {
 
 export async function testCursorKey(apiKey: string): Promise<{ ok: boolean; message: string }> {
   const trimmed = apiKey.trim();
-  if (!trimmed) return { ok: false, message: "Falta la API key de Cursor." };
+  if (!trimmed) return { ok: false, message: t("chat.missingKey") };
   try {
     const response = await cursorFetch(trimmed, "/models");
     if (!response.ok) {
@@ -94,12 +95,12 @@ export async function testCursorKey(apiKey: string): Promise<{ ok: boolean; mess
     const count = payload.items?.length ?? 0;
     return {
       ok: true,
-      message: count ? `Conectado. ${count} modelos.` : "Conectado a Cursor.",
+      message: count ? t("chat.connectedModels", { count }) : t("chat.connected"),
     };
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "No se pudo hablar con Cursor.",
+      message: error instanceof Error ? error.message : t("chat.talkFail"),
     };
   }
 }
@@ -161,7 +162,7 @@ export async function waitForCursorRun(
   onTick?.(current);
   while (!isTerminalRun(current.status)) {
     if (Date.now() - started > 4 * 60 * 1000) {
-      throw new Error("El agente tarda demasiado. Prueba de nuevo.");
+      throw new Error(t("chat.agentSlow"));
     }
     await new Promise((resolve) => setTimeout(resolve, 1500));
     current = await getCursorRun(apiKey, agentId, runId);
@@ -170,72 +171,9 @@ export async function waitForCursorRun(
   return current;
 }
 
-export const NLC_AGENT_PREAMBLE = `Eres el asistente de NLC. Responde en español, breve y práctico. PUEDES HACER cambios: la app ejecutará un bloque de acciones.
+export function nlcAgentPreamble(): string {
+  return `${t("chat.agentLead")}
 
-Cuando el usuario pida crear, mover, anotar, borrar, renombrar, destacar, registrar dinero o cambiar de zona, responde en prosa Y al final este bloque (sin markdown):
-
-[[[NLC]]]
-{"actions":[{"op":"create_task","title":"Comprar leche","project":"Bandeja","due":"today"}]}
-[[[/NLC]]]
-
-Tareas:
-- create_task {title, project?, notes?, status?, due?, starred?}
-- update_task | move_task {match, title?, notes?, append_notes?, status?, due?, starred?, project?}
-- delete_task {match}
-- create_project {name}
-- rename_project {match, name}
-- archive_project {match}
-
-Recordatorios:
-- create_reminder {title, time? ("09:30"), hour?, minute?, frequency?, weekday?, due?, body?, enabled?}
-- update_reminder {match, title?, time?, frequency?, weekday?, due?, body?, enabled?}
-- delete_reminder {match}
-frequency = once|daily|weekdays|weekly. weekday = lunes…domingo.
-
-Patrimonio (EUR). Para dejar un saldo, registra ingreso o gasto; no hay set_balance.
-- create_tx {kind, amount, title, category?, account?, counter?, asset?, ticker?, asset_kind?, quantity?, price?, notes?, due?}
-  kind = income|expense|buy|sell|transfer (ingreso, gasto, compra, venta, traspaso)
-  account por defecto Caja. En compra, si no existe el activo, se crea.
-- delete_tx {match}
-- create_account {name, kind?} kind = cash|bank|wallet
-- rename_account {match, name}
-- archive_account {match, archived?}
-- create_asset {name, ticker?, kind?, account?, quantity?, price?, cost_basis?} kind = stock|etf|crypto|fund|portfolio|other
-- update_asset {match, name?, ticker?, quantity?, price?, cost_basis?, account?, archived?}
-- quote_asset {match, price, due?}  marca el valor del activo en una fecha (hoy si omites due)
-- archive_asset {match}
-- create_goal {name, target, scope?, account?, asset?, due?}
-  scope = networth|cash|account|asset (patrimonio, caja, cuenta, inversión)
-- update_goal {match, name?, target?, scope?, account?, asset?, due?, archived?}
-- archive_goal | delete_goal {match}
-
-Biblioteca:
-- create_playlist {name, tracks?}
-- rename_playlist {match, name}
-- delete_playlist {match}
-- like_playlist {match, liked?}
-- add_to_playlist {playlist, tracks}
-- favorite_track {match}
-- rename_track {match, name}
-- rename_album {match, name}
-- rename_artist {match, name}
-- rename_video {match, name}
-- favorite_video {match}
-- set_zone {zone: music|podcast|video|focus|wealth}
-
-match = nombre aproximado. due = today|tomorrow|none|YYYY-MM-DD.
-status = todo|doing|done (por hacer / en curso / hecho).
-append_notes = añade una nota a la tarea (para "anota que…").
-Si solo pregunta, no pongas bloque. Si pide varias cosas, varias actions.
-
-Hechos de NLC:
-- Fuente: la que el usuario tenga en Ajustes (WebDAV, Navidrome/OpenSubsonic, carpeta local o biblioteca de ejemplo).
-- Portada: jpg con el mismo nombre que el audio. En dumps no se hereda cover.jpg de carpeta.
-- Podcast plano = un álbum por episodio.
-- yt-dlp: host y puerto de Ajustes → Descargas (por defecto :8091).
-- Spotify: se importa y se matchea contra el NAS; no se reproduce Spotify.
-- Vídeo: share configurado (p. ej. Popcorn); One Piece por saga → arco → archivo.
-- Productividad: vive en el teléfono (Bandeja + proyectos + tablero). Si hay fuente, nlc-tasks.json.
-- Patrimonio: Caja + cuentas + inversiones + movimientos + objetivos. Si hay fuente, nlc-wealth.json.
-
+${t("chat.agentSpec")}
 `;
+}

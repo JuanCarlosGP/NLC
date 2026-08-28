@@ -3,6 +3,7 @@ import { Clapperboard, Mic, Music2, SquareCheck, Wallet } from "lucide-react-nat
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { APP_ZONES, useZone, type AppZone, type EnabledZones } from "@/lib/zone/zone-context";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
@@ -14,14 +15,15 @@ const ICONS: Record<AppZone, typeof Music2> = {
   wealth: Wallet,
 };
 
-export function zoneVisibilitySummary(enabled: EnabledZones): string {
+export function zoneVisibilitySummary(enabled: EnabledZones, t: (path: string) => string): string {
   const visible = APP_ZONES.filter((item) => enabled[item.id]);
-  if (visible.length === APP_ZONES.length) return "Todos visibles";
-  return visible.map((item) => item.label).join(" · ") || "Ninguno";
+  if (visible.length === APP_ZONES.length) return t("zones.allVisible");
+  return visible.map((item) => t(`zones.${item.id}`)).join(" · ") || t("zones.none");
 }
 
 export function ZoneSwitch() {
   const { zone, setZone, enabled } = useZone();
+  const { t } = useI18n();
   const options = APP_ZONES.filter((item) => enabled[item.id]);
   if (options.length <= 1) return null;
 
@@ -34,7 +36,7 @@ export function ZoneSwitch() {
           <Pressable
             key={item.id}
             accessibilityRole="button"
-            accessibilityLabel={item.label}
+            accessibilityLabel={t(`zones.${item.id}`)}
             accessibilityState={{ selected: active }}
             onPress={() => {
               triggerUiHaptic();
@@ -58,22 +60,21 @@ export function ZoneVisibilitySheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const { enabled, setZoneEnabled } = useZone();
+  const { t } = useI18n();
 
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar apartados"
+      accessibilityCloseLabel={t("settings.closeZones")}
       viewportRatio={0.62}
     >
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.titleMeta}>
-          <Text style={type.label}>Apartados</Text>
-          <Text style={type.pageTitle}>Selector de zona</Text>
+          <Text style={type.label}>{t("settings.zones")}</Text>
+          <Text style={type.pageTitle}>{t("settings.zonePicker")}</Text>
         </View>
-        <Text style={styles.hint}>
-          El selector solo enseña los que dejes encendidos. Tiene que quedar al menos uno.
-        </Text>
+        <Text style={styles.hint}>{t("settings.zoneHint")}</Text>
         {APP_ZONES.map((item) => {
           const Icon = ICONS[item.id];
           const on = enabled[item.id];
@@ -81,8 +82,10 @@ export function ZoneVisibilitySheet({
             <View key={item.id} style={styles.visibilityRow}>
               <Icon size={18} color={on ? colors.ink : colors.inkSoft} strokeWidth={1.9} />
               <View style={styles.visibilityMeta}>
-                <Text style={styles.option}>{item.label}</Text>
-                <Text style={styles.visibilitySummary}>{on ? "Visible" : "Oculto"}</Text>
+                <Text style={styles.option}>{t(`zones.${item.id}`)}</Text>
+                <Text style={styles.visibilitySummary}>
+                  {on ? t("settings.zoneVisible") : t("settings.zoneHidden")}
+                </Text>
               </View>
               <Switch
                 value={on}

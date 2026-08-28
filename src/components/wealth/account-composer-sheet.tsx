@@ -8,7 +8,9 @@ import { AmountInput } from "@/components/wealth/amount-input";
 import { TxComposerSheet } from "@/components/wealth/tx-composer-sheet";
 import { WealthChart } from "@/components/wealth/wealth-chart";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { formatAmountInput, formatEuro, formatPct, formatSignedEuro, parseAmount, roundMoney } from "@/lib/wealth/money";
+import { useI18n } from "@/lib/i18n/context";
+import { dateLocale, t as tr } from "@/lib/i18n/runtime";
+import { amountPlaceholder, formatAmountInput, formatEuro, formatPct, formatSignedEuro, parseAmount, roundMoney } from "@/lib/wealth/money";
 import { assetHistory, assetSeries, changePct, parseBookedDay } from "@/lib/wealth/compute";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 import {
@@ -30,14 +32,16 @@ export function AccountComposerSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   return (
-    <BottomSheet open={open} onOpenChange={onOpenChange} accessibilityCloseLabel="Cerrar cuenta" viewportRatio={0.62}>
+    <BottomSheet open={open} onOpenChange={onOpenChange} accessibilityCloseLabel={t("wealth.closeAccount")} viewportRatio={0.62}>
       <AccountComposerBody open={open} onDone={() => onOpenChange(false)} />
     </BottomSheet>
   );
 }
 
 function AccountComposerBody({ open, onDone }: { open: boolean; onDone: () => void }) {
+  const { t } = useI18n();
   const { createAccount } = useWealth();
   const [name, setName] = useState("");
   const [kind, setKind] = useState<WealthAccountKind>("bank");
@@ -64,11 +68,11 @@ function AccountComposerBody({ open, onDone }: { open: boolean; onDone: () => vo
 
   return (
     <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Text style={type.sectionTitle}>Nueva cuenta</Text>
+      <Text style={type.sectionTitle}>{t("wealth.newAccount")}</Text>
       <TextInput
         value={name}
         onChangeText={setName}
-        placeholder="BBVA, Revolut…"
+        placeholder={t("wealth.accountPlaceholder")}
         placeholderTextColor={colors.muted}
         style={styles.input}
       />
@@ -94,7 +98,7 @@ function AccountComposerBody({ open, onDone }: { open: boolean; onDone: () => vo
         onPress={() => void submit()}
         style={({ pressed }) => [styles.submit, { opacity: !name.trim() || busy ? 0.4 : pressed ? 0.86 : 1 }]}
       >
-        <Text style={styles.submitText}>{busy ? "…" : "Crear"}</Text>
+        <Text style={styles.submitText}>{busy ? "…" : t("common.create")}</Text>
       </Pressable>
     </SheetScrollView>
   );
@@ -107,11 +111,12 @@ export function CashComposerSheet({
   account: WealthAccount | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={account != null}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar efectivo"
+      accessibilityCloseLabel={t("wealth.closeCash")}
       viewportRatio={0.52}
     >
       {account ? <CashComposerBody account={account} onDone={() => onOpenChange(false)} /> : null}
@@ -120,6 +125,7 @@ export function CashComposerSheet({
 }
 
 function CashComposerBody({ account, onDone }: { account: WealthAccount; onDone: () => void }) {
+  const { t } = useI18n();
   const { createTx, balanceOf } = useWealth();
   const cash = balanceOf(account.id);
   const [amount, setAmount] = useState("");
@@ -148,14 +154,14 @@ function CashComposerBody({ account, onDone }: { account: WealthAccount; onDone:
       await createTx({
         kind: delta > 0 ? "income" : "expense",
         amount: Math.abs(delta),
-        title: "Ajuste",
+        title: tr("wealth.adjustment"),
         category: "Otro",
         accountId: account.id,
       });
       triggerUiHaptic();
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar.");
+      setError(err instanceof Error ? err.message : t("wealth.saveFail"));
     } finally {
       setBusy(false);
     }
@@ -163,14 +169,14 @@ function CashComposerBody({ account, onDone }: { account: WealthAccount; onDone:
 
   return (
     <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Text style={type.sectionTitle}>Editar efectivo</Text>
+      <Text style={type.sectionTitle}>{t("wealth.editCash")}</Text>
       <Text style={type.meta}>{account.name}</Text>
-      <Text style={type.label}>Saldo</Text>
+      <Text style={type.label}>{t("wealth.balance")}</Text>
       <AmountInput
         value={amount}
         onChangeText={setAmount}
-        placeholder="0,00"
-        accessibilityLabel="Efectivo"
+        placeholder={amountPlaceholder()}
+        accessibilityLabel={t("wealth.cashA11y")}
         style={styles.input}
       />
       {error ? <Text style={styles.removeText}>{error}</Text> : null}
@@ -179,7 +185,7 @@ function CashComposerBody({ account, onDone }: { account: WealthAccount; onDone:
         onPress={() => void submit()}
         style={({ pressed }) => [styles.submit, { opacity: !canSave || busy ? 0.4 : pressed ? 0.86 : 1 }]}
       >
-        <Text style={styles.submitText}>{busy ? "…" : "Guardar"}</Text>
+        <Text style={styles.submitText}>{busy ? "…" : t("common.save")}</Text>
       </Pressable>
     </SheetScrollView>
   );
@@ -196,11 +202,12 @@ export function AssetComposerSheet({
   asset?: WealthAsset | null;
   defaultAccountId?: string | null;
 }) {
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar inversión"
+      accessibilityCloseLabel={t("wealth.closeAsset")}
       viewportRatio={0.86}
     >
       <AssetComposerBody
@@ -224,6 +231,7 @@ function AssetComposerBody({
   defaultAccountId?: string | null;
   onDone: () => void;
 }) {
+  const { t } = useI18n();
   const { createAsset, updateAsset, createQuote, deleteQuote, assets, quotes, txs } = useWealth();
   const accounts = useLiveAccounts();
   const current = asset ? (assets.find((item) => item.id === asset.id) ?? asset) : null;
@@ -324,18 +332,18 @@ function AssetComposerBody({
   return (
     <>
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text style={type.sectionTitle}>{asset ? "Editar inversión" : "Nueva inversión"}</Text>
+        <Text style={type.sectionTitle}>{asset ? t("wealth.editAsset") : t("wealth.newAsset")}</Text>
         <TextInput
           value={name}
           onChangeText={setName}
-          placeholder="SpaceX, Intel…"
+          placeholder={t("wealth.assetPlaceholder")}
           placeholderTextColor={colors.muted}
           style={styles.input}
         />
         <TextInput
           value={ticker}
           onChangeText={setTicker}
-          placeholder="Ticker"
+          placeholder={t("wealth.tickerShort")}
           placeholderTextColor={colors.muted}
           autoCapitalize="characters"
           style={styles.input}
@@ -357,7 +365,7 @@ function AssetComposerBody({
             );
           })}
         </View>
-        <Text style={type.label}>Cuenta</Text>
+        <Text style={type.label}>{t("wealth.account")}</Text>
         <View style={styles.chips}>
           <Pressable
             onPress={() => {
@@ -366,7 +374,7 @@ function AssetComposerBody({
             }}
             style={[styles.chip, !accountId && styles.chipOn]}
           >
-            <Text style={[styles.chipLabel, !accountId && styles.chipLabelOn]}>Ninguna</Text>
+            <Text style={[styles.chipLabel, !accountId && styles.chipLabelOn]}>{t("wealth.accountNone")}</Text>
           </Pressable>
           {accounts.map((account) => {
             const active = accountId === account.id;
@@ -384,38 +392,38 @@ function AssetComposerBody({
             );
           })}
         </View>
-        <Text style={type.label}>Cantidad</Text>
+        <Text style={type.label}>{t("wealth.quantityA11y")}</Text>
         <AmountInput
           value={qty}
           onChangeText={setQty}
           decimals={8}
-          placeholder="Vacío = 1"
-          accessibilityLabel="Cantidad"
+          placeholder={t("wealth.quantityEmpty")}
+          accessibilityLabel={t("wealth.quantityA11y")}
           style={styles.input}
         />
-        <Text style={type.label}>Precio</Text>
+        <Text style={type.label}>{t("wealth.priceA11y")}</Text>
         <AmountInput
           value={price}
           onChangeText={setPrice}
-          placeholder="25,00"
-          accessibilityLabel="Precio"
+          placeholder={amountPlaceholder(25)}
+          accessibilityLabel={t("wealth.priceA11y")}
           style={styles.input}
         />
         {asset ? (
           <>
-            <Text style={type.label}>Coste</Text>
+            <Text style={type.label}>{t("wealth.costA11y")}</Text>
             <AmountInput
               value={cost}
               onChangeText={setCost}
-              placeholder="50,00"
-              accessibilityLabel="Coste"
+              placeholder={amountPlaceholder(50)}
+              accessibilityLabel={t("wealth.costA11y")}
               style={styles.input}
             />
-            <Text style={type.label}>Fecha del valor</Text>
+            <Text style={type.label}>{t("wealth.quoteDate")}</Text>
             <TextInput
               value={day}
               onChangeText={setDay}
-              placeholder="Hoy o 25/8/2026"
+              placeholder={t("wealth.quoteDatePlaceholder")}
               placeholderTextColor={colors.muted}
               style={styles.input}
             />
@@ -427,7 +435,7 @@ function AssetComposerBody({
                 { opacity: !canQuote || busy ? 0.4 : pressed ? 0.86 : 1 },
               ]}
             >
-              <Text style={styles.secondaryText}>{busy ? "…" : "Registrar valor"}</Text>
+              <Text style={styles.secondaryText}>{busy ? "…" : t("wealth.recordValue")}</Text>
             </Pressable>
             <View style={styles.chips}>
               <Pressable
@@ -438,7 +446,7 @@ function AssetComposerBody({
                 }}
                 style={({ pressed }) => [styles.chip, { opacity: pressed ? 0.86 : 1 }]}
               >
-                <Text style={styles.chipLabel}>Aportar</Text>
+                <Text style={styles.chipLabel}>{t("wealth.contribute")}</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -448,16 +456,16 @@ function AssetComposerBody({
                 }}
                 style={({ pressed }) => [styles.chip, { opacity: pressed ? 0.86 : 1 }]}
               >
-                <Text style={styles.chipLabel}>Vender</Text>
+                <Text style={styles.chipLabel}>{t("wealth.sellChip")}</Text>
               </Pressable>
             </View>
             {points.length >= 2 ? (
               <View style={styles.historyHead}>
-                <Text style={type.sectionTitle}>Evolución</Text>
+                <Text style={type.sectionTitle}>{t("wealth.evolution")}</Text>
                 <Text style={[styles.chg, historyUp ? styles.up : styles.down]}>{formatPct(historyChange)}</Text>
               </View>
             ) : (
-              <Text style={type.sectionTitle}>Historial</Text>
+              <Text style={type.sectionTitle}>{t("wealth.history")}</Text>
             )}
             {points.length >= 2 ? (
               <WealthChart points={points} up={historyUp} range="max" height={112} fromZero={false} />
@@ -465,12 +473,17 @@ function AssetComposerBody({
             {history.length ? (
               <View>
                 {history.map((item) => {
-                  const date = new Date(item.at).toLocaleDateString("es-ES", {
+                  const date = new Date(item.at).toLocaleDateString(dateLocale(), {
                     day: "numeric",
                     month: "short",
                     year: "numeric",
                   });
-                  const title = item.kind === "quote" ? "Valor" : item.kind === "buy" ? "Aportación" : "Venta";
+                  const title =
+                    item.kind === "quote"
+                      ? t("wealth.value")
+                      : item.kind === "buy"
+                        ? t("wealth.contribution")
+                        : t("wealth.sale");
                   const unit =
                     item.price != null
                       ? item.quantity != null && item.quantity > 0.00000001 && Math.abs(item.quantity - 1) > 0.00000001
@@ -510,9 +523,7 @@ function AssetComposerBody({
                 })}
               </View>
             ) : (
-              <Text style={type.body}>
-                Registra el valor cuando cambie, o un aporte / venta. Mantén pulsado un valor para borrarlo.
-              </Text>
+              <Text style={type.body}>{t("wealth.assetHistoryHint")}</Text>
             )}
           </>
         ) : null}
@@ -521,7 +532,7 @@ function AssetComposerBody({
           onPress={() => void submit()}
           style={({ pressed }) => [styles.submit, { opacity: !canSave || busy ? 0.4 : pressed ? 0.86 : 1 }]}
         >
-          <Text style={styles.submitText}>{busy ? "…" : asset ? "Guardar" : "Añadir"}</Text>
+          <Text style={styles.submitText}>{busy ? "…" : asset ? t("common.save") : t("wealth.add")}</Text>
         </Pressable>
         {asset ? (
           <Pressable
@@ -531,16 +542,16 @@ function AssetComposerBody({
             }}
             style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={styles.removeText}>Eliminar</Text>
+            <Text style={styles.removeText}>{t("common.delete")}</Text>
           </Pressable>
         ) : null}
       </SheetScrollView>
       <ConfirmDialog
         open={confirmDelete}
-        title="Eliminar inversión"
-        message={asset ? `Se oculta «${asset.name}». Los movimientos no se tocan.` : ""}
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        title={t("wealth.deleteAsset")}
+        message={asset ? t("wealth.hideAssetMessage", { name: asset.name }) : ""}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={busy}
         onCancel={() => {
@@ -559,10 +570,10 @@ function AssetComposerBody({
       />
       <ConfirmDialog
         open={dropQuote != null}
-        title="Borrar valor"
-        message="Se quita este punto del historial. El precio actual pasa a ser el último que quede."
-        confirmLabel="Borrar"
-        cancelLabel="Cancelar"
+        title={t("wealth.deleteQuote")}
+        message={t("wealth.deleteQuoteMessage")}
+        confirmLabel={t("chat.clearConfirm")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={busy}
         onCancel={() => {

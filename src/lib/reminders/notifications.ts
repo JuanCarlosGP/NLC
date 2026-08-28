@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import { t } from "@/lib/i18n/runtime";
 import { isReminderNotification, openRemindersFromNotification } from "@/lib/reminders/open";
 import type { ProdReminder } from "@/lib/reminders/types";
 
@@ -31,7 +32,7 @@ function onceDate(reminder: ProdReminder): Date | null {
 async function ensureChannel(): Promise<void> {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync(REMINDER_CHANNEL, {
-    name: "Recordatorios",
+    name: t("reminders.channel"),
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 140, 80, 140],
     lightColor: "#E4D5B8",

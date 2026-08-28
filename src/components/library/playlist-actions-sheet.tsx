@@ -12,15 +12,17 @@ import { usePlaylistActions } from "@/lib/spotify/playlist-actions-context";
 import { useSpotify } from "@/lib/spotify/spotify-context";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts } from "@/lib/theme";
 
 export function PlaylistActionsSheet() {
   const { open, playlist, setOpen } = usePlaylistActions();
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={setOpen}
-      accessibilityCloseLabel="Cerrar opciones de la playlist"
+      accessibilityCloseLabel={t("playlistActions.closeSheet")}
       viewportRatio={0.5}
       expandable
       expandedRatio={0.88}
@@ -38,6 +40,7 @@ function PlaylistActionsBody({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
   const { playTracks, enqueueTracks } = usePlayer();
   const { deletePlaylist, rematchPlaylist, togglePlaylistLiked } = useSpotify();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -45,7 +48,11 @@ function PlaylistActionsBody({
   const playable = matchedNasTracks(playlist.tracks);
   const liked = Boolean(playlist.liked);
   const canRematch = playlist.kind !== "local";
-  const kindLabel = playlist.kind === "album" ? "Álbum" : "Playlist";
+  const kindLabel = playlist.kind === "album" ? t("playlistActions.album") : t("playlistActions.playlist");
+  const trackCountLabel = t(
+    playlist.tracks.length === 1 ? "playlistActions.trackOne" : "playlistActions.trackMany",
+    { count: playlist.tracks.length },
+  );
 
   function closeAfter(action: () => unknown) {
     triggerUiHaptic();
@@ -73,7 +80,7 @@ function PlaylistActionsBody({
               {playlist.name}
             </Text>
             <Text numberOfLines={1} style={styles.headerSub}>
-              {[kindLabel, playlist.ownerName, `${playlist.tracks.length} temas`].filter(Boolean).join(" · ")}
+              {[kindLabel, playlist.ownerName, trackCountLabel].filter(Boolean).join(" · ")}
             </Text>
           </View>
         </View>
@@ -81,7 +88,7 @@ function PlaylistActionsBody({
 
         <ActionRow
           icon={<ListMusic color={colors.ink} size={22} strokeWidth={1.8} />}
-          label="Ver playlist"
+          label={t("playlistActions.view")}
           onPress={() =>
             closeAfter(() => {
               router.push(`/imported/${playlist.id}`);
@@ -90,19 +97,19 @@ function PlaylistActionsBody({
         />
         <ActionRow
           icon={<Play color={colors.ink} size={22} fill={colors.ink} strokeWidth={1.8} />}
-          label="Reproducir"
+          label={t("playlistActions.play")}
           disabled={!playable.length}
           onPress={() => closeAfter(() => playTracks(playable, 0))}
         />
         <ActionRow
           icon={<ListPlus color={colors.ink} size={22} strokeWidth={1.8} />}
-          label="Reproducir a continuación"
+          label={t("playlistActions.playNext")}
           disabled={!playable.length}
           onPress={() => closeAfter(() => enqueueTracks(playable, "next"))}
         />
         <ActionRow
           icon={<ListEnd color={colors.ink} size={22} strokeWidth={1.8} />}
-          label="Añadir a la cola"
+          label={t("playlistActions.queue")}
           disabled={!playable.length}
           onPress={() => closeAfter(() => enqueueTracks(playable, "end"))}
         />
@@ -115,19 +122,19 @@ function PlaylistActionsBody({
               strokeWidth={1.8}
             />
           }
-          label={liked ? "Quitar de inicio" : "Añadir a inicio"}
+          label={liked ? t("importedEntity.removeHome") : t("importedEntity.addHome")}
           onPress={() => closeAfter(() => togglePlaylistLiked(playlist.id))}
         />
         {canRematch ? (
           <ActionRow
             icon={<RefreshCw color={colors.ink} size={22} strokeWidth={1.8} />}
-            label="Volver a emparejar"
+            label={t("playlistActions.rematch")}
             onPress={() => closeAfter(() => rematchPlaylist(playlist.id))}
           />
         ) : null}
         <ActionRow
           icon={<Trash2 color={colors.danger} size={22} strokeWidth={1.8} />}
-          label="Eliminar playlist"
+          label={t("playlistActions.delete")}
           danger
           onPress={() => {
             triggerUiHaptic();
@@ -138,10 +145,10 @@ function PlaylistActionsBody({
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Eliminar playlist"
-        message={`Se quitará «${playlist.name}» de la biblioteca. Los archivos del NAS no se borran.`}
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        title={t("playlistActions.delete")}
+        message={t("playlistActions.deleteMessage")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={busy}
         onCancel={() => {

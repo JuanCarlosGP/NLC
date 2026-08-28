@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
+import { useI18n } from "@/lib/i18n/context";
 import { useProductivity } from "@/lib/productivity/productivity-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
@@ -13,11 +14,12 @@ export function ProjectComposerSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar nuevo proyecto"
+      accessibilityCloseLabel={t("projects.closeNewProject")}
       viewportRatio={0.42}
     >
       <ProjectComposerBody open={open} onDone={() => onOpenChange(false)} />
@@ -26,6 +28,7 @@ export function ProjectComposerSheet({
 }
 
 function ProjectComposerBody({ open, onDone }: { open: boolean; onDone: () => void }) {
+  const { t } = useI18n();
   const { createProject } = useProductivity();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,11 +53,11 @@ function ProjectComposerBody({ open, onDone }: { open: boolean; onDone: () => vo
 
   return (
     <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-      <Text style={type.sectionTitle}>Nuevo proyecto</Text>
+      <Text style={type.sectionTitle}>{t("projects.newProject")}</Text>
       <TextInput
         value={name}
         onChangeText={setName}
-        placeholder="Nombre"
+        placeholder={t("projects.name")}
         placeholderTextColor={colors.muted}
         autoFocus
         style={styles.input}
@@ -70,7 +73,7 @@ function ProjectComposerBody({ open, onDone }: { open: boolean; onDone: () => vo
           { opacity: !name.trim() || busy ? 0.4 : pressed ? 0.86 : 1 },
         ]}
       >
-        <Text style={styles.submitText}>{busy ? "…" : "Crear"}</Text>
+        <Text style={styles.submitText}>{busy ? "…" : t("common.create")}</Text>
       </Pressable>
     </SheetScrollView>
   );

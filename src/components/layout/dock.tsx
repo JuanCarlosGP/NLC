@@ -11,6 +11,7 @@ import { usePlayerUi } from "@/lib/player/player-ui-context";
 import { colors } from "@/lib/theme";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { USE_NATIVE_DRIVER } from "@/lib/use-native-driver";
+import { useI18n } from "@/lib/i18n/context";
 import { useZone } from "@/lib/zone/zone-context";
 
 const HIDE_SPRING = { damping: 22, stiffness: 280, mass: 0.85 };
@@ -34,10 +35,11 @@ function DockButton({
   onPress: () => void;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={badge ? `${label}, novedad` : label}
+      accessibilityLabel={badge ? `${label}, ${t("chrome.novelty")}` : label}
       accessibilityState={{ selected: active }}
       onPress={() => {
         triggerSelectionUiHaptic();
@@ -63,6 +65,7 @@ function DockIcons() {
   const router = useRouter();
   const pathname = usePathname();
   const { zone } = useZone();
+  const { t } = useI18n();
   const updatePending = usePendingUpdate();
   const { chatOpen, chatUnread, setChatOpen } = useCursor();
   const homeActive = isHomeRoute(pathname);
@@ -78,13 +81,13 @@ function DockIcons() {
     pathname.startsWith("/task");
   const searchActive = pathname.startsWith("/search");
   const settingsActive = pathname.startsWith("/settings");
-  const libraryLabel = zone === "wealth" ? "Libro" : "Biblioteca";
+  const libraryLabel = zone === "wealth" ? t("chrome.ledger") : t("chrome.library");
 
   return (
     <>
       <DockButton
         active={homeActive}
-        label="Inicio"
+        label={t("chrome.home")}
         onPress={() => {
           if (isHomeRoute(pathname)) return;
           router.push("/");
@@ -94,7 +97,7 @@ function DockIcons() {
       </DockButton>
       <DockButton
         active={searchActive}
-        label="Buscar"
+        label={t("chrome.search")}
         onPress={() => {
           if (pathname.startsWith("/search")) return;
           router.push("/search");
@@ -105,7 +108,7 @@ function DockIcons() {
       <DockButton
         active={chatOpen}
         badge={chatUnread}
-        label="Mensajes"
+        label={t("chrome.messages")}
         onPress={() => setChatOpen(true)}
       >
         <MessageCircle color={chatOpen ? colors.ink : colors.muted} size={26} strokeWidth={1.75} />
@@ -123,7 +126,7 @@ function DockIcons() {
       <DockButton
         active={settingsActive}
         badge={updatePending}
-        label="Ajustes"
+        label={t("chrome.settings")}
         onPress={() => {
           if (pathname.startsWith("/settings")) return;
           router.push("/settings");

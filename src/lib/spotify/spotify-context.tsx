@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   hydrateTrackArtworkCache,
@@ -70,7 +71,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
       const youtube = parseYoutubeMusicUrl(url);
       const parsed = youtube ? null : parseSpotifyUrl(url);
       if (!youtube && !parsed) {
-        throw new Error("Pega un enlace de Spotify o de YouTube Music.");
+        throw new Error(t("nasExtra.pasteSpotifyYoutube"));
       }
       const publicEntity = youtube
         ? await fetchPublicYoutubeMusic(url, youtube)
@@ -98,9 +99,9 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
 
   const createLocalPlaylist = useCallback(async (name: string, tracks: Track[]) => {
     const title = name.trim();
-    if (!title) throw new Error("Ponle un nombre a la playlist.");
+    if (!title) throw new Error(t("nasExtra.playlistNeedName"));
     const picked = tracks.filter(Boolean);
-    if (!picked.length) throw new Error("Elige al menos una canción del NAS.");
+    if (!picked.length) throw new Error(t("nasExtra.pickNasTrack"));
     const imported = picked.map((track) => ({
       spotifyId: track.id,
       title: track.title,

@@ -1,9 +1,10 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { dateLocale, t } from "@/lib/i18n/runtime";
 import { colors, fonts } from "@/lib/theme";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { formatEuro, formatSignedEuro } from "@/lib/wealth/money";
 import { useTxActions } from "@/lib/wealth/tx-actions-context";
-import { TX_KIND_LABEL, type WealthAccount, type WealthTx } from "@/lib/wealth/types";
+import { accountDisplayName, TX_KIND_LABEL, type WealthAccount, type WealthTx } from "@/lib/wealth/types";
 import { useWealth } from "@/lib/wealth/wealth-context";
 
 function signedAmount(tx: WealthTx, accountId?: string): number {
@@ -19,7 +20,8 @@ function signedAmount(tx: WealthTx, accountId?: string): number {
 
 function accountName(accounts: WealthAccount[], id: string | null): string | null {
   if (!id) return null;
-  return accounts.find((item) => item.id === id)?.name ?? null;
+  const account = accounts.find((item) => item.id === id);
+  return account ? accountDisplayName(account) : null;
 }
 
 function accountLine(tx: WealthTx, accounts: WealthAccount[], focusedAccountId?: string): string | null {
@@ -46,12 +48,12 @@ export function TxRow({
   const { openTxActions } = useTxActions();
   const signed = signedAmount(tx, accountId);
   const when = new Date(tx.bookedAt);
-  const date = when.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+  const date = when.toLocaleDateString(dateLocale(), { day: "numeric", month: "short" });
   const account = accountLine(tx, accounts, accountId);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityHint="Mantén pulsado para editar"
+      accessibilityHint={t("wealth.holdEdit")}
       delayLongPress={350}
       onPress={
         onPress

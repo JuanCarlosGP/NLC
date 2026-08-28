@@ -1,7 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { t } from "@/lib/i18n/runtime";
 import { colors, fonts } from "@/lib/theme";
 import { formatEuro, formatPct } from "@/lib/wealth/money";
 import type { AssetPosition } from "@/lib/wealth/compute";
+import { accountDisplayName } from "@/lib/wealth/types";
 import { useWealth } from "@/lib/wealth/wealth-context";
 
 export function AssetRow({
@@ -17,9 +19,11 @@ export function AssetRow({
   const up = position.pnl >= 0;
   const accountName =
     showAccount && position.asset.accountId
-      ? liveAccounts.find((item) => item.id === position.asset.accountId)?.name
+      ? liveAccounts.find((item) => item.id === position.asset.accountId)
       : null;
-  const sub = [position.asset.ticker || "Inversión", accountName].filter(Boolean).join(" · ");
+  const sub = [position.asset.ticker || t("wealth.assetFallback"), accountName ? accountDisplayName(accountName) : null]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.72 : 1 }]}>
       <View style={styles.mark}>

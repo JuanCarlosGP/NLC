@@ -1,3 +1,5 @@
+import { t } from "@/lib/i18n/runtime";
+
 export type SpotifyEntityKind = "playlist" | "album" | "track";
 
 export type ParsedSpotifyUrl = {
@@ -36,7 +38,7 @@ export function spotifyEmbedUrl(kind: SpotifyEntityKind, id: string): string {
 }
 
 export function kindLabel(kind: SpotifyEntityKind | undefined): string {
-  if (kind === "album") return "Álbum";
-  if (kind === "track") return "Canción";
-  return "Playlist";
+  if (kind === "album") return t("playlistActions.album");
+  if (kind === "track") return t("nasExtra.unknownTrack");
+  return t("playlistActions.playlist");
 }

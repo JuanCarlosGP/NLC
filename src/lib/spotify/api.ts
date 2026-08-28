@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import type { ImportedPlaylist, ImportedTrack } from "@/lib/spotify/types";
 
 type SpotifyImage = { url?: string };
@@ -32,7 +33,7 @@ function mapTrack(raw: SpotifyTrack | null | undefined): ImportedTrack | null {
   return {
     spotifyId: raw.id,
     title: raw.name,
-    artistName: (raw.artists ?? []).map((artist) => artist.name).filter(Boolean).join(", ") || "Artista",
+    artistName: (raw.artists ?? []).map((artist) => artist.name).filter(Boolean).join(", ") || t("nasExtra.unknownArtist"),
     albumName: raw.album?.name ?? "",
     durationMs: typeof raw.duration_ms === "number" ? raw.duration_ms : 0,
     coverUrl: firstImage(raw.album?.images),
@@ -45,16 +46,16 @@ async function getJson<T>(url: string, accessToken: string): Promise<T> {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (response.status === 401) {
-    throw new Error("Sesión de Spotify caducada. Conecta de nuevo en Ajustes.");
+    throw new Error(t("nasExtra.spotifySessionExpired"));
   }
   if (response.status === 403) {
-    throw new Error("Spotify no dejó leer esta playlist. Tiene que ser tuya o colaborativa.");
+    throw new Error(t("nasExtra.spotifyForbidden"));
   }
   if (response.status === 404) {
-    throw new Error("No se encontró esa playlist.");
+    throw new Error(t("nasExtra.spotifyNotFound"));
   }
   if (!response.ok) {
-    throw new Error(`Spotify respondió ${response.status}.`);
+    throw new Error(t("nasExtra.spotifyHttpFail", { status: response.status }));
   }
   return (await response.json()) as T;
 }
@@ -82,7 +83,7 @@ export async function fetchSpotifyPlaylist(
   return {
     id: playlist.id ?? playlistId,
     kind: "playlist",
-    name: playlist.name ?? "Playlist",
+    name: playlist.name ?? t("playlistActions.playlist"),
     ownerName: playlist.owner?.display_name ?? "Spotify",
     coverUrl: firstImage(playlist.images) ?? tracks[0]?.coverUrl ?? null,
     spotifyUrl: playlist.external_urls?.spotify ?? `https://open.spotify.com/playlist/${playlistId}`,
@@ -99,22 +100,21 @@ export async function fetchSpotifyPlaylistPreview(playlistUrl: string): Promise<
     `https://open.spotify.com/oembed?url=${encoded}`,
     `https://noembed.com/embed?url=${encoded}`,
   ];
-  let lastMessage = "No se pudo leer esa playlist.";
+  let lastMessage = t("nasExtra.spotifyPreviewFail");
   for (const endpoint of endpoints) {
     try {
       const response = await fetch(endpoint, { headers: { Accept: "application/json" } });
       if (!response.ok) {
-        lastMessage = "No se pudo leer esa playlist. ¿Es un enlace público?";
+        lastMessage = t("nasExtra.spotifyPreviewPrivate");
         continue;
       }
       const payload = (await response.json()) as { title?: string; thumbnail_url?: string };
       return {
-        title: payload.title?.trim() || "Playlist",
+        title: payload.title?.trim() || t("playlistActions.playlist"),
         thumbnail: payload.thumbnail_url ?? null,
       };
     } catch {
-      lastMessage =
-        "No se pudo leer la playlist. En el navegador Spotify suele bloquearlo; pruébalo en el APK.";
+      lastMessage = t("nasExtra.spotifyPreviewBrowser");
     }
   }
   throw new Error(lastMessage);

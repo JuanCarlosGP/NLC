@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
+import { t } from "@/lib/i18n/runtime";
 import { upsertLocalLibrary } from "@/lib/db/catalog";
 import type { Album, AlbumDetail, Artist, MusicSource, PingResult, PlayableSource, SearchResults } from "@/lib/nas/types";
 import {
@@ -35,9 +36,9 @@ function nameFromUri(uri: string): string {
   try {
     const decoded = decodeURIComponent(uri);
     const tail = decoded.split("/").pop() ?? decoded;
-    return tail.replace(/^.*:/, "") || "archivo";
+    return tail.replace(/^.*:/, "") || t("nasExtra.fileFallback");
   } catch {
-    return "archivo";
+    return t("nasExtra.fileFallback");
   }
 }
 
@@ -171,8 +172,6 @@ export function createLocalSource(folderUri: string, options: LocalSourceOptions
     return tokens.length > 0 && tokens.every((token) => blob.includes(token));
   }
 
-  const noun = asPodcast ? "episodios" : "canciones";
-
   return {
     kind: "local",
 
@@ -182,14 +181,16 @@ export function createLocalSource(folderUri: string, options: LocalSourceOptions
         return {
           ok: true,
           message: library.tracks.length
-            ? `${library.tracks.length} ${noun} en la carpeta local.`
-            : `La carpeta local está vacía o no tiene ${asPodcast ? "episodios" : "audio"}.`,
-          serverName: "Carpeta local",
+            ? t(asPodcast ? "nasExtra.localEpisodesCount" : "nasExtra.localSongsCount", {
+                count: library.tracks.length,
+              })
+            : t(asPodcast ? "nasExtra.localEmptyEpisodes" : "nasExtra.localEmptyAudio"),
+          serverName: t("nasExtra.localFolder"),
         };
       } catch (error) {
         return {
           ok: false,
-          message: error instanceof Error ? error.message : "No se pudo leer la carpeta local.",
+          message: error instanceof Error ? error.message : t("nasExtra.localRead"),
         };
       }
     },
@@ -205,7 +206,7 @@ export function createLocalSource(folderUri: string, options: LocalSourceOptions
     async getAlbum(id: string): Promise<AlbumDetail> {
       const library = await scan();
       const album = library.albums.find((item) => item.id === id);
-      if (!album) throw new Error("Álbum no encontrado.");
+      if (!album) throw new Error(t("nasExtra.localAlbum"));
       return { ...album, tracks: library.albumTracks[id] ?? [] };
     },
 

@@ -1,3 +1,4 @@
+import { collateLocale, t } from "@/lib/i18n/runtime";
 import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import { getWebDirectoryHandle } from "@/lib/local/pick-folder";
@@ -30,9 +31,9 @@ function nameFromUri(uri: string): string {
   try {
     const decoded = decodeURIComponent(uri);
     const tail = decoded.split("/").pop() ?? decoded;
-    return tail.replace(/^.*:/, "") || "archivo";
+    return tail.replace(/^.*:/, "") || t("nasExtra.fileFallback");
   } catch {
-    return "archivo";
+    return t("nasExtra.fileFallback");
   }
 }
 
@@ -158,7 +159,7 @@ export async function localVideoPlayable(folderUri: string, path: string): Promi
   }
   const root = await loadLocalVideoTree(folderUri);
   const node = findNode(root, localVideoRel(path));
-  if (!node || node.dir) throw new Error("Vídeo local no encontrado.");
+  if (!node || node.dir) throw new Error(t("nasExtra.localVideoMissing"));
   return { uri: node.uri };
 }
 
@@ -185,5 +186,5 @@ export async function listLocalVideoShows(folderUri: string): Promise<LocalVideo
       else if (VIDEO_EXT.has(extOf(child.name))) items.push(toShow(child, "movie", true));
     }
   }
-  return items.sort((a, b) => a.name.localeCompare(b.name, "es"));
+  return items.sort((a, b) => a.name.localeCompare(b.name, collateLocale()));
 }

@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { relayCursorFromRequest } from "@/lib/cursor/proxy";
 import { relayLanGet, relayLanRequest } from "@/lib/nas/lan-proxy";
 
@@ -6,7 +7,7 @@ export async function GET(request: Request) {
   if (cursor) return cursor;
   const proxied = await relayLanGet(request);
   if (proxied) return proxied;
-  return Response.json({ error: "Falta la URL del NAS." }, { status: 400 });
+  return Response.json({ error: t("nasExtra.missingNasUrl") }, { status: 400 });
 }
 
 export async function POST(request: Request) {
@@ -20,13 +21,13 @@ export async function POST(request: Request) {
       body?: string;
     };
     const method = (payload.method ?? "GET").toUpperCase();
-    if (!["GET", "HEAD", "OPTIONS", "PROPFIND", "PUT", "DELETE"].includes(method)) {
-      return Response.json({ error: "Método no permitido." }, { status: 405 });
+    if (!["GET", "HEAD", "OPTIONS", "PROPFIND", "PUT", "DELETE", "MKCOL"].includes(method)) {
+      return Response.json({ error: t("nasExtra.methodNotAllowed") }, { status: 405 });
     }
     return await relayLanRequest(payload.url ?? "", method, payload.headers ?? {}, payload.body);
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "Proxy del NAS no válido." },
+      { error: error instanceof Error ? error.message : t("nasExtra.nasProxyInvalid") },
       { status: 400 },
     );
   }

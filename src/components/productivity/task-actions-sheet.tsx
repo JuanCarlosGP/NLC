@@ -4,9 +4,10 @@ import { Check, Circle, CircleDot, Star, Trash2 } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n/context";
 import { useProductivity } from "@/lib/productivity/productivity-context";
 import { useTaskActions } from "@/lib/productivity/task-actions-context";
-import { STATUS_LABEL, TASK_STATUSES, type TaskStatus } from "@/lib/productivity/types";
+import { projectDisplayName, STATUS_LABEL, TASK_STATUSES, type TaskStatus } from "@/lib/productivity/types";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
@@ -17,12 +18,13 @@ const STATUS_ICON: Record<TaskStatus, typeof Circle> = {
 };
 
 export function TaskActionsSheet() {
+  const { t } = useI18n();
   const { open, task, setOpen } = useTaskActions();
   return (
     <BottomSheet
       open={open}
       onOpenChange={setOpen}
-      accessibilityCloseLabel="Cerrar opciones de tarea"
+      accessibilityCloseLabel={t("focus.closeTaskActions")}
       viewportRatio={0.52}
     >
       {task ? <TaskActionsBody taskId={task.id} onClose={() => setOpen(false)} /> : null}
@@ -31,6 +33,7 @@ export function TaskActionsSheet() {
 }
 
 function TaskActionsBody({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+  const { t } = useI18n();
   const { tasks, projects, updateTask, deleteTask } = useProductivity();
   const task = tasks.find((item) => item.id === taskId);
   const project = task ? projects.find((item) => item.id === task.projectId) : null;
@@ -53,7 +56,7 @@ function TaskActionsBody({ taskId, onClose }: { taskId: string; onClose: () => v
             <Text style={styles.headerTitle} numberOfLines={2}>
               {task.title}
             </Text>
-            <Text style={styles.headerSub}>{project?.name ?? "Tarea"}</Text>
+            <Text style={styles.headerSub}>{project ? projectDisplayName(project) : t("focus.task")}</Text>
           </View>
         </View>
         <View style={styles.rule} />
@@ -81,12 +84,12 @@ function TaskActionsBody({ taskId, onClose }: { taskId: string; onClose: () => v
               strokeWidth={1.8}
             />
           }
-          label={task.starred ? "Quitar estrella" : "Destacar"}
+          label={task.starred ? t("focus.unstar") : t("focus.star")}
           onPress={() => closeAfter(() => updateTask(task.id, { starred: !task.starred }))}
         />
         <ActionRow
           icon={<Trash2 color={colors.danger} size={20} strokeWidth={1.8} />}
-          label="Eliminar"
+          label={t("common.delete")}
           danger
           onPress={() => {
             triggerUiHaptic();
@@ -96,10 +99,10 @@ function TaskActionsBody({ taskId, onClose }: { taskId: string; onClose: () => v
       </SheetScrollView>
       <ConfirmDialog
         open={confirm}
-        title="Eliminar tarea"
-        message={`Se borrará «${task.title}» del teléfono.`}
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        title={t("focus.deleteTask")}
+        message={t("focus.deleteTaskConfirm", { title: task.title })}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={busy}
         onCancel={() => {

@@ -1,3 +1,4 @@
+import { collateLocale, t } from "@/lib/i18n/runtime";
 import type { Album, AlbumDetail, Artist, Track } from "@/lib/nas/types";
 
 export type WebDavEntry = {
@@ -89,6 +90,25 @@ export function joinPath(base: string, child: string): string {
   const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
   const clean = child.replace(/\/+$/, "");
   return `${prefix}/${clean}`.replace(/\/{2,}/g, "/");
+}
+
+/** Sibling libraries under the WebDAV root chosen in onboarding. */
+export const LIBRARY_DIR = {
+  music: "Music",
+  podcasts: "Podcasts",
+  video: "Video",
+  wealth: "Finanzas",
+} as const;
+
+export function parentDir(path: string): string {
+  const parts = normalizeSharePath(path).split("/").filter(Boolean);
+  parts.pop();
+  return parts.length ? `/${parts.join("/")}` : "/";
+}
+
+/** `/test/Music` + `Podcasts` → `/test/Podcasts`. */
+export function siblingOfShare(sharePath: string, folder: string): string {
+  return joinPath(parentDir(sharePath), folder);
 }
 
 export function extOf(name: string): string {
@@ -202,7 +222,7 @@ function utf8ToBase64(value: string): string {
   const BufferCtor = (globalThis as { Buffer?: { from: (input: string, enc: string) => { toString: (enc: string) => string } } })
     .Buffer;
   if (BufferCtor) return BufferCtor.from(value, "utf8").toString("base64");
-  throw new Error("No hay codificador Base64.");
+  throw new Error(t("nasExtra.noBase64"));
 }
 
 export function cleanDisplayTitle(value: string): string {
@@ -241,7 +261,7 @@ export function splitArtistTitle(name: string): { artist: string; title: string 
       title: cleanDisplayTitle(match[2]),
     };
   }
-  return { artist: "Desconocido", title: cleanDisplayTitle(name) };
+  return { artist: t("nasExtra.unknownArtist"), title: cleanDisplayTitle(name) };
 }
 
 function parseYear(albumName: string): number | null {
@@ -328,8 +348,8 @@ export function buildIndex(
     const parsed = parseTrackName(filename);
     let title = parsed.title;
     const track = parsed.track;
-    let artistName = "Desconocido";
-    let albumName = "Sin álbum";
+    let artistName = t("nasExtra.unknownArtist");
+    let albumName = t("nasExtra.noAlbum");
 
     if (podcastTree) {
       artistName = "Podcasts";
@@ -404,14 +424,14 @@ export function buildIndex(
   }
 
   for (const album of albumMap.values()) {
-    album.tracks.sort((a, b) => (a.track ?? 999) - (b.track ?? 999) || a.title.localeCompare(b.title, "es"));
+    album.tracks.sort((a, b) => (a.track ?? 999) - (b.track ?? 999) || a.title.localeCompare(b.title, collateLocale()));
   }
 
   return {
-    artists: [...artistMap.values()].sort((a, b) => a.name.localeCompare(b.name, "es")),
+    artists: [...artistMap.values()].sort((a, b) => a.name.localeCompare(b.name, collateLocale())),
     albums: [...albumMap.values()]
       .map(({ tracks: _tracks, ...album }) => album)
-      .sort((a, b) => a.name.localeCompare(b.name, "es")),
+      .sort((a, b) => a.name.localeCompare(b.name, collateLocale())),
     albumTracks: Object.fromEntries([...albumMap.values()].map((album) => [album.id, album.tracks])),
     tracks,
     scannedAt: Date.now(),

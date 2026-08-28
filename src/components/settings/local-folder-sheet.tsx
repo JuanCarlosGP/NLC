@@ -15,75 +15,37 @@ import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import type { SettingsFeedback } from "@/hooks/use-nas-settings";
 import { folderDisplayName, pickLocalFolder } from "@/lib/local/pick-folder";
+import { useI18n } from "@/lib/i18n/context";
 import type { NasSettings } from "@/lib/settings/storage";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
-const MUSIC_HELP = [
-  {
-    title: "Álbumes",
-    body: "Artista / Álbum / pista. El número al inicio ordena las pistas. El año entre paréntesis en el álbum se usa si está.",
-  },
-  {
-    title: "Temas sueltos",
-    body: "Archivos en la raíz o en una carpeta de artista, sin subcarpeta de álbum.",
-  },
-  {
-    title: "Portadas",
-    body: "cover.jpg o folder.jpg junto al álbum. También vale una imagen con el mismo nombre que el audio.",
-  },
-  {
-    title: "Audio",
-    body: "mp3, m4a, m4b, flac, ogg, opus, wav, aac, wma, aiff. El resto se ignora. Se mezcla con el NAS.",
-  },
+const MUSIC_HELP_KEYS = [
+  { title: "localFolder.albums", body: "localFolder.albumsBody" },
+  { title: "localFolder.loose", body: "localFolder.looseBody" },
+  { title: "localFolder.covers", body: "localFolder.coversBody" },
+  { title: "localFolder.audio", body: "localFolder.audioBody" },
 ] as const;
 
-const PODCAST_HELP = [
-  {
-    title: "Programas",
-    body: "Una carpeta por programa, con los episodios dentro. Si los dejas sueltos, cada archivo es un episodio.",
-  },
-  {
-    title: "Audio",
-    body: "mp3, m4a, m4b y el resto de formatos de audio. Se mezcla con el NAS.",
-  },
+const PODCAST_HELP_KEYS = [
+  { title: "localFolder.shows", body: "localFolder.showsBody" },
+  { title: "localFolder.audio", body: "localFolder.audioBody" },
 ] as const;
 
-const WEALTH_HELP = [
-  {
-    title: "Archivo",
-    body: "En esa carpeta NLC escribe nlc-wealth.json: cuentas, inversiones y movimientos.",
-  },
-  {
-    title: "NAS",
-    body: "Si también hay carpeta compartida, se copia al NAS. Gana el archivo más reciente.",
-  },
+const WEALTH_HELP_KEYS = [
+  { title: "localFolder.file", body: "localFolder.fileBody" },
+  { title: "localFolder.nas", body: "localFolder.nasBody" },
 ] as const;
 
-const FOCUS_HELP = [
-  {
-    title: "Archivo",
-    body: "En esa carpeta NLC escribe nlc-tasks.json: tareas, proyectos y recordatorios.",
-  },
-  {
-    title: "NAS",
-    body: "Si también hay carpeta compartida, se copia al NAS. Gana el archivo más reciente.",
-  },
+const FOCUS_HELP_KEYS = [
+  { title: "localFolder.file", body: "localFolder.focusFileBody" },
+  { title: "localFolder.nas", body: "localFolder.nasBody" },
 ] as const;
 
-const VIDEO_HELP = [
-  {
-    title: "Series",
-    body: "Una carpeta por serie, con temporadas o episodios dentro.",
-  },
-  {
-    title: "Películas",
-    body: "Archivos sueltos, o una carpeta por título si hay extras.",
-  },
-  {
-    title: "Vídeo",
-    body: "mp4, mkv, m4v, webm, avi, mov. Se mezcla con el NAS.",
-  },
+const VIDEO_HELP_KEYS = [
+  { title: "localFolder.series", body: "localFolder.seriesBody" },
+  { title: "localFolder.movies", body: "localFolder.moviesBody" },
+  { title: "explorer.video", body: "localFolder.videoBody" },
 ] as const;
 
 export function LocalFolderSheet({
@@ -103,6 +65,7 @@ export function LocalFolderSheet({
   feedback: SettingsFeedback | null;
   variant?: "music" | "podcast" | "video" | "wealth" | "focus";
 }) {
+  const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
   const uri =
@@ -144,7 +107,7 @@ export function LocalFolderSheet({
       if (!picked) return;
       await applyLocalFolder(withFolder(picked.uri, picked.name));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo abrir la carpeta.");
+      setError(err instanceof Error ? err.message : t("localFolder.openFail"));
     }
   }
 
@@ -158,18 +121,18 @@ export function LocalFolderSheet({
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar carpeta local"
+      accessibilityCloseLabel={t("localFolder.close")}
       viewportRatio={0.62}
     >
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.titleRow}>
           <View style={styles.titleMeta}>
-            <Text style={type.label}>Fuente</Text>
-            <Text style={type.pageTitle}>Carpeta local</Text>
+            <Text style={type.label}>{t("sourceSheet.title")}</Text>
+            <Text style={type.pageTitle}>{t("localFolder.title")}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Cómo organizar la carpeta local"
+            accessibilityLabel={t("localFolder.howA11y")}
             onPress={() => {
               triggerUiHaptic();
               setInfoOpen(true);
@@ -181,19 +144,21 @@ export function LocalFolderSheet({
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{variant === "wealth" || variant === "focus" ? "Archivo" : "Biblioteca"}</Text>
+          <Text style={styles.sectionLabel}>
+            {variant === "wealth" || variant === "focus" ? t("localFolder.file") : t("localFolder.library")}
+          </Text>
           <View style={styles.card}>
             <View style={styles.cardBody}>
-              <Text style={styles.pathLabel}>Carpeta</Text>
-              <Text style={styles.pathValue}>{hasFolder ? name : "Ninguna"}</Text>
+              <Text style={styles.pathLabel}>{t("localFolder.folder")}</Text>
+              <Text style={styles.pathValue}>{hasFolder ? name : t("localFolder.none")}</Text>
               <Text style={styles.hint}>
                 {variant === "wealth"
-                  ? "Ahí se guarda nlc-wealth.json. Puedes copiarla a otro teléfono o al NAS."
+                  ? t("localFolder.wealthFileHint")
                   : variant === "focus"
-                    ? "Ahí se guarda nlc-tasks.json. Puedes copiarla a otro teléfono o al NAS."
+                    ? t("localFolder.focusFileHint")
                     : Platform.OS === "web"
-                      ? "En el PC se usa hasta recargar. En el teléfono queda guardada."
-                      : "Se mezcla con lo que ya hay en el NAS. Cada apartado usa su propia carpeta."}
+                      ? t("localFolder.webHint")
+                      : t("localFolder.mediaHint")}
               </Text>
             </View>
             <View style={styles.actions}>
@@ -206,7 +171,9 @@ export function LocalFolderSheet({
                   { opacity: busy ? 0.45 : pressed ? 0.7 : 1 },
                 ]}
               >
-                <Text style={styles.btnSolidText}>{busy ? "Abriendo…" : hasFolder ? "Cambiar" : "Elegir carpeta"}</Text>
+                <Text style={styles.btnSolidText}>
+                  {busy ? t("localFolder.opening") : hasFolder ? t("localFolder.change") : t("localFolder.pick")}
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => void clear()}
@@ -217,7 +184,7 @@ export function LocalFolderSheet({
                   { opacity: !hasFolder || busy ? 0.4 : pressed ? 0.7 : 1 },
                 ]}
               >
-                <Text style={styles.btnGhostText}>Quitar</Text>
+                <Text style={styles.btnGhostText}>{t("localFolder.remove")}</Text>
               </Pressable>
             </View>
           </View>
@@ -240,16 +207,17 @@ function LocalFolderHelpDialog({
   onClose: () => void;
   variant?: "music" | "podcast" | "video" | "wealth" | "focus";
 }) {
-  const steps =
+  const { t } = useI18n();
+  const stepKeys =
     variant === "video"
-      ? VIDEO_HELP
+      ? VIDEO_HELP_KEYS
       : variant === "podcast"
-        ? PODCAST_HELP
+        ? PODCAST_HELP_KEYS
         : variant === "wealth"
-          ? WEALTH_HELP
+          ? WEALTH_HELP_KEYS
           : variant === "focus"
-            ? FOCUS_HELP
-            : MUSIC_HELP;
+            ? FOCUS_HELP_KEYS
+            : MUSIC_HELP_KEYS;
   const { height: windowHeight } = useWindowDimensions();
   const cardMaxHeight = Math.round(windowHeight * 0.9);
 
@@ -259,14 +227,14 @@ function LocalFolderHelpDialog({
         <View style={styles.helpBackdrop} pointerEvents="box-none">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Cerrar ayuda"
+            accessibilityLabel={t("localFolder.helpCloseA11y")}
             style={StyleSheet.absoluteFill}
             onPress={onClose}
           />
           <View style={[styles.helpCard, { maxHeight: cardMaxHeight }]} pointerEvents="auto">
             <View style={styles.helpHeader}>
-              <Text style={type.label}>Fuente</Text>
-              <Text style={styles.helpTitle}>Organizar la carpeta</Text>
+              <Text style={type.label}>{t("sourceSheet.title")}</Text>
+              <Text style={styles.helpTitle}>{t("localFolder.helpTitle")}</Text>
             </View>
 
             <ScrollView
@@ -279,14 +247,14 @@ function LocalFolderHelpDialog({
               overScrollMode="never"
             >
               <View style={styles.helpSteps}>
-                {steps.map((step, index) => (
+                {stepKeys.map((step, index) => (
                   <View key={step.title} style={styles.helpStep}>
                     <View style={styles.helpIndex}>
                       <Text style={styles.helpIndexText}>{index + 1}</Text>
                     </View>
                     <View style={styles.helpStepText}>
-                      <Text style={styles.helpStepTitle}>{step.title}</Text>
-                      <Text style={styles.helpStepBody}>{step.body}</Text>
+                      <Text style={styles.helpStepTitle}>{t(step.title)}</Text>
+                      <Text style={styles.helpStepBody}>{t(step.body)}</Text>
                     </View>
                   </View>
                 ))}
@@ -300,7 +268,7 @@ function LocalFolderHelpDialog({
               }}
               style={({ pressed }) => [styles.helpDone, { opacity: pressed ? 0.86 : 1 }]}
             >
-              <Text style={styles.helpDoneText}>Entendido</Text>
+              <Text style={styles.helpDoneText}>{t("common.understood")}</Text>
             </Pressable>
           </View>
         </View>

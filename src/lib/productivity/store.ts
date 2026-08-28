@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db/client";
+import { t } from "@/lib/i18n/runtime";
 import { coverTint } from "@/lib/theme";
 import {
   INBOX_PROJECT_ID,
@@ -107,7 +108,7 @@ export async function getProject(id: string): Promise<ProdProject | null> {
 
 export async function createProject(name: string): Promise<ProdProject> {
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("El proyecto necesita un nombre.");
+  if (!trimmed) throw new Error(t("projects.errNeedName"));
   const db = await getDb();
   const id = newId("proj");
   const createdAt = Date.now();
@@ -185,7 +186,7 @@ export async function createTask(input: {
   status?: TaskStatus;
 }): Promise<ProdTask> {
   const title = input.title.trim();
-  if (!title) throw new Error("La tarea necesita un título.");
+  if (!title) throw new Error(t("focus.errNeedTaskTitle"));
   await ensureInbox();
   const db = await getDb();
   const projectId = input.projectId || INBOX_PROJECT_ID;

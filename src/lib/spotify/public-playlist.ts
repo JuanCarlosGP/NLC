@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { Platform } from "react-native";
 import { parseSpotifyPublicPayload } from "@/lib/spotify/embed-parse";
 import { spotifyEmbedUrl, type SpotifyEntityKind } from "@/lib/spotify/parse-url";
@@ -76,13 +77,13 @@ export async function fetchPublicSpotifyEntity(
       const parsed = parseSpotifyPublicPayload(payload, kind, entityId);
       return withHydratedCovers(parsed);
     } catch (err) {
-      lastError = err instanceof Error ? err : new Error("No se pudo leer el listado público.");
+      lastError = err instanceof Error ? err : new Error(t("nasExtra.publicListFail"));
     }
   }
 
   throw (
     lastError ??
-    new Error("No se pudo leer el listado público de ese enlace. Si es una playlist, comprueba que sea pública.")
+    new Error(t("nasExtra.spotifyLinkNotPublic"))
   );
 }
 

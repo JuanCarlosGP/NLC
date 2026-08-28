@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { spotifyOpenUrl, type SpotifyEntityKind } from "@/lib/spotify/parse-url";
 import type { ImportedPlaylist, ImportedTrack } from "@/lib/spotify/types";
 
@@ -50,7 +51,7 @@ function trackCover(raw: EmbedTrack, fallback: string | null): string | null {
 function artistFromEntity(entity: EmbedEntity): string {
   const named = (entity.artists ?? []).map((artist) => artist.name?.trim()).filter(Boolean);
   if (named.length) return named.join(", ");
-  return entity.subtitle?.trim() || "Artista";
+  return entity.subtitle?.trim() || t("nasExtra.unknownArtist");
 }
 
 function mapTrack(
@@ -64,7 +65,7 @@ function mapTrack(
   return {
     spotifyId: trackId(raw, title, index),
     title,
-    artistName: raw.subtitle?.trim() || "Artista",
+    artistName: raw.subtitle?.trim() || t("nasExtra.unknownArtist"),
     albumName,
     durationMs: typeof raw.duration === "number" ? raw.duration : 0,
     coverUrl,
@@ -157,7 +158,7 @@ export function parseSpotifyEmbedMarkdown(
     const headingMatch = lines[i].match(/^\d+\.\s+###\s+(.+?)\s*$/);
     if (!headingMatch) continue;
     const title = headingMatch[1].trim();
-    let artistName = "Artista";
+    let artistName = t("nasExtra.unknownArtist");
     let durationMs = 0;
     for (let j = i + 1; j < Math.min(i + 8, lines.length); j += 1) {
       const artistMatch = lines[j].match(/^####\s+(?:E\s+)?(.+?)\s*$/);
@@ -185,7 +186,7 @@ export function parseSpotifyEmbedMarkdown(
   }
 
   if (!tracks.length) {
-    throw new Error("No vinieron canciones. Si la playlist es privada, cámbiala a pública e inténtalo otra vez.");
+    throw new Error(t("nasExtra.spotifyNoSongs"));
   }
 
   return {
@@ -216,13 +217,13 @@ export function parseSpotifyEmbedHtml(
   entityId: string,
 ): Omit<ImportedPlaylist, "importedAt"> {
   if (!isSpotifyEmbedHtml(html)) {
-    throw new Error("No se pudo leer el embed público de Spotify.");
+    throw new Error(t("nasExtra.spotifyEmbedFail"));
   }
 
   const payload = nextDataJson(html);
   const entity = findEntity(payload);
   if (!entity) {
-    throw new Error("Ese enlace no trae datos públicos. Si es una playlist, ponla en público y espera un minuto.");
+    throw new Error(t("nasExtra.spotifyNoPublic"));
   }
 
   const coverUrl = coverFromEntity(entity);
@@ -236,7 +237,7 @@ export function parseSpotifyEmbedHtml(
     : [asSingleTrack(entity, coverUrl)].filter((track): track is ImportedTrack => Boolean(track));
 
   if (!tracks.length) {
-    throw new Error("No vinieron canciones. Si la playlist es privada, cámbiala a pública e inténtalo otra vez.");
+    throw new Error(t("nasExtra.spotifyNoSongs"));
   }
 
   return {

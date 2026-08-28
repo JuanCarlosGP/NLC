@@ -6,9 +6,11 @@ import { useSettings } from "@/lib/settings/settings-context";
 import { inspectFolder, toVideoEpisode, type VideoListing } from "@/lib/video/browse";
 import { watchRoute } from "@/lib/video/onepiece";
 import { useVideoActions } from "@/lib/video/video-actions-context";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, type } from "@/lib/theme";
 
 export function VideoBrowse({ path }: { path: string }) {
+  const { t } = useI18n();
   const router = useRouter();
   const { openVideoActions } = useVideoActions();
   const { settings, password, ready } = useSettings();
@@ -23,12 +25,12 @@ export function VideoBrowse({ path }: { path: string }) {
     try {
       setListing(await inspectFolder(settings, password, path));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo abrir la carpeta.");
+      setError(err instanceof Error ? err.message : t("videoUi.folderOpenError"));
       setListing(null);
     } finally {
       setLoading(false);
     }
-  }, [password, path, settings]);
+  }, [password, path, settings, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -42,9 +44,9 @@ export function VideoBrowse({ path }: { path: string }) {
   return (
     <View>
       <View style={styles.header}>
-        <Text style={type.label}>{listing?.eyebrow ?? "Vídeo"}</Text>
+        <Text style={type.label}>{listing?.eyebrow ?? t("videoUi.title")}</Text>
         <Text style={type.pageTitle}>{listing?.title ?? "…"}</Text>
-        <Text style={type.meta}>{loading ? "Cargando…" : listing?.summary}</Text>
+        <Text style={type.meta}>{loading ? t("videoUi.loading") : listing?.summary}</Text>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}

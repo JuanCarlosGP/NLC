@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useState } from "react";
-import { LogBox, Platform, View } from "react-native";
+import { LogBox, Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -29,7 +29,8 @@ import { PlayerUiProvider } from "@/lib/player/player-ui-context";
 import { TrackActionsProvider } from "@/lib/player/track-actions-context";
 import { VideoActionsProvider } from "@/lib/video/video-actions-context";
 import { OfflineProvider } from "@/lib/offline/offline-context";
-import { SettingsProvider } from "@/lib/settings/settings-context";
+import { SettingsProvider, useSettings } from "@/lib/settings/settings-context";
+import { LocaleProvider, useI18n } from "@/lib/i18n/context";
 import { ProductivityProvider } from "@/lib/productivity/productivity-context";
 import { RemindersProvider } from "@/lib/reminders/reminders-context";
 import { WealthProvider } from "@/lib/wealth/wealth-context";
@@ -41,6 +42,7 @@ import { TxActionsSheet } from "@/components/wealth/tx-composer-sheet";
 import { PlaylistActionsProvider } from "@/lib/spotify/playlist-actions-context";
 import { SpotifyProvider } from "@/lib/spotify/spotify-context";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { Onboarding } from "@/components/onboarding/onboarding";
 import { OtaBootstrap } from "@/lib/ota/ota-bootstrap";
 import { colors } from "@/lib/theme";
 
@@ -78,7 +80,9 @@ export default function RootLayout() {
     <ErrorBoundary>
     <SafeAreaProvider>
       <SettingsProvider>
+        <LocaleProvider>
         <OtaBootstrap />
+        <OnboardingGate>
         <ZoneProvider>
         <ProductivityProvider>
         <WealthProvider>
@@ -161,9 +165,29 @@ export default function RootLayout() {
         </WealthProvider>
         </ProductivityProvider>
         </ZoneProvider>
+        </OnboardingGate>
+        </LocaleProvider>
       </SettingsProvider>
     </SafeAreaProvider>
     </ErrorBoundary>
+  );
+}
+
+function OnboardingGate({ children }: { children: ReactNode }) {
+  const { ready, onboardingNeeded } = useSettings();
+  const { ready: i18nReady } = useI18n();
+  if (!ready || !i18nReady) {
+    return <View style={styles.boot} />;
+  }
+  return (
+    <View style={styles.boot}>
+      {children}
+      {onboardingNeeded ? (
+        <View style={styles.onboarding} pointerEvents="auto">
+          <Onboarding />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -175,3 +199,16 @@ function DockChrome({ children }: { children: ReactNode }) {
     </DockProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  boot: {
+    flex: 1,
+    backgroundColor: colors.void,
+  },
+  onboarding: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 200,
+    elevation: 200,
+    backgroundColor: colors.void,
+  },
+});

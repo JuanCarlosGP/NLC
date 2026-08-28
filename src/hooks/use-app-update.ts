@@ -3,6 +3,7 @@ import Constants from "expo-constants";
 import { applyOtaUpdate, checkOtaAvailable, getOtaInfo, type OtaInfo } from "@/lib/ota/apply-update";
 import { fetchRemoteApk, isRemoteApkNewer, type RemoteApk } from "@/lib/ota/github-apk";
 import { downloadAndInstallApk } from "@/lib/ota/install-apk";
+import { t } from "@/lib/i18n/runtime";
 
 export type ApkStatus = "loading" | "current" | "apk" | "none" | "error";
 export type OtaStatus = "loading" | "current" | "available" | "unsupported";
@@ -102,28 +103,28 @@ export function useAppUpdate() {
   const apkSummary =
     apkProgress != null
       ? apkProgress >= 1
-        ? "Abriendo el instalador…"
-        : `Descargando desde GitHub… ${Math.round(apkProgress * 100)}%`
+        ? t("update.openingInstaller")
+        : t("update.downloadingGithub", { pct: Math.round(apkProgress * 100) })
       : apkError
-        ? "No se pudo bajar. Toca para reintentar."
+        ? t("update.apkFail")
         : apkStatus === "loading"
-          ? "Comprobando GitHub…"
+          ? t("update.checkingGithub")
           : apkStatus === "apk"
-            ? `Hay una APK nueva${remote ? ` · ${remote.version}` : ""}. Toca para descargarla.`
+            ? t("update.apkNew", { version: remote ? ` · ${remote.version}` : "" })
             : apkStatus === "current"
-              ? "Estás en la última APK"
+              ? t("update.apkCurrent")
               : apkStatus === "error"
-                ? "No se pudo comprobar GitHub"
-                : "Aún no hay APK publicada";
+                ? t("update.apkCheckFail")
+                : t("update.apkNone");
   const otaChannel = ota.channel ? ` · ${ota.channel}` : "";
   const otaSummary =
     otaStatus === "loading"
-      ? "Comprobando canal OTA…"
+      ? t("update.checkingOta")
       : otaStatus === "available"
-        ? "Hay una OTA nueva. Toca para instalarla."
+        ? t("update.otaNew")
         : otaStatus === "current"
-          ? `Estás en la última OTA${otaChannel}`
-          : "La OTA solo llega en la APK del teléfono";
+          ? t("update.otaCurrent", { channel: otaChannel })
+          : t("update.otaApkOnly");
 
   return {
     localVersion,

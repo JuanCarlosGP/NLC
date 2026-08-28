@@ -27,6 +27,8 @@ import { useTrackActions } from "@/lib/player/track-actions-context";
 import { usePlaylistActions } from "@/lib/spotify/playlist-actions-context";
 import { useSpotify } from "@/lib/spotify/spotify-context";
 import { colors, fonts, type } from "@/lib/theme";
+import { useI18n } from "@/lib/i18n/context";
+import { collateLocale } from "@/lib/i18n/runtime";
 import { useZone } from "@/lib/zone/zone-context";
 
 const SHORTCUT_SLOTS = 8;
@@ -37,6 +39,7 @@ function isGenericPodcastBucket(name: string): boolean {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const { recents, musicAlbums, podcastAlbums, loading, error, refresh } = useHome();
   const { playlists } = useSpotify();
   const { openPlaylistActions } = usePlaylistActions();
@@ -83,14 +86,14 @@ export default function HomeScreen() {
           {
             key: "videos",
             id: "videos",
-            title: "Vídeos",
+            title: t("home.videos"),
             video: true,
             onPress: () => router.push("/videos"),
           },
           {
             key: "favorites-video",
             id: "favorites-video",
-            title: "Favoritos vídeo",
+            title: t("home.videoFavorites"),
             liked: true,
             video: true,
             onPress: () => router.push({ pathname: "/favorites", params: { kind: "video" } }),
@@ -101,14 +104,14 @@ export default function HomeScreen() {
             {
               key: "podcasts",
               id: "podcasts",
-              title: "Podcasts",
+              title: t("home.podcasts"),
               podcast: true,
               onPress: () => router.push("/podcasts"),
             },
             {
               key: "favorites-podcast",
               id: "favorites-podcast",
-              title: "Favoritos podcast",
+              title: t("home.podcastFavorites"),
               liked: true,
               podcast: true,
               onPress: () => router.push({ pathname: "/favorites", params: { kind: "podcast" } }),
@@ -118,14 +121,14 @@ export default function HomeScreen() {
             {
               key: "music",
               id: "music",
-              title: "Música",
+              title: t("home.music"),
               music: true,
               onPress: () => router.push("/music"),
             },
             {
               key: "favorites-music",
               id: "favorites-music",
-              title: "Favoritos música",
+              title: t("home.musicFavorites"),
               liked: true,
               onPress: () => router.push({ pathname: "/favorites", params: { kind: "music" } }),
             },
@@ -160,7 +163,7 @@ export default function HomeScreen() {
     }
 
     return items;
-  }, [albums, openPlaylistActions, playlists, podcast, router, video]);
+  }, [albums, openPlaylistActions, playlists, podcast, router, t, video]);
 
   const showSkeleton = !video && loading && albums.length === 0 && scopedRecents.length === 0;
   const gridAlbumIds = new Set(
@@ -175,9 +178,9 @@ export default function HomeScreen() {
 
   const sortedRecents = useMemo(() => {
     const next = [...scopedRecents];
-    if (sort === "alpha") next.sort((a, b) => a.title.localeCompare(b.title, "es", { sensitivity: "base" }));
+    if (sort === "alpha") next.sort((a, b) => a.title.localeCompare(b.title, collateLocale(), { sensitivity: "base" }));
     else if (sort === "creator") {
-      next.sort((a, b) => a.artistName.localeCompare(b.artistName, "es", { sensitivity: "base" }));
+      next.sort((a, b) => a.artistName.localeCompare(b.artistName, collateLocale(), { sensitivity: "base" }));
     }
     return next;
   }, [scopedRecents, sort]);
@@ -192,9 +195,9 @@ export default function HomeScreen() {
       if (podcast && recentTitles.has(album.name.trim().toLowerCase())) return false;
       return true;
     });
-    if (sort === "alpha") next.sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
+    if (sort === "alpha") next.sort((a, b) => a.name.localeCompare(b.name, collateLocale(), { sensitivity: "base" }));
     else if (sort === "creator") {
-      next.sort((a, b) => a.artistName.localeCompare(b.artistName, "es", { sensitivity: "base" }));
+      next.sort((a, b) => a.artistName.localeCompare(b.artistName, collateLocale(), { sensitivity: "base" }));
     } else if (sort === "added") next.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
     return next;
   }, [moreAlbums, podcast, sort, sortedRecents]);
@@ -249,7 +252,7 @@ export default function HomeScreen() {
               <Text style={styles.sortLabel}>{librarySortLabel(sort)}</Text>
             </Pressable>
             <Pressable
-              accessibilityLabel={grid ? "Ver lista" : "Ver cuadrícula"}
+              accessibilityLabel={grid ? t("common.viewList") : t("common.viewGrid")}
               onPress={() => setViewMode(grid ? "list" : "grid")}
               style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
             >
@@ -274,7 +277,7 @@ export default function HomeScreen() {
                 <View key={album.id} style={styles.cell}>
                   <AlbumTile
                     album={album}
-                    subtitle={podcast ? "Podcast" : `Álbum · ${album.artistName}`}
+                    subtitle={podcast ? t("home.podcast") : t("home.albumBy", { artist: album.artistName })}
                     onPress={() => router.push(albumHref(album.id))}
                   />
                 </View>

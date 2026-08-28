@@ -30,7 +30,9 @@
   "scripts": {
     "start": "expo start",
     "start:clean": "expo start --clear",
+    "start:go": "adb reverse tcp:8082 tcp:8082 && EXPO_OFFLINE=1 expo start --localhost --port 8082",
     "android": "expo start --android",
+    "postinstall": "node scripts/fix-expo-platform-header.mjs",
     "typecheck": "tsc --noEmit",
     "update:preview": "eas update --channel preview && node scripts/notify-ota.mjs preview",
     "update:production": "eas update --channel production && node scripts/notify-ota.mjs production",

@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { ArrowDownCircle, Check, CircleCheck, Trash2 } from "lucide-react-native";
+import { t } from "@/lib/i18n/runtime";
 import { colors, fonts, type } from "@/lib/theme";
 
 export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Eliminar",
-  cancelLabel = "Cancelar",
+  confirmLabel = t("common.delete"),
+  cancelLabel = t("common.cancel"),
   destructive = true,
   busy = false,
   success = false,

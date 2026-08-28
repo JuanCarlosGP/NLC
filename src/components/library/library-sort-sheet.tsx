@@ -2,19 +2,20 @@ import { Pressable, StyleSheet, Text } from "react-native";
 import { Check } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
+import { t } from "@/lib/i18n/runtime";
 import { colors, fonts, type } from "@/lib/theme";
 
 export type LibrarySort = "recents" | "added" | "alpha" | "creator";
 
 export const LIBRARY_SORTS: { id: LibrarySort; label: string }[] = [
-  { id: "recents", label: "Recientes" },
-  { id: "added", label: "Añadidos recientemente" },
-  { id: "alpha", label: "Alfabético" },
-  { id: "creator", label: "Creador" },
+  { id: "recents", get label() { return t("settings.sortRecents"); } },
+  { id: "added", get label() { return t("settings.sortAdded"); } },
+  { id: "alpha", get label() { return t("settings.sortAlpha"); } },
+  { id: "creator", get label() { return t("settings.sortCreator"); } },
 ];
 
 export function librarySortLabel(sort: LibrarySort): string {
-  return LIBRARY_SORTS.find((item) => item.id === sort)?.label ?? "Recientes";
+  return LIBRARY_SORTS.find((item) => item.id === sort)?.label ?? t("settings.sortRecents");
 }
 
 export function LibrarySortSheet({
@@ -32,11 +33,11 @@ export function LibrarySortSheet({
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar ordenar"
+      accessibilityCloseLabel={t("settings.closeSort")}
       viewportRatio={0.48}
     >
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text style={styles.heading}>Ordenar por</Text>
+        <Text style={styles.heading}>{t("settings.sortBy")}</Text>
         {LIBRARY_SORTS.map((item) => {
           const active = item.id === value;
           return (

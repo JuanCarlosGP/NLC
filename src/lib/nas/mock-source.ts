@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import type {
   Album,
   AlbumDetail,
@@ -168,7 +169,7 @@ export const mockSource: MusicSource = {
   async ping(): Promise<PingResult> {
     return {
       ok: true,
-      message: "Biblioteca de ejemplo lista (sin NAS).",
+      message: t("nasExtra.mockLibrary"),
       serverName: "NLC mock",
       version: "0.1.0",
     };
@@ -184,7 +185,7 @@ export const mockSource: MusicSource = {
 
   async getAlbum(id: string): Promise<AlbumDetail> {
     const album = albums.find((item) => item.id === id);
-    if (!album) throw new Error("Álbum no encontrado.");
+    if (!album) throw new Error(t("nasExtra.mockAlbum"));
     return { ...album, tracks: tracks.filter((item) => item.albumId === id) };
   },
 
@@ -209,7 +210,7 @@ export const mockSource: MusicSource = {
 
   async streamUrl(trackId: string): Promise<PlayableSource> {
     const url = streamByTrackId.get(trackId);
-    if (!url) throw new Error("No hay stream para esta pista.");
+    if (!url) throw new Error(t("nasExtra.noStream"));
     return url;
   },
 

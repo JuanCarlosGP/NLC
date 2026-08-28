@@ -4,14 +4,16 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Star } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n/context";
 import { dueToday, dueTomorrow, formatDue, isOverdue } from "@/lib/productivity/dates";
 import { libraryParamId } from "@/lib/library/href";
 import { useActiveProjects, useProductivity } from "@/lib/productivity/productivity-context";
-import { STATUS_LABEL, TASK_STATUSES } from "@/lib/productivity/types";
+import { projectDisplayName, STATUS_LABEL, TASK_STATUSES } from "@/lib/productivity/types";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function TaskScreen() {
+  const { t } = useI18n();
   const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
   const id = libraryParamId(rawId);
   const router = useRouter();
@@ -33,7 +35,7 @@ export default function TaskScreen() {
   if (!ready) {
     return (
       <Screen>
-        <Text style={type.meta}>Cargando…</Text>
+        <Text style={type.meta}>{t("common.loading")}</Text>
       </Screen>
     );
   }
@@ -41,14 +43,16 @@ export default function TaskScreen() {
   if (!task) {
     return (
       <Screen>
-        <Text style={type.pageTitle}>Tarea</Text>
-        <Text style={type.body}>Esta tarea ya no está en el teléfono.</Text>
+        <Text style={type.pageTitle}>{t("focus.task")}</Text>
+        <Text style={type.body}>{t("focus.missingTask")}</Text>
       </Screen>
     );
   }
 
   const current = task;
   const overdue = isOverdue(current.dueAt, current.status);
+  const todayLabel = t("dates.today");
+  const tomorrowLabel = t("dates.tomorrow");
 
   async function saveTitle() {
     const next = title.trim();
@@ -67,18 +71,18 @@ export default function TaskScreen() {
         <View style={[styles.art, { backgroundColor: project?.color ?? colors.sheetRaised }]}>
           <View style={[styles.innerDot, { backgroundColor: colors.accent }]} />
         </View>
-        <Text style={type.label}>{project?.name ?? "Tarea"}</Text>
+        <Text style={type.label}>{project ? projectDisplayName(project) : t("focus.task")}</Text>
         <View style={styles.titleRow}>
           <TextInput
             value={title}
             onChangeText={setTitle}
             onBlur={() => void saveTitle()}
             style={styles.titleInput}
-            placeholder="Título"
+            placeholder={t("focus.title")}
             placeholderTextColor={colors.muted}
           />
           <Pressable
-            accessibilityLabel={current.starred ? "Quitar estrella" : "Destacar"}
+            accessibilityLabel={current.starred ? t("focus.unstar") : t("focus.star")}
             onPress={() => {
               triggerUiHaptic();
               void updateTask(current.id, { starred: !current.starred });
@@ -95,7 +99,7 @@ export default function TaskScreen() {
         </View>
       </View>
 
-      <Text style={type.label}>Estado</Text>
+      <Text style={type.label}>{t("focus.statusLabel")}</Text>
       <View style={styles.chips}>
         {TASK_STATUSES.map((status) => {
           const active = current.status === status;
@@ -117,13 +121,13 @@ export default function TaskScreen() {
         })}
       </View>
 
-      <Text style={type.label}>Fecha</Text>
+      <Text style={type.label}>{t("focus.date")}</Text>
       <View style={styles.chips}>
         {(
           [
-            [null, "Sin fecha"],
-            [dueToday(), "Hoy"],
-            [dueTomorrow(), "Mañana"],
+            [null, t("dates.noDate")],
+            [dueToday(), todayLabel],
+            [dueTomorrow(), tomorrowLabel],
           ] as const
         ).map(([value, label]) => {
           const active =
@@ -146,11 +150,11 @@ export default function TaskScreen() {
           );
         })}
       </View>
-      {current.dueAt != null && formatDue(current.dueAt) !== "Hoy" && formatDue(current.dueAt) !== "Mañana" ? (
+      {current.dueAt != null && formatDue(current.dueAt) !== todayLabel && formatDue(current.dueAt) !== tomorrowLabel ? (
         <Text style={[type.meta, overdue && styles.overdue]}>{formatDue(current.dueAt)}</Text>
       ) : null}
 
-      <Text style={type.label}>Proyecto</Text>
+      <Text style={type.label}>{t("focus.project")}</Text>
       <View style={styles.chips}>
         {projects.map((item) => {
           const active = item.id === current.projectId;
@@ -165,18 +169,18 @@ export default function TaskScreen() {
               style={[styles.chip, active && styles.chipOn]}
             >
               <View style={[styles.dot, { backgroundColor: item.color }]} />
-              <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{item.name}</Text>
+              <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{projectDisplayName(item)}</Text>
             </Pressable>
           );
         })}
       </View>
 
-      <Text style={type.label}>Notas</Text>
+      <Text style={type.label}>{t("focus.notes")}</Text>
       <TextInput
         value={notes}
         onChangeText={setNotes}
         onBlur={() => void saveNotes()}
-        placeholder="Notas cortas"
+        placeholder={t("focus.notesHint")}
         placeholderTextColor={colors.muted}
         multiline
         style={styles.notes}
@@ -189,15 +193,15 @@ export default function TaskScreen() {
         }}
         style={({ pressed }) => [styles.delete, { opacity: pressed ? 0.8 : 1 }]}
       >
-        <Text style={styles.deleteText}>Eliminar</Text>
+        <Text style={styles.deleteText}>{t("common.delete")}</Text>
       </Pressable>
 
       <ConfirmDialog
         open={confirm}
-        title="Eliminar tarea"
-        message={`Se borrará «${current.title}» del teléfono.`}
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        title={t("focus.deleteTask")}
+        message={t("focus.deleteTaskConfirm", { title: current.title })}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={busy}
         onCancel={() => {

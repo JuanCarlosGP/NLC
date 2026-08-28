@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { clearLocalLibrary } from "@/lib/db/catalog";
-import { createMusicSource } from "@/lib/nas/source-factory";
+import { t } from "@/lib/i18n/runtime";
+import { createMusicSource, pingMusicSource } from "@/lib/nas/source-factory";
 import { probeWebDav } from "@/lib/nas/webdav-source";
 import type { NasSettings } from "@/lib/settings/storage";
 import { podcastSourceSettings, videoSourceSettings, wealthSourceSettings, focusSourceSettings } from "@/lib/settings/storage";
@@ -172,8 +173,7 @@ export function useNasSettings() {
     setBusy(true);
     setFeedback(null);
     try {
-      const source = createMusicSource(ctx.settings, ctx.password);
-      const ping = await source.ping();
+      const ping = await pingMusicSource(ctx.settings, ctx.password);
       cachedShareConnected = ping.ok;
       setConnected(ping.ok);
       setFeedback({
@@ -194,26 +194,25 @@ export function useNasSettings() {
         cachedShareConnected = false;
         setConnected(false);
         setFeedback({
-          text: "Ajustes guardados. Estás usando la biblioteca de ejemplo.",
+          text: t("feedback.mockSaved"),
           color: colors.ok,
         });
         return;
       }
-      const source = createMusicSource(ctx.settings, ctx.password);
-      const ping = await source.ping();
+      const ping = await pingMusicSource(ctx.settings, ctx.password);
       cachedShareConnected = ping.ok;
       setConnected(ping.ok);
       setFeedback(
         ping.ok
-          ? { text: `Ajustes guardados. ${ping.message}`, color: colors.ok }
+          ? { text: t("feedback.savedOk", { detail: ping.message }), color: colors.ok }
           : {
-              text: `Ajustes guardados, pero no hay conexión. ${ping.message}`,
+              text: t("feedback.savedNoConnection", { detail: ping.message }),
               color: colors.warn,
             },
       );
     } catch (error) {
       setFeedback({
-        text: error instanceof Error ? error.message : "No se pudieron guardar los ajustes.",
+        text: error instanceof Error ? error.message : t("feedback.saveFail"),
         color: colors.danger,
       });
     } finally {
@@ -227,19 +226,19 @@ export function useNasSettings() {
     try {
       const conn = podcastSourceSettings(ctx.settings);
       if (!conn.sharePath.trim()) {
-        throw new Error("Falta la ruta absoluta de los podcasts.");
+        throw new Error(t("feedback.podcastPath"));
       }
       const ok = await probeWebDav(conn, ctx.password);
       cachedShareConnected = ok;
       setConnected(ok);
-      if (!ok) throw new Error(`No se pudo abrir ${conn.sharePath}.`);
+      if (!ok) throw new Error(t("feedback.openPathFail", { path: conn.sharePath }));
       setFeedback({
-        text: `Hay conexión con ${conn.sharePath}.`,
+        text: t("feedback.connectedAt", { path: conn.sharePath }),
         color: colors.ok,
       });
     } catch (error) {
       setFeedback({
-        text: error instanceof Error ? error.message : "No se pudo conectar a la carpeta de podcasts.",
+        text: error instanceof Error ? error.message : t("feedback.podcastConnect"),
         color: colors.danger,
       });
     } finally {
@@ -253,21 +252,21 @@ export function useNasSettings() {
     try {
       const conn = videoSourceSettings(ctx.settings);
       if (!conn.sharePath.trim()) {
-        throw new Error("Falta la ruta absoluta de la carpeta de vídeo.");
+        throw new Error(t("feedback.videoPath"));
       }
       const { listDir } = createVideoDavClient(ctx.settings, ctx.password);
       const entries = await listDir(conn.sharePath);
       cachedVideoConnected = true;
       setVideoConnected(true);
       setFeedback({
-        text: `Hay conexión. ${entries.length} elementos en ${conn.sharePath}.`,
+        text: t("feedback.videoConnectedItems", { count: entries.length, path: conn.sharePath }),
         color: colors.ok,
       });
     } catch (error) {
       cachedVideoConnected = false;
       setVideoConnected(false);
       setFeedback({
-        text: error instanceof Error ? error.message : "No se pudo conectar a la carpeta de vídeo.",
+        text: error instanceof Error ? error.message : t("feedback.videoConnect"),
         color: colors.danger,
       });
     } finally {
@@ -280,22 +279,22 @@ export function useNasSettings() {
     setFeedback(null);
     try {
       if (!ctx.settings.wealthSharePath.trim()) {
-        throw new Error("Falta la ruta absoluta de la carpeta de patrimonio.");
+        throw new Error(t("feedback.wealthPath"));
       }
       const conn = wealthSourceSettings(ctx.settings);
       const ok = await probeWebDav(conn, ctx.password);
       cachedWealthConnected = ok;
       setWealthConnected(ok);
-      if (!ok) throw new Error(`No se pudo abrir ${conn.sharePath}.`);
+      if (!ok) throw new Error(t("feedback.openPathFail", { path: conn.sharePath }));
       setFeedback({
-        text: `Hay conexión con ${conn.sharePath}.`,
+        text: t("feedback.connectedAt", { path: conn.sharePath }),
         color: colors.ok,
       });
     } catch (error) {
       cachedWealthConnected = false;
       setWealthConnected(false);
       setFeedback({
-        text: error instanceof Error ? error.message : "No se pudo conectar a la carpeta de patrimonio.",
+        text: error instanceof Error ? error.message : t("feedback.wealthConnect"),
         color: colors.danger,
       });
     } finally {
@@ -309,7 +308,7 @@ export function useNasSettings() {
     try {
       await ctx.persist();
       if (!ctx.settings.wealthSharePath.trim()) {
-        throw new Error("Falta la ruta absoluta de la carpeta de patrimonio.");
+        throw new Error(t("feedback.wealthPath"));
       }
       const conn = wealthSourceSettings(ctx.settings);
       const ok = await probeWebDav(conn, ctx.password);
@@ -317,7 +316,7 @@ export function useNasSettings() {
       setWealthConnected(ok);
       if (!ok) {
         setFeedback({
-          text: `Ajustes guardados, pero no se pudo abrir ${conn.sharePath}. Crea la carpeta en el NAS.`,
+          text: t("feedback.savedOpenPathFail", { path: conn.sharePath }),
           color: colors.warn,
         });
         return;
@@ -326,13 +325,13 @@ export function useNasSettings() {
       const pushError = await pushWealthToSources(ctx.settings, ctx.password);
       if (pushError) {
         setFeedback({
-          text: `Hay conexión con ${conn.sharePath}, pero no se pudo escribir nlc-wealth.json. ${pushError}`,
+          text: t("feedback.wealthWriteFail", { path: conn.sharePath, error: pushError }),
           color: colors.warn,
         });
         return;
       }
       setFeedback({
-        text: `Hay conexión con ${conn.sharePath}. Se copia nlc-wealth.json ahí.`,
+        text: t("feedback.wealthCopyOk", { path: conn.sharePath }),
         color: colors.ok,
       });
     } catch (error) {
@@ -340,7 +339,7 @@ export function useNasSettings() {
         text:
           error instanceof Error
             ? error.message
-            : "No se pudieron guardar los ajustes de patrimonio.",
+            : t("feedback.wealthSaveFail"),
         color: colors.danger,
       });
     } finally {
@@ -353,22 +352,22 @@ export function useNasSettings() {
     setFeedback(null);
     try {
       if (!ctx.settings.focusSharePath.trim()) {
-        throw new Error("Falta la ruta absoluta de la carpeta de tareas.");
+        throw new Error(t("feedback.focusPath"));
       }
       const conn = focusSourceSettings(ctx.settings);
       const ok = await probeWebDav(conn, ctx.password);
       cachedFocusConnected = ok;
       setFocusConnected(ok);
-      if (!ok) throw new Error(`No se pudo abrir ${conn.sharePath}.`);
+      if (!ok) throw new Error(t("feedback.openPathFail", { path: conn.sharePath }));
       setFeedback({
-        text: `Hay conexión con ${conn.sharePath}.`,
+        text: t("feedback.connectedAt", { path: conn.sharePath }),
         color: colors.ok,
       });
     } catch (error) {
       cachedFocusConnected = false;
       setFocusConnected(false);
       setFeedback({
-        text: error instanceof Error ? error.message : "No se pudo conectar a la carpeta de tareas.",
+        text: error instanceof Error ? error.message : t("feedback.focusConnect"),
         color: colors.danger,
       });
     } finally {
@@ -382,7 +381,7 @@ export function useNasSettings() {
     try {
       await ctx.persist();
       if (!ctx.settings.focusSharePath.trim()) {
-        throw new Error("Falta la ruta absoluta de la carpeta de tareas.");
+        throw new Error(t("feedback.focusPath"));
       }
       const conn = focusSourceSettings(ctx.settings);
       const ok = await probeWebDav(conn, ctx.password);
@@ -390,7 +389,7 @@ export function useNasSettings() {
       setFocusConnected(ok);
       if (!ok) {
         setFeedback({
-          text: `Ajustes guardados, pero no se pudo abrir ${conn.sharePath}. Crea la carpeta en el NAS.`,
+          text: t("feedback.savedOpenPathFail", { path: conn.sharePath }),
           color: colors.warn,
         });
         return;
@@ -399,13 +398,13 @@ export function useNasSettings() {
       const pushError = await pushFocusToSources(ctx.settings, ctx.password);
       if (pushError) {
         setFeedback({
-          text: `Hay conexión con ${conn.sharePath}, pero no se pudo escribir nlc-tasks.json. ${pushError}`,
+          text: t("feedback.focusWriteFail", { path: conn.sharePath, error: pushError }),
           color: colors.warn,
         });
         return;
       }
       setFeedback({
-        text: `Hay conexión con ${conn.sharePath}. Se copia nlc-tasks.json ahí.`,
+        text: t("feedback.focusCopyOk", { path: conn.sharePath }),
         color: colors.ok,
       });
     } catch (error) {
@@ -413,7 +412,7 @@ export function useNasSettings() {
         text:
           error instanceof Error
             ? error.message
-            : "No se pudieron guardar los ajustes de tareas.",
+            : t("feedback.focusSaveFail"),
         color: colors.danger,
       });
     } finally {
@@ -434,15 +433,15 @@ export function useNasSettings() {
 
       if (focusChanged && !musicChanged && !podcastChanged && !videoChanged && !wealthChanged) {
         if (!next.focusLocalFolderUri) {
-          setFeedback({ text: "Carpeta local de tareas quitada.", color: colors.ok });
+          setFeedback({ text: t("feedback.focusLocalRemoved"), color: colors.ok });
           return;
         }
         await pullFocusFromSources(next, ctx.password);
         const pushError = await pushFocusToSources(next, ctx.password);
         setFeedback({
           text: pushError
-            ? `Carpeta local lista, pero no se pudo escribir nlc-tasks.json. ${pushError}`
-            : "Carpeta local lista. Se guarda nlc-tasks.json ahí.",
+            ? t("feedback.focusLocalWriteFail", { error: pushError })
+            : t("feedback.focusLocalReady"),
           color: pushError ? colors.warn : colors.ok,
         });
         return;
@@ -450,15 +449,15 @@ export function useNasSettings() {
 
       if (wealthChanged && !musicChanged && !podcastChanged && !videoChanged && !focusChanged) {
         if (!next.wealthLocalFolderUri) {
-          setFeedback({ text: "Carpeta local de patrimonio quitada.", color: colors.ok });
+          setFeedback({ text: t("feedback.wealthLocalRemoved"), color: colors.ok });
           return;
         }
         await pullWealthFromSources(next, ctx.password);
         const pushError = await pushWealthToSources(next, ctx.password);
         setFeedback({
           text: pushError
-            ? `Carpeta local lista, pero no se pudo escribir nlc-wealth.json. ${pushError}`
-            : "Carpeta local lista. Se guarda nlc-wealth.json ahí.",
+            ? t("feedback.wealthLocalWriteFail", { error: pushError })
+            : t("feedback.wealthLocalReady"),
           color: pushError ? colors.warn : colors.ok,
         });
         return;
@@ -467,14 +466,16 @@ export function useNasSettings() {
       if (videoChanged && !musicChanged && !podcastChanged) {
         forgetLocalVideoTree();
         if (!next.videoLocalFolderUri) {
-          setFeedback({ text: "Carpeta local de vídeo quitada.", color: colors.ok });
+          setFeedback({ text: t("feedback.videoLocalRemoved"), color: colors.ok });
           return;
         }
         const shows = await listLocalVideoShows(next.videoLocalFolderUri);
         setFeedback({
           text: shows.length
-            ? `${shows.length} título${shows.length === 1 ? "" : "s"} en la carpeta local de vídeo.`
-            : "La carpeta local de vídeo está vacía o no tiene series/movies.",
+            ? t(shows.length === 1 ? "feedback.videoLocalTitleOne" : "feedback.videoLocalTitleMany", {
+                count: shows.length,
+              })
+            : t("feedback.videoLocalEmpty"),
           color: shows.length ? colors.ok : colors.warn,
         });
         return;
@@ -483,7 +484,7 @@ export function useNasSettings() {
       if (podcastChanged && !musicChanged) {
         if (!next.podcastLocalFolderUri) {
           await clearLocalLibrary("localpod:");
-          setFeedback({ text: "Carpeta local de podcasts quitada.", color: colors.ok });
+          setFeedback({ text: t("feedback.podcastLocalRemoved"), color: colors.ok });
           return;
         }
         const source = createLocalSource(next.podcastLocalFolderUri, { asPodcast: true, idPrefix: "localpod" });
@@ -494,7 +495,7 @@ export function useNasSettings() {
 
       if (!next.localFolderUri) {
         await clearLocalLibrary("local:");
-        setFeedback({ text: "Carpeta local de música quitada.", color: colors.ok });
+        setFeedback({ text: t("feedback.musicLocalRemoved"), color: colors.ok });
         return;
       }
       const source = createMusicSource(next, ctx.password);
@@ -505,7 +506,7 @@ export function useNasSettings() {
       });
     } catch (error) {
       setFeedback({
-        text: error instanceof Error ? error.message : "No se pudo usar la carpeta local.",
+        text: error instanceof Error ? error.message : t("feedback.localFail"),
         color: colors.danger,
       });
     } finally {

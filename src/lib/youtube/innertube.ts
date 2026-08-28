@@ -1,3 +1,4 @@
+import { runtimeLocale, t } from "@/lib/i18n/runtime";
 import type { ImportedPlaylist, ImportedTrack } from "@/lib/spotify/types";
 import {
   youtubeMusicCanonicalUrl,
@@ -8,14 +9,12 @@ import {
 const EMBED_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-const CONTEXT = {
-  client: {
-    clientName: "WEB_REMIX",
-    clientVersion: "1.20250407.01.00",
-    hl: "es",
-    gl: "ES",
-  },
-};
+function youtubeLang(): { hl: string; gl: string; accept: string } {
+  if (runtimeLocale() === "es") {
+    return { hl: "es", gl: "ES", accept: "es-ES,es;q=0.9,en;q=0.8" };
+  }
+  return { hl: "en", gl: "US", accept: "en-US,en;q=0.9" };
+}
 
 type Json = Record<string, unknown>;
 
@@ -171,10 +170,11 @@ async function innertube(
   extra: Json,
   host: "music.youtube.com" | "www.youtube.com" = "music.youtube.com",
 ): Promise<unknown> {
+  const lang = youtubeLang();
   const context =
     host === "www.youtube.com"
-      ? { client: { clientName: "WEB", clientVersion: "2.20250407.00.00", hl: "es", gl: "ES" } }
-      : CONTEXT;
+      ? { client: { clientName: "WEB", clientVersion: "2.20250407.00.00", hl: lang.hl, gl: lang.gl } }
+      : { client: { clientName: "WEB_REMIX", clientVersion: "1.20250407.01.00", hl: lang.hl, gl: lang.gl } };
   try {
     const response = await fetch(`https://${host}/youtubei/v1/${endpoint}?prettyPrint=false`, {
       method: "POST",
@@ -182,19 +182,19 @@ async function innertube(
         Accept: "application/json",
         "Content-Type": "application/json",
         "User-Agent": EMBED_UA,
-        "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        "Accept-Language": lang.accept,
         Origin: `https://${host}`,
         Referer: `https://${host}/`,
       },
       body: JSON.stringify({ context, ...extra }),
     });
     if (!response.ok) {
-      throw new Error("YouTube Music no devolvió el listado.");
+      throw new Error(t("nasExtra.youtubeNoList"));
     }
     return response.json();
   } catch (err) {
-    if (err instanceof Error && /no devolvió el listado/i.test(err.message)) throw err;
-    throw new Error("YouTube Music no respondió. En el PC usa Metro con el servidor web.");
+    if (err instanceof Error && err.message === t("nasExtra.youtubeNoList")) throw err;
+    throw new Error(t("nasExtra.youtubePcMetro"));
   }
 }
 
@@ -204,7 +204,7 @@ function asPlaylist(
   name: string,
 ): Omit<ImportedPlaylist, "importedAt"> {
   if (!tracks.length) {
-    throw new Error("Ese enlace no trajo canciones. Prueba una playlist pública o un mix.");
+    throw new Error(t("nasExtra.youtubeNoSongs"));
   }
   return {
     id: youtubeMusicEntityId(ref),
@@ -273,5 +273,5 @@ export async function fetchYoutubeMusicEntity(
     const result = await attempt(ref);
     if (result) return result;
   }
-  throw new Error("No se pudieron leer las canciones de YouTube Music.");
+  throw new Error(t("nasExtra.youtubeReadSongsFail"));
 }

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
+import { useI18n } from "@/lib/i18n/context";
 import { AssetRow, assetListStyle } from "@/components/wealth/asset-row";
 import { CashComposerSheet } from "@/components/wealth/account-composer-sheet";
 import { TxComposerSheet } from "@/components/wealth/tx-composer-sheet";
@@ -11,7 +12,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { assetPosition } from "@/lib/wealth/compute";
 import { formatEuro } from "@/lib/wealth/money";
-import { type WealthAccount, type WealthAsset, type WealthTxKind } from "@/lib/wealth/types";
+import { accountDisplayName, type WealthAccount, type WealthAsset, type WealthTxKind } from "@/lib/wealth/types";
 import { useWealth } from "@/lib/wealth/wealth-context";
 
 export function AccountActivitySheet({
@@ -23,6 +24,7 @@ export function AccountActivitySheet({
   onOpenChange: (open: boolean) => void;
   onEditAsset?: (asset: WealthAsset | null) => void;
 }) {
+  const { t } = useI18n();
   const [txOpen, setTxOpen] = useState(false);
   const [txKind, setTxKind] = useState<WealthTxKind>("income");
   const [txAccountId, setTxAccountId] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export function AccountActivitySheet({
           }
           onOpenChange(open);
         }}
-        accessibilityCloseLabel="Cerrar movimientos de la cuenta"
+        accessibilityCloseLabel={t("wealth.closeAccountActivity")}
         viewportRatio={0.68}
         expandable
       >
@@ -89,6 +91,7 @@ function AccountActivityBody({
   onAddTx: (kind: WealthTxKind) => void;
   onEditCash: () => void;
 }) {
+  const { t } = useI18n();
   const { assets, txs, balanceOf, holdingsOf, totalOf } = useWealth();
   const cash = balanceOf(account.id);
   const invested = holdingsOf(account.id);
@@ -108,47 +111,47 @@ function AccountActivityBody({
   return (
     <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <View style={styles.head}>
-        <Text style={type.sectionTitle}>{account.name}</Text>
+        <Text style={type.sectionTitle}>{accountDisplayName(account)}</Text>
         <Text style={styles.balance}>{formatEuro(total)}</Text>
         <View style={styles.split}>
           <View style={styles.stat}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Efectivo, ${formatEuro(cash)}`}
+              accessibilityLabel={`${t("wealth.cashAmount")}, ${formatEuro(cash)}`}
               onPress={onEditCash}
               style={({ pressed }) => [{ opacity: pressed ? 0.72 : 1 }]}
             >
               <Text style={styles.statValue}>{formatEuro(cash)}</Text>
-              <Text style={type.label}>Efectivo</Text>
+              <Text style={type.label}>{t("wealth.cashAmount")}</Text>
             </Pressable>
           </View>
           <View style={styles.stat}>
             <Text style={styles.statValue}>{formatEuro(invested)}</Text>
-            <Text style={type.label}>Invertido</Text>
+            <Text style={type.label}>{t("wealth.invested")}</Text>
           </View>
         </View>
       </View>
       <View style={styles.actions}>
         <Action
-          label="Ingreso"
+          label={t("wealth.income")}
           icon={<ArrowDown size={18} color={colors.void} strokeWidth={2} />}
           onPress={() => onAddTx("income")}
         />
         <Action
-          label="Traspaso"
+          label={t("wealth.transfer")}
           icon={<ArrowUpDown size={18} color={colors.void} strokeWidth={2} />}
           onPress={() => onAddTx("transfer")}
         />
       </View>
       <View style={styles.actions}>
         <Action
-          label="Gasto"
+          label={t("wealth.expense")}
           icon={<ArrowUp size={18} color={colors.void} strokeWidth={2} />}
           onPress={() => onAddTx("expense")}
         />
         {onEditAsset ? (
           <Action
-            label="Inversión"
+            label={t("wealth.investment")}
             icon={<Plus size={18} color={colors.void} strokeWidth={2} />}
             onPress={() => {
               triggerUiHaptic();

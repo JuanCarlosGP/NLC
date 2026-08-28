@@ -11,10 +11,12 @@ import { albumHref } from "@/lib/library/href";
 import type { Album, Track } from "@/lib/nas/types";
 import { usePlayer } from "@/lib/player/player-context";
 import { useSettings } from "@/lib/settings/settings-context";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function PodcastsScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const { source, ready, settings } = useSettings();
   const { playTracks, current } = usePlayer();
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -39,11 +41,11 @@ export default function PodcastsScreen() {
         setTracks([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron cargar los podcasts.");
+      setError(err instanceof Error ? err.message : t("podcasts.loadError"));
     } finally {
       setLoading(false);
     }
-  }, [source]);
+  }, [source, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,14 +68,16 @@ export default function PodcastsScreen() {
         <View style={styles.art}>
           <Mic color={colors.accent} size={36} strokeWidth={1.8} />
         </View>
-        <Text style={type.label}>Lista</Text>
-        <Text style={type.pageTitle}>Podcasts</Text>
+        <Text style={type.label}>{t("common.list")}</Text>
+        <Text style={type.pageTitle}>{t("podcasts.title")}</Text>
         <Text style={type.meta}>
           {loading
-            ? "Cargando…"
+            ? t("common.loading")
             : episodeCount
-              ? `${episodeCount} episodios`
-              : `Aún no hay episodios en ${settings.podcastSharePath || "Music/Podcasts"}`}
+              ? t(episodeCount === 1 ? "podcasts.episodeOne" : "podcasts.episodeMany", {
+                  count: episodeCount,
+                })
+              : t("podcasts.emptyInPath", { path: settings.podcastSharePath || "Podcasts" })}
         </Text>
       </View>
 
@@ -81,8 +85,7 @@ export default function PodcastsScreen() {
 
       {!loading && !albums.length && !tracks.length ? (
         <Text style={type.body}>
-          Descarga un episodio en Ajustes → Descargar. Quedará en{" "}
-          {settings.podcastSharePath || "Music/Podcasts"}.
+          {t("podcasts.emptyHintDownload", { path: settings.podcastSharePath || "Podcasts" })}
         </Text>
       ) : null}
 
@@ -93,13 +96,13 @@ export default function PodcastsScreen() {
               onPress={() => void playTracks(tracks, 0)}
               style={({ pressed }) => [styles.btn, styles.solid, { opacity: pressed ? 0.8 : 1 }]}
             >
-              <Text style={styles.solidText}>Reproducir</Text>
+              <Text style={styles.solidText}>{t("common.play")}</Text>
             </Pressable>
             <Pressable
               onPress={() => void playTracks(tracks, Math.floor(Math.random() * tracks.length))}
               style={({ pressed }) => [styles.btn, styles.ghost, { opacity: pressed ? 0.8 : 1 }]}
             >
-              <Text style={styles.ghostText}>Aleatorio</Text>
+              <Text style={styles.ghostText}>{t("common.shuffle")}</Text>
             </Pressable>
           </View>
           {tracks.map((track, index) => (
@@ -117,7 +120,7 @@ export default function PodcastsScreen() {
           <AlbumRow
             key={album.id}
             album={album}
-            subtitle="Podcast"
+            subtitle={t("podcasts.kind")}
             onPress={() => router.push(albumHref(album.id))}
           />
         ))

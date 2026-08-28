@@ -9,12 +9,14 @@ import { useExitingList } from "@/hooks/use-exiting-list";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import { isPodcastAlbum } from "@/lib/nas/webdav";
 import { usePlayer } from "@/lib/player/player-context";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function AlbumScreen() {
   const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
   const id = libraryParamId(rawId);
   const router = useRouter();
+  const { t } = useI18n();
   const { album, loading, error } = useAlbum(id);
   const { playTracks, current } = usePlayer();
   const albumTracks = album?.tracks ?? [];
@@ -24,7 +26,7 @@ export default function AlbumScreen() {
 
   return (
     <Screen>
-      {loading ? <Text style={type.meta}>Cargando álbum…</Text> : null}
+      {loading ? <Text style={type.meta}>{t("album.loading")}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {album ? (
         <>
@@ -32,7 +34,7 @@ export default function AlbumScreen() {
             <Cover id={album.id} label={album.name} uri={cover} size={160} radius={4} />
             <Text style={type.pageTitle}>{album.name}</Text>
             {podcast ? (
-              <Text style={type.body}>Podcast</Text>
+              <Text style={type.body}>{t("album.podcast")}</Text>
             ) : (
               <Pressable onPress={() => router.push(artistHref(album.artistId))}>
                 <Text style={type.body}>{album.artistName}</Text>
@@ -40,7 +42,16 @@ export default function AlbumScreen() {
             )}
             <Text style={type.meta}>
               {album.year ? `${album.year} · ` : ""}
-              {album.tracks.length} {podcast ? "episodios" : "pistas"}
+              {t(
+                podcast
+                  ? album.tracks.length === 1
+                    ? "album.episodeOne"
+                    : "album.episodeMany"
+                  : album.tracks.length === 1
+                    ? "album.trackOne"
+                    : "album.trackMany",
+                { count: album.tracks.length },
+              )}
             </Text>
           </View>
           <View style={styles.actions}>
@@ -48,13 +59,13 @@ export default function AlbumScreen() {
               onPress={() => void playTracks(album.tracks, 0)}
               style={({ pressed }) => [styles.btn, styles.solid, { opacity: pressed ? 0.8 : 1 }]}
             >
-              <Text style={styles.solidText}>Reproducir</Text>
+              <Text style={styles.solidText}>{t("common.play")}</Text>
             </Pressable>
             <Pressable
               onPress={() => void playTracks(album.tracks, Math.floor(Math.random() * album.tracks.length))}
               style={({ pressed }) => [styles.btn, styles.ghost, { opacity: pressed ? 0.8 : 1 }]}
             >
-              <Text style={styles.ghostText}>Aleatorio</Text>
+              <Text style={styles.ghostText}>{t("common.shuffle")}</Text>
             </Pressable>
           </View>
           {visibleTracks.map((track, index) => (

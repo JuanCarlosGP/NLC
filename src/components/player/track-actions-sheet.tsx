@@ -25,6 +25,7 @@ import { usePlayer } from "@/lib/player/player-context";
 import { useTrackActions, type TrackActionsTarget } from "@/lib/player/track-actions-context";
 import { useSettings } from "@/lib/settings/settings-context";
 import { useSpotify } from "@/lib/spotify/spotify-context";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
@@ -32,11 +33,12 @@ type ViewMode = "menu" | "playlists";
 
 export function TrackActionsSheet() {
   const { open, target, setOpen } = useTrackActions();
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={setOpen}
-      accessibilityCloseLabel="Cerrar opciones de la canción"
+      accessibilityCloseLabel={t("sheet.close")}
       viewportRatio={0.72}
     >
       {target ? <TrackActionsBody target={target} onClose={() => setOpen(false)} /> : null}
@@ -51,6 +53,7 @@ function TrackActionsBody({
   target: TrackActionsTarget;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const { track, playlistId } = target;
   const router = useRouter();
   const cover = useTrackArtwork(track);
@@ -144,18 +147,18 @@ function TrackActionsBody({
           <>
             <ActionRow
               icon={<ChevronLeft color={colors.ink} size={22} strokeWidth={1.8} />}
-              label="Volver"
+              label={t("onboarding.back")}
               onPress={() => {
                 triggerUiHaptic();
                 setView("menu");
               }}
             />
-            <Text style={styles.section}>Nueva playlist</Text>
+            <Text style={styles.section}>{t("player.newPlaylist")}</Text>
             <View style={styles.create}>
               <TextInput
                 value={name}
                 onChangeText={setName}
-                placeholder="Nombre"
+                placeholder={t("player.playlistName")}
                 placeholderTextColor={colors.muted}
                 selectionColor={colors.accent}
                 style={styles.input}
@@ -170,7 +173,7 @@ function TrackActionsBody({
                 }}
                 style={({ pressed }) => [styles.createBtn, { opacity: pressed || busy ? 0.7 : 1 }]}
               >
-                <Text style={styles.createBtnText}>Crear</Text>
+                <Text style={styles.createBtnText}>{t("common.create")}</Text>
               </Pressable>
             </View>
             {lists.map((playlist) => (
@@ -190,7 +193,7 @@ function TrackActionsBody({
           <>
             <ActionRow
               icon={<CirclePlus color={colors.ink} size={22} strokeWidth={1.8} />}
-              label="Añadir a playlist"
+              label={t("player.addToPlaylist")}
               onPress={() => {
                 triggerUiHaptic();
                 setView("playlists");
@@ -199,7 +202,7 @@ function TrackActionsBody({
             {playlistId ? (
               <ActionRow
                 icon={<CircleMinus color={colors.ink} size={22} strokeWidth={1.8} />}
-                label="Quitar de esta playlist"
+                label={t("player.removeFromPlaylist")}
                 onPress={() =>
                   closeAfter(() => removeTrackFromPlaylist(playlistId, track.id))
                 }
@@ -207,17 +210,17 @@ function TrackActionsBody({
             ) : null}
             <ActionRow
               icon={<ListEnd color={colors.ink} size={22} strokeWidth={1.8} />}
-              label="Añadir a la cola"
+              label={t("player.addQueue")}
               onPress={() => closeAfter(() => enqueueTracks([track], "end"))}
             />
             <ActionRow
               icon={<ListPlus color={colors.ink} size={22} strokeWidth={1.8} />}
-              label="Reproducir a continuación"
+              label={t("player.playNext")}
               onPress={() => closeAfter(() => enqueueTracks([track], "next"))}
             />
             <ActionRow
               icon={<User color={colors.ink} size={22} strokeWidth={1.8} />}
-              label="Ir al artista"
+              label={t("player.goArtist")}
               onPress={() =>
                 closeAfter(() => {
                   router.push(artistHref(track.artistId));
@@ -233,13 +236,13 @@ function TrackActionsBody({
                   strokeWidth={1.8}
                 />
               }
-              label={liked ? "Quitar de favoritos" : "Añadir a favoritos"}
+              label={liked ? t("player.favoriteRemove") : t("player.favoriteAdd")}
               onPress={() => closeAfter(() => toggleFavorite(track))}
             />
             {canDelete ? (
               <ActionRow
                 icon={<Trash2 color={colors.danger} size={22} strokeWidth={1.8} />}
-                label="Eliminar del NAS"
+                label={t("player.deleteNas")}
                 danger
                 onPress={() => {
                   triggerUiHaptic();
@@ -253,10 +256,10 @@ function TrackActionsBody({
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Eliminar del NAS"
-        message={`Se borrará «${display.title}» del NAS.`}
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        title={t("player.deleteNas")}
+        message={t("player.deleteNasMessage")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={busy}
         onCancel={() => {

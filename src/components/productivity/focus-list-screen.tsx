@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { TaskRow, taskListStyle } from "@/components/productivity/task-row";
 import { Screen } from "@/components/ui/screen";
+import { useI18n } from "@/lib/i18n/context";
 import { taskHref } from "@/lib/library/href";
 import { useActiveProjects } from "@/lib/productivity/productivity-context";
 import { useTaskActions } from "@/lib/productivity/task-actions-context";
@@ -30,6 +31,7 @@ export function FocusListScreen({
   tasks: ProdTask[];
   onAdd?: () => void;
 }) {
+  const { t } = useI18n();
   const router = useRouter();
   const projects = useActiveProjects();
   const { openTaskActions } = useTaskActions();
@@ -46,7 +48,7 @@ export function FocusListScreen({
           </View>
           {onAdd ? (
             <Pressable
-              accessibilityLabel="Nueva tarea"
+              accessibilityLabel={t("focus.newTask")}
               onPress={() => {
                 triggerUiHaptic();
                 onAdd();

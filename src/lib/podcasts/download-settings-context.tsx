@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { colors } from "@/lib/theme";
+import { t } from "@/lib/i18n/runtime";
 import {
   DEFAULT_DOWNLOAD_SETTINGS,
   loadDownloadSettings,
@@ -73,10 +74,10 @@ export function DownloadSettingsProvider({ children }: { children: ReactNode }) 
     setFeedback(null);
     try {
       await Promise.all([saveDownloadSettings(settings), saveDownloadToken(token)]);
-      setFeedback({ text: "Ajustes de descargas guardados.", color: colors.ok });
+      setFeedback({ text: t("feedback.downloadsSaved"), color: colors.ok });
     } catch (err) {
       setFeedback({
-        text: err instanceof Error ? err.message : "No se pudo guardar.",
+        text: err instanceof Error ? err.message : t("feedback.saveShortFail"),
         color: colors.danger,
       });
     } finally {
@@ -89,12 +90,14 @@ export function DownloadSettingsProvider({ children }: { children: ReactNode }) 
     setFeedback(null);
     try {
       const health = await checkDownloaderHealth(settings, token);
+      const dirs = health.podcastDir ?? health.downloadDir;
       setFeedback({
         text: health.ok
-          ? `Conectado · yt-dlp ${health.ytDlp ?? "?"}${
-              health.podcastDir ? ` · ${health.podcastDir}` : health.downloadDir ? ` · ${health.downloadDir}` : ""
-            }`
-          : "El servicio respondió, pero no está OK.",
+          ? t("downloadSheet.healthConnected", {
+              version: health.ytDlp ?? "?",
+              dirs: dirs ? ` · ${dirs}` : "",
+            })
+          : t("feedback.downloaderNotOk"),
         color: health.ok ? colors.ok : colors.danger,
       });
     } catch (err) {
@@ -102,7 +105,7 @@ export function DownloadSettingsProvider({ children }: { children: ReactNode }) 
         text:
           err instanceof Error
             ? err.message
-            : "No hay respuesta. ¿Docker en el NAS y mismo Wi‑Fi?",
+            : t("feedback.downloaderNoReply"),
         color: colors.danger,
       });
     } finally {
@@ -123,18 +126,18 @@ export function DownloadSettingsProvider({ children }: { children: ReactNode }) 
         const started = Date.now();
         while (current.status === "queued" || current.status === "running") {
           if (Date.now() - started > 15 * 60 * 1000) {
-            throw new Error("La descarga tarda demasiado. Revisa el contenedor.");
+            throw new Error(t("feedback.downloadSlow"));
           }
           await new Promise((r) => setTimeout(r, 1500));
           current = await getDownloadJob(settings, token, created.id);
           setJob(current);
           const kindHint =
             current.resolvedKind === "podcast"
-              ? " · podcast"
+              ? t("downloadSheet.kindHintPodcast")
               : current.resolvedKind === "song"
-                ? " · canción"
+                ? t("downloadSheet.kindHintSong")
                 : current.resolvedKind === "video"
-                  ? " · vídeo"
+                  ? t("downloadSheet.kindHintVideo")
                   : "";
           setFeedback({ text: `${jobStatusLabel(current.status)}${kindHint}`, color: colors.inkSoft });
         }
@@ -142,28 +145,28 @@ export function DownloadSettingsProvider({ children }: { children: ReactNode }) 
         if (current.status === "done") {
           const where =
             current.resolvedKind === "song"
-              ? "Music/Canciones"
+              ? t("downloadSheet.songHint")
               : current.resolvedKind === "podcast"
-                ? "Music/Podcasts"
+                ? t("downloadSheet.podcastHint")
                 : current.resolvedKind === "video"
-                  ? "Popcorn/movies"
-                  : "el NAS";
+                  ? t("downloadSheet.videoHint")
+                  : t("downloadSheet.nasFallback");
           setFeedback({
             text: current.filename
-              ? `Guardado en ${where}: ${current.filename}. Refresca la biblioteca.`
-              : `Descarga lista en ${where}. Refresca la biblioteca.`,
+              ? t("downloadSheet.savedTo", { where, filename: current.filename })
+              : t("downloadSheet.savedReady", { where }),
             color: colors.ok,
           });
         } else {
           setFeedback({
-            text: current.error || "La descarga falló.",
+            text: current.error || t("feedback.downloadFail"),
             color: colors.danger,
           });
         }
         return current;
       } catch (err) {
         setFeedback({
-          text: err instanceof Error ? err.message : "No se pudo encolar.",
+          text: err instanceof Error ? err.message : t("feedback.enqueueFail"),
           color: colors.danger,
         });
         throw err;

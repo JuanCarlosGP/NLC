@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { joinPath } from "@/lib/nas/webdav";
 import { getWebDavText, putWebDavText } from "@/lib/nas/webdav-source";
 import type { NasSettings } from "@/lib/settings/storage";
@@ -108,7 +109,7 @@ export async function pushFocusToSources(settings: NasSettings, password: string
     if (result.status === "rejected") {
       const reason = result.reason;
       console.warn("No se pudieron copiar las tareas", reason);
-      errors.push(reason instanceof Error ? reason.message : "No se pudo escribir nlc-tasks.json.");
+      errors.push(reason instanceof Error ? reason.message : t("feedback.writeTasksFail"));
     }
   }
   return errors[0] ?? null;

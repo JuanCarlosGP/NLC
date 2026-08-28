@@ -18,6 +18,7 @@ import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ChatBubble, ChatTypingMarker } from "@/components/chat/chat-bubble";
 import { useKeyboardBottomOverlap } from "@/components/chat/use-keyboard-bottom-overlap";
 import { useCursor } from "@/hooks/use-cursor";
+import { useI18n } from "@/lib/i18n/context";
 import { webInteractiveStyle } from "@/lib/interactive";
 import { colors, fonts } from "@/lib/theme";
 
@@ -30,103 +31,24 @@ const SEND_ACTIVE = "#2563eb";
 const SEND_ACTIVE_HOVER = "#1d4ed8";
 const SEND_ICON = "#ffffff";
 
-const UTILITIES: { id: string; label: string; hint: string; draft: string }[] = [
-  {
-    id: "task-create",
-    label: "Crear tarea",
-    hint: "Bandeja, proyecto o fecha",
-    draft: "Crea la tarea «título» en Bandeja para hoy y ponla en por hacer.",
-  },
-  {
-    id: "task-move",
-    label: "Mover tarea",
-    hint: "Por hacer / en curso / hecho",
-    draft: "Pasa «título» a en curso y anota: «detalle».",
-  },
-  {
-    id: "rename",
-    label: "Renombrar",
-    hint: "Canción, playlist, álbum o vídeo",
-    draft: "Renombra «nombre actual» a «nombre nuevo».",
-  },
-  {
-    id: "cover-track",
-    label: "Carátula de canción",
-    hint: "Jpg con el mismo nombre que el audio",
-    draft:
-      "La canción «título» no tiene carátula. En NLC la portada es un jpg al lado del mp3, mismo nombre. ¿Qué archivo pongo y en qué carpeta?",
-  },
-  {
-    id: "cover-podcast",
-    label: "Carátula de podcast",
-    hint: "El episodio no hereda la de la carpeta",
-    draft:
-      "El episodio «título o #nº» no muestra portada. Los podcasts no usan el cover.jpg de la carpeta: hace falta «nombre-del-audio.jpg». ¿Cómo lo dejo?",
-  },
-  {
-    id: "no-play",
-    label: "No suena",
-    hint: "Pista, episodio o capítulo",
-    draft:
-      "No reproduce «título». Fuente WebDAV (host/puerto/carpeta de Ajustes). ¿Qué reviso (conexión, ruta, formato)?",
-  },
-  {
-    id: "missing",
-    label: "No aparece",
-    hint: "Biblioteca, búsqueda o recientes",
-    draft:
-      "No encuentro «artista / álbum / canción» en Biblioteca. ¿Debería salir en Canciones, Álbumes o Podcasts? ¿Hace falta refrescar?",
-  },
-  {
-    id: "ytdlp",
-    label: "Descargar",
-    hint: "yt-dlp :8091 y miniatura",
-    draft:
-      "Quiero bajar «URL» con yt-dlp (Ajustes → Descargas, puerto 8091) a /Music/Podcasts o /Music/Canciones, con jpg al lado. ¿Cómo lo dejo en Ajustes y en el NAS?",
-  },
-  {
-    id: "nas",
-    label: "NAS no conecta",
-    hint: "Host, puerto, usuario y carpeta",
-    draft:
-      "No conecta la carpeta compartida. Host, puerto, usuario y carpeta son los de Ajustes; HTTPS off. ¿Checklist?",
-  },
-  {
-    id: "spotify",
-    label: "Playlist de Spotify",
-    hint: "Importar y matchear contra el NAS",
-    draft:
-      "Quiero importar esta playlist: «URL». NLC no reproduce Spotify: la matchea con lo que hay en /Music. ¿Pasos en Biblioteca → +?",
-  },
-  {
-    id: "onepiece",
-    label: "Capítulo One Piece",
-    hint: "Saga, arco y archivo",
-    draft:
-      "No encuentro o no abre el capítulo «arco / episodio» de One Piece. ¿Cómo está montado (saga → arco → archivo) y qué reviso?",
-  },
-  {
-    id: "wealth-tx",
-    label: "Apuntar dinero",
-    hint: "Gasto, ingreso, compra o venta",
-    draft:
-      "Apunta un gasto de 24,50 € en Comida: «restaurante». Cuenta Caja.",
-  },
-  {
-    id: "wealth-hold",
-    label: "Inversión",
-    hint: "Posición o compra",
-    draft:
-      "Compré 2 acciones de Tesla (TSLA) a 180 €. Regístralo en patrimonio.",
-  },
-  {
-    id: "wealth-goal",
-    label: "Objetivo",
-    hint: "Importe y cuándo llegas",
-    draft:
-      "Crea un objetivo de 20.000 € de patrimonio para dentro de un año, fondo de emergencia.",
-  },
-];
+function buildUtilities(t: (path: string) => string): { id: string; label: string; hint: string; draft: string }[] {
+  return [
+    { id: "task-create", label: t("chat.utilCreateTask"), hint: t("chat.utilCreateTaskHint"), draft: t("chat.utilDraftTaskCreate") },
+    { id: "task-move", label: t("chat.utilMoveTask"), hint: t("chat.utilMoveTaskHint"), draft: t("chat.utilDraftTaskMove") },
+    { id: "rename", label: t("chat.utilRename"), hint: t("chat.utilRenameHint"), draft: t("chat.utilDraftRename") },
+    { id: "cover-track", label: t("chat.utilCoverSong"), hint: t("chat.utilCoverSongHint"), draft: t("chat.utilDraftCoverTrack") },
+    { id: "cover-podcast", label: t("chat.utilCoverPodcast"), hint: t("chat.utilCoverPodcastHint"), draft: t("chat.utilDraftCoverPodcast") },
+    { id: "no-play", label: t("chat.utilNoSound"), hint: t("chat.utilNoSoundHint"), draft: t("chat.utilDraftNoPlay") },
+    { id: "missing", label: t("chat.utilMissing"), hint: t("chat.utilMissingHint"), draft: t("chat.utilDraftMissing") },
+    { id: "ytdlp", label: t("chat.utilDownload"), hint: t("chat.utilDownloadHint"), draft: t("chat.utilDraftDownload") },
+    { id: "nas", label: t("chat.utilNas"), hint: t("chat.utilNasHint"), draft: t("chat.utilDraftNas") },
+    { id: "spotify", label: t("chat.utilSpotify"), hint: t("chat.utilSpotifyHint"), draft: t("chat.utilDraftSpotify") },
+    { id: "onepiece", label: t("chat.utilOnePiece"), hint: t("chat.utilOnePieceHint"), draft: t("chat.utilDraftOnePiece") },
+    { id: "wealth-tx", label: t("chat.utilMoney"), hint: t("chat.utilMoneyHint"), draft: t("chat.utilDraftMoney") },
+    { id: "wealth-hold", label: t("chat.utilAsset"), hint: t("chat.utilAssetHint"), draft: t("chat.utilDraftAsset") },
+    { id: "wealth-goal", label: t("chat.utilGoal"), hint: t("chat.utilGoalHint"), draft: t("chat.utilDraftGoal") },
+  ];
+}
 
 function ChatDialog({
   open,
@@ -139,6 +61,7 @@ function ChatDialog({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <Modal
       visible={open}
@@ -149,7 +72,7 @@ function ChatDialog({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Cerrar"
+        accessibilityLabel={t("common.close")}
         style={styles.dialogBackdrop}
         onPress={onClose}
       >
@@ -163,12 +86,13 @@ function ChatDialog({
 }
 
 export function ChatSheet() {
+  const { t } = useI18n();
   const { chatOpen, setChatOpen } = useCursor();
   return (
     <BottomSheet
       open={chatOpen}
       onOpenChange={setChatOpen}
-      accessibilityCloseLabel="Cerrar chat"
+      accessibilityCloseLabel={t("chat.closeChat")}
       viewportRatio={0.92}
     >
       <ChatSheetBody />
@@ -177,6 +101,7 @@ export function ChatSheet() {
 }
 
 function ChatSheetBody() {
+  const { t } = useI18n();
   const {
     apiKey,
     setApiKey,
@@ -202,6 +127,8 @@ function ChatSheetBody() {
   // o el input queda cortado por el teclado / barra de sistema.
   const sheetBottomPad = keyboardOverlap + bottomInset + (keyboardOpen ? 0 : 36);
 
+  const utilities = buildUtilities(t);
+
   useEffect(() => {
     if (!apiKey) setSetupOpen(true);
   }, [apiKey]);
@@ -217,12 +144,12 @@ function ChatSheetBody() {
     <View style={[styles.panel, { paddingBottom: sheetBottomPad }]}>
       <View style={[styles.header, { borderBottomColor: colors.rule }]}>
         <View style={styles.headerText}>
-          <Text style={styles.title}>Mensajes</Text>
-          <Text style={styles.description}>Agente NLC · Cursor</Text>
+          <Text style={styles.title}>{t("chat.title")}</Text>
+          <Text style={styles.description}>{t("chat.agent")}</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable
-            accessibilityLabel="Borrar historial"
+            accessibilityLabel={t("chat.clearBtn")}
             disabled={messages.length === 0}
             onPress={() => {
               setClearOpen(true);
@@ -240,7 +167,7 @@ function ChatSheetBody() {
             <Trash2 size={16} color={colors.inkSoft} strokeWidth={1.8} />
           </Pressable>
           <Pressable
-            accessibilityLabel="Utilidades"
+            accessibilityLabel={t("chat.utilitiesBtn")}
             onPress={() => {
               setUtilsOpen((value) => !value);
               setSetupOpen(false);
@@ -256,7 +183,7 @@ function ChatSheetBody() {
             <Sparkles size={16} color={utilsOpen ? colors.ink : colors.inkSoft} strokeWidth={1.8} />
           </Pressable>
           <Pressable
-            accessibilityLabel="Ajustes del agente"
+            accessibilityLabel={t("chat.agentSettings")}
             onPress={() => {
               setSetupOpen((value) => !value);
               setUtilsOpen(false);
@@ -280,10 +207,8 @@ function ChatSheetBody() {
             <View style={styles.emptyIcon}>
               <Headphones size={22} color={colors.inkSoft} strokeWidth={1.75} />
             </View>
-            <Text style={styles.emptyTitle}>Nueva conversación</Text>
-            <Text style={styles.emptyBody}>
-              Pide lo que quieras: crear o mover tareas, anotar, renombrar canciones, playlists o vídeos.
-            </Text>
+            <Text style={styles.emptyTitle}>{t("chat.newChat")}</Text>
+            <Text style={styles.emptyBody}>{t("chat.empty")}</Text>
           </View>
         ) : (
           <SheetScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
@@ -300,7 +225,7 @@ function ChatSheetBody() {
           ref={inputRef}
           value={draft}
           onChangeText={setDraft}
-          placeholder="Cuéntanos qué te pasa…"
+          placeholder={t("chat.placeholder")}
           placeholderTextColor={colors.muted}
           editable={!busy}
           multiline
@@ -314,12 +239,12 @@ function ChatSheetBody() {
             webInteractiveStyle(),
             Platform.OS === "web" ? ({ outlineStyle: "none", outlineWidth: 0 } as object) : null,
           ]}
-          accessibilityLabel="Mensaje"
+          accessibilityLabel={t("chat.messageLabel")}
         />
         <Pressable
           onPress={() => void onSend()}
           disabled={!canSend}
-          accessibilityLabel="Enviar"
+          accessibilityLabel={t("chat.send")}
           {...(Platform.OS === "web"
             ? ({
                 onMouseDown: (event: { preventDefault: () => void }) => {
@@ -351,10 +276,10 @@ function ChatSheetBody() {
         </Pressable>
       </View>
 
-      <ChatDialog open={utilsOpen} title="Utilidades" onClose={() => setUtilsOpen(false)}>
-        <Text style={styles.dialogHint}>Elige una. Completa lo que va entre « ».</Text>
+      <ChatDialog open={utilsOpen} title={t("chat.utilities")} onClose={() => setUtilsOpen(false)}>
+        <Text style={styles.dialogHint}>{t("chat.utilitiesHint")}</Text>
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {UTILITIES.map((item) => (
+          {utilities.map((item) => (
             <Pressable
               key={item.id}
               onPress={() => {
@@ -371,17 +296,15 @@ function ChatSheetBody() {
         </ScrollView>
       </ChatDialog>
 
-      <ChatDialog open={setupOpen} title="Agente" onClose={() => setSetupOpen(false)}>
-        <Text style={styles.dialogHint}>
-          Pega la API key. Se guarda en el teléfono. El agente no ve el NAS.
-        </Text>
+      <ChatDialog open={setupOpen} title={t("chat.agentSection")} onClose={() => setSetupOpen(false)}>
+        <Text style={styles.dialogHint}>{t("chat.agentSetupHint")}</Text>
         <TextInput
           value={apiKey}
           onChangeText={setApiKey}
           secureTextEntry
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder="crsr_…"
+          placeholder={t("chat.keyPlaceholder")}
           placeholderTextColor={colors.muted}
           style={styles.keyInput}
         />
@@ -391,7 +314,7 @@ function ChatSheetBody() {
             onPress={() => void testConnection()}
             style={({ pressed }) => [styles.setupBtn, styles.setupGhost, { opacity: pressed ? 0.85 : 1 }]}
           >
-            <Text style={styles.setupGhostText}>Probar</Text>
+            <Text style={styles.setupGhostText}>{t("chat.test")}</Text>
           </Pressable>
           <Pressable
             disabled={busy}
@@ -401,7 +324,7 @@ function ChatSheetBody() {
             }}
             style={({ pressed }) => [styles.setupBtn, styles.setupSolid, { opacity: pressed ? 0.85 : 1 }]}
           >
-            <Text style={styles.setupSolidText}>Guardar</Text>
+            <Text style={styles.setupSolidText}>{t("chat.save")}</Text>
           </Pressable>
         </View>
         {feedback ? <Text style={[styles.feedback, { color: feedback.color }]}>{feedback.text}</Text> : null}
@@ -409,9 +332,9 @@ function ChatSheetBody() {
 
       <ConfirmDialog
         open={clearOpen}
-        title="Borrar historial"
-        message="Se vacía esta conversación. La API key se queda."
-        confirmLabel="Borrar"
+        title={t("chat.clearHistory")}
+        message={t("chat.clearHistoryMessage")}
+        confirmLabel={t("chat.clearConfirm")}
         onCancel={() => setClearOpen(false)}
         onConfirm={() => {
           void clearHistory();

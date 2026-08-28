@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { ChatMdText } from "@/components/chat/chat-md-text";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts } from "@/lib/theme";
 
 export const ChatBubble = memo(function ChatBubble({
@@ -35,10 +36,11 @@ export const ChatBubble = memo(function ChatBubble({
 });
 
 export function ChatTypingMarker() {
+  const { t } = useI18n();
   return (
     <View style={[styles.row, styles.rowAssistant]}>
       <View style={[styles.bubble, styles.typing, { backgroundColor: colors.sheetRaised, borderColor: colors.rule }]}>
-        <Text style={styles.typingText}>Escribiendo…</Text>
+        <Text style={styles.typingText}>{t("chat.typing")}</Text>
       </View>
     </View>
   );

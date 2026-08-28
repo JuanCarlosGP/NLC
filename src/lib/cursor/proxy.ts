@@ -1,3 +1,5 @@
+import { t } from "@/lib/i18n/runtime";
+
 const CURSOR_API = "https://api.cursor.com/v1";
 
 export function cursorUpstreamUrl(path: string): string | null {
@@ -9,9 +11,9 @@ export function cursorUpstreamUrl(path: string): string | null {
 
 export async function relayCursorRequest(request: Request, path: string): Promise<Response> {
   const dest = cursorUpstreamUrl(path);
-  if (!dest) return Response.json({ error: "Ruta Cursor no válida." }, { status: 400 });
+  if (!dest) return Response.json({ error: t("chat.badCursorPath") }, { status: 400 });
   const auth = request.headers.get("Authorization");
-  if (!auth) return Response.json({ error: "Falta Authorization." }, { status: 401 });
+  if (!auth) return Response.json({ error: t("chat.missingAuth") }, { status: 401 });
 
   const headers = new Headers();
   headers.set("Authorization", auth);

@@ -1,3 +1,4 @@
+import { collateLocale, t } from "@/lib/i18n/runtime";
 import type { NasSettings } from "@/lib/settings/storage";
 import { createVideoClient } from "@/lib/video/source";
 import { LOCAL_VIDEO_ROOT, isLocalVideoPath } from "@/lib/local/local-video";
@@ -145,21 +146,21 @@ function majorityRole(folders: VideoFolderItem[]): FolderRole | null {
 }
 
 function roleWord(role: FolderRole, count: number): string {
-  if (role === "season") return count === 1 ? "temporada" : "temporadas";
-  if (role === "saga") return count === 1 ? "saga" : "sagas";
-  if (role === "arc") return count === 1 ? "arco" : "arcos";
-  return count === 1 ? "carpeta" : "carpetas";
+  if (role === "season") return t(count === 1 ? "videoUi.seasonOne" : "videoUi.seasonMany");
+  if (role === "saga") return t(count === 1 ? "videoUi.sagaOne" : "videoUi.sagaMany");
+  if (role === "arc") return t(count === 1 ? "videoUi.arcOne" : "videoUi.arcMany");
+  return t(count === 1 ? "videoUi.folderOne" : "videoUi.folderMany");
 }
 
 function eyebrowFor(path: string, folders: VideoFolderItem[], episodes: VideoEpisodeItem[]): string {
   const role = majorityRole(folders);
-  if (role === "season" || role === "saga") return "Serie";
-  if (role === "arc") return "Saga";
-  if (/\/movies(\/|$)/i.test(path)) return episodes.length && !folders.length ? "Película" : "Películas";
-  if (/\/series\/[^/]+$/i.test(path)) return "Serie";
-  if (parseSeasonName(baseName(path))) return "Temporada";
-  if (episodes.length && !folders.length) return "Episodios";
-  return "Carpeta";
+  if (role === "season" || role === "saga") return t("videoUi.eyebrowSeries");
+  if (role === "arc") return t("videoUi.eyebrowSaga");
+  if (/\/movies(\/|$)/i.test(path)) return episodes.length && !folders.length ? t("videoUi.eyebrowMovie") : t("videoUi.eyebrowMovies");
+  if (/\/series\/[^/]+$/i.test(path)) return t("videoUi.eyebrowSeries");
+  if (parseSeasonName(baseName(path))) return t("videoUi.eyebrowSeason");
+  if (episodes.length && !folders.length) return t("videoUi.eyebrowEpisodes");
+  return t("videoUi.eyebrowFolder");
 }
 
 function skip(entry: WebDavEntry): boolean {
@@ -203,19 +204,21 @@ export async function inspectFolder(
     });
   }
 
-  folders.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, "es"));
-  episodes.sort((a, b) => a.number - b.number || a.title.localeCompare(b.title, "es"));
+  folders.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, collateLocale()));
+  episodes.sort((a, b) => a.number - b.number || a.title.localeCompare(b.title, collateLocale()));
 
   const role = majorityRole(folders);
   const parts: string[] = [];
   if (folders.length) parts.push(`${folders.length} ${roleWord(role ?? "folder", folders.length)}`);
-  if (episodes.length) parts.push(`${episodes.length} episodio${episodes.length === 1 ? "" : "s"}`);
+  if (episodes.length) {
+    parts.push(t(episodes.length === 1 ? "videoUi.episodeOne" : "videoUi.episodeMany", { count: episodes.length }));
+  }
 
   return {
     path: root,
     title: showTitle(baseName(root)),
     eyebrow: eyebrowFor(root, folders, episodes),
-    summary: parts.join(" · ") || "Vacía",
+    summary: parts.join(" · ") || t("videoUi.emptyListing"),
     folders,
     episodes,
   };

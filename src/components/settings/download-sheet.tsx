@@ -17,6 +17,7 @@ import { Check, Copy, Info } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import type { useDownloadSettings } from "@/hooks/use-download-settings";
+import { useI18n } from "@/lib/i18n/context";
 import type { DownloadMediaKind } from "@/lib/podcasts/downloader";
 import type { AppZone } from "@/lib/zone/zone-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -32,7 +33,7 @@ const YTDLP_COMPOSE = `services:
       - "8091:8091"
     environment:
       LIBRARY_DIR: /library
-      PODCAST_DIR: /library/Podcasts
+      PODCAST_DIR: /podcasts
       SONG_DIR: /library
       VIDEO_DIR: /video
       BIND_HOST: 0.0.0.0
@@ -42,7 +43,8 @@ const YTDLP_COMPOSE = `services:
     volumes:
       - /volume1/Music/nlc-downloader-app:/app
       - /volume1/Music:/library
-      - /volume1/Popcorn:/video
+      - /volume1/Podcasts:/podcasts
+      - /volume1/Video:/video
     command:
       - bash
       - -lc
@@ -55,11 +57,19 @@ const YTDLP_COMPOSE = `services:
 
 type DownloadHook = ReturnType<typeof useDownloadSettings>;
 
-const KIND_OPTIONS: { id: DownloadMediaKind; label: string; hint: string }[] = [
-  { id: "song", label: "Canción", hint: "Music/Canciones" },
-  { id: "podcast", label: "Podcast", hint: "Music/Podcasts" },
-  { id: "video", label: "Vídeo", hint: "Popcorn/movies" },
+const KIND_OPTION_IDS: { id: DownloadMediaKind; labelKey: string; hintKey: string }[] = [
+  { id: "song", labelKey: "downloadSheet.song", hintKey: "downloadSheet.songHint" },
+  { id: "podcast", labelKey: "downloadSheet.podcast", hintKey: "downloadSheet.podcastHint" },
+  { id: "video", labelKey: "downloadSheet.video", hintKey: "downloadSheet.videoHint" },
 ];
+
+const HELP_STEP_KEYS = [
+  { title: "downloadSheet.stepFolders", body: "downloadSheet.stepFoldersBody" },
+  { title: "downloadSheet.stepApp", body: "downloadSheet.stepAppBody" },
+  { title: "downloadSheet.stepCompose", body: "downloadSheet.stepComposeBody" },
+  { title: "downloadSheet.stepDeploy", body: "downloadSheet.stepDeployBody" },
+  { title: "downloadSheet.stepConnect", body: "downloadSheet.stepConnectBody" },
+] as const;
 
 function defaultKind(zone?: AppZone): DownloadMediaKind {
   if (zone === "podcast") return "podcast";
@@ -78,11 +88,12 @@ export function DownloadSheet({
   download: DownloadHook;
   zone?: AppZone;
 }) {
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar descargas"
+      accessibilityCloseLabel={t("downloadSheet.close")}
       viewportRatio={0.9}
     >
       <DownloadSheetBody download={download} zone={zone} />
@@ -91,6 +102,7 @@ export function DownloadSheet({
 }
 
 function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: AppZone }) {
+  const { t } = useI18n();
   const { settings, setSettings, token, setToken, busy, feedback, job, persist, testConnection, enqueue } =
     download;
   const [url, setUrl] = useState("");
@@ -117,12 +129,12 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.titleRow}>
           <View style={styles.titleMeta}>
-            <Text style={type.label}>Descargas</Text>
-            <Text style={type.pageTitle}>yt-dlp</Text>
+            <Text style={type.label}>{t("downloadSheet.title")}</Text>
+            <Text style={type.pageTitle}>{t("downloadSheet.ytdlp")}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Cómo configurar yt-dlp"
+            accessibilityLabel={t("downloadSheet.howA11y")}
             onPress={() => {
               triggerUiHaptic();
               setInfoOpen(true);
@@ -134,13 +146,13 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Servidor</Text>
+          <Text style={styles.sectionLabel}>{t("downloadSheet.server")}</Text>
           <View style={styles.card}>
             <View style={styles.switchRow}>
               <View style={styles.switchMeta}>
-                <Text style={styles.switchLabel}>Activar</Text>
+                <Text style={styles.switchLabel}>{t("downloadSheet.enable")}</Text>
                 <Text style={styles.switchHint}>
-                  {settings.enabled ? `${settings.host}:${settings.port}` : "Apagado"}
+                  {settings.enabled ? `${settings.host}:${settings.port}` : t("common.off")}
                 </Text>
               </View>
               <Switch
@@ -155,7 +167,7 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
               <View style={styles.pair}>
                 <View style={styles.pairItem}>
                   <Field
-                    label="Host"
+                    label={t("downloadSheet.host")}
                     value={settings.host}
                     onChange={(host) => setSettings({ ...settings, host })}
                     autoCapitalize="none"
@@ -163,7 +175,7 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
                 </View>
                 <View style={[styles.pairItem, styles.port]}>
                   <Field
-                    label="Puerto"
+                    label={t("downloadSheet.port")}
                     value={settings.port}
                     onChange={(port) => setSettings({ ...settings, port })}
                     keyboardType="number-pad"
@@ -171,12 +183,12 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
                 </View>
               </View>
               <Field
-                label="Token"
+                label={t("downloadSheet.token")}
                 value={token}
                 onChange={setToken}
                 secure
                 autoCapitalize="none"
-                placeholder="Opcional si AUTH_TOKEN está vacío"
+                placeholder={t("downloadSheet.tokenOptional")}
               />
               <View style={styles.actions}>
                 <Pressable
@@ -188,14 +200,14 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
                     { opacity: busy || !settings.enabled ? 0.45 : pressed ? 0.7 : 1 },
                   ]}
                 >
-                  <Text style={styles.btnGhostText}>{busy ? "…" : "Probar"}</Text>
+                  <Text style={styles.btnGhostText}>{busy ? "…" : t("common.test")}</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => void persist()}
                   disabled={busy}
                   style={({ pressed }) => [styles.btn, styles.btnSolid, { opacity: pressed || busy ? 0.7 : 1 }]}
                 >
-                  <Text style={styles.btnSolidText}>Guardar</Text>
+                  <Text style={styles.btnSolidText}>{t("common.save")}</Text>
                 </Pressable>
               </View>
             </View>
@@ -203,11 +215,11 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
         </View>
 
         <View style={[styles.section, !settings.enabled && styles.sectionDim]}>
-          <Text style={styles.sectionLabel}>Enviar</Text>
+          <Text style={styles.sectionLabel}>{t("downloadSheet.send")}</Text>
           <View style={styles.card}>
             <View style={styles.cardBody}>
               <View style={styles.field}>
-                <Text style={type.label}>URL</Text>
+                <Text style={type.label}>{t("downloadSheet.url")}</Text>
                 <TextInput
                   value={url}
                   onChangeText={setUrl}
@@ -223,9 +235,9 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
               </View>
 
               <View style={styles.field}>
-                <Text style={type.label}>Tipo</Text>
+                <Text style={type.label}>{t("downloadSheet.type")}</Text>
                 <View style={styles.kindRow}>
-                  {KIND_OPTIONS.map((option) => {
+                  {KIND_OPTION_IDS.map((option) => {
                     const active = kind === option.id;
                     return (
                       <Pressable
@@ -237,8 +249,8 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
                         disabled={busy || !settings.enabled}
                         style={[styles.kindChip, active && styles.kindChipActive]}
                       >
-                        <Text style={[styles.kindLabel, active && styles.kindLabelActive]}>{option.label}</Text>
-                        <Text style={[styles.kindHint, active && styles.kindHintActive]}>{option.hint}</Text>
+                        <Text style={[styles.kindLabel, active && styles.kindLabelActive]}>{t(option.labelKey)}</Text>
+                        <Text style={[styles.kindHint, active && styles.kindHintActive]}>{t(option.hintKey)}</Text>
                       </Pressable>
                     );
                   })}
@@ -250,7 +262,7 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
                 disabled={!canSend}
                 style={({ pressed }) => [styles.enqueueBtn, { opacity: !canSend ? 0.4 : pressed ? 0.86 : 1 }]}
               >
-                <Text style={styles.enqueueText}>{busy ? "Trabajando…" : "Descargar al NAS"}</Text>
+                <Text style={styles.enqueueText}>{busy ? t("downloadSheet.working") : t("downloadSheet.downloadNas")}</Text>
               </Pressable>
             </View>
           </View>
@@ -258,7 +270,7 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
 
         {job ? (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Log</Text>
+            <Text style={styles.sectionLabel}>{t("downloadSheet.log")}</Text>
             <View style={[styles.card, styles.logCard]}>
               {job.progress != null ? (
                 <Text style={styles.logMeta}>
@@ -292,30 +304,8 @@ async function copyCompose(): Promise<void> {
   await Share.share({ title: "docker-compose.yml", message: YTDLP_COMPOSE });
 }
 
-const HELP_STEPS = [
-  {
-    title: "Carpetas",
-    body: "En el NAS, elige (o crea) las carpetas donde irán canciones, podcasts y vídeos.",
-  },
-  {
-    title: "App del downloader",
-    body: "Copia nas/podcast-downloader a una carpeta del NAS (app.py y requirements.txt).",
-  },
-  {
-    title: "Compose",
-    body: "En Container Manager pega el YAML y ajusta los volúmenes a esas carpetas.",
-  },
-  {
-    title: "Desplegar",
-    body: "Arranca el stack y espera a que instale ffmpeg y yt-dlp.",
-  },
-  {
-    title: "Conectar NLC",
-    body: "Abre http://IP-DEL-NAS:8091/health. En NLC usa esa IP, puerto 8091 y el mismo AUTH_TOKEN (vacío si no hay token).",
-  },
-] as const;
-
 function DownloadHelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
   const cardMaxHeight = Math.round(windowHeight * 0.9);
@@ -341,21 +331,18 @@ function DownloadHelpDialog({ open, onClose }: { open: boolean; onClose: () => v
         <View style={styles.helpBackdrop} pointerEvents="box-none">
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Cerrar ayuda"
+            accessibilityLabel={t("downloadSheet.helpCloseA11y")}
             style={StyleSheet.absoluteFill}
             onPress={close}
           />
           <View style={[styles.helpCard, { maxHeight: cardMaxHeight }]} pointerEvents="auto">
             <View style={styles.helpHeader}>
-              <Text style={type.label}>Descargas</Text>
-              <Text style={styles.helpTitle}>Configurar yt-dlp</Text>
+              <Text style={type.label}>{t("downloadSheet.title")}</Text>
+              <Text style={styles.helpTitle}>{t("downloadSheet.helpTitle")}</Text>
             </View>
 
             <ScrollView
-              style={[
-                styles.helpScroll,
-                { maxHeight: Math.max(180, cardMaxHeight - 200) },
-              ]}
+              style={[styles.helpScroll, { maxHeight: Math.max(180, cardMaxHeight - 200) }]}
               contentContainerStyle={styles.helpBody}
               nestedScrollEnabled
               keyboardShouldPersistTaps="handled"
@@ -364,14 +351,14 @@ function DownloadHelpDialog({ open, onClose }: { open: boolean; onClose: () => v
               overScrollMode="never"
             >
               <View style={styles.helpSteps}>
-                {HELP_STEPS.map((step, index) => (
+                {HELP_STEP_KEYS.map((step, index) => (
                   <View key={step.title} style={styles.helpStep}>
                     <View style={styles.helpIndex}>
                       <Text style={styles.helpIndexText}>{index + 1}</Text>
                     </View>
                     <View style={styles.helpStepText}>
-                      <Text style={styles.helpStepTitle}>{step.title}</Text>
-                      <Text style={styles.helpStepBody}>{step.body}</Text>
+                      <Text style={styles.helpStepTitle}>{t(step.title)}</Text>
+                      <Text style={styles.helpStepBody}>{t(step.body)}</Text>
                     </View>
                   </View>
                 ))}
@@ -382,7 +369,7 @@ function DownloadHelpDialog({ open, onClose }: { open: boolean; onClose: () => v
                   <Text style={styles.helpComposeLabel}>docker-compose.yml</Text>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Copiar compose"
+                    accessibilityLabel={t("downloadSheet.helpCopyA11y")}
                     onPress={() => void onCopy()}
                     style={({ pressed }) => [styles.helpCopy, { opacity: pressed ? 0.7 : 1 }]}
                   >
@@ -392,7 +379,7 @@ function DownloadHelpDialog({ open, onClose }: { open: boolean; onClose: () => v
                       <Copy color={colors.inkSoft} size={16} strokeWidth={1.8} />
                     )}
                     <Text style={[styles.helpCopyText, copied && { color: colors.ok }]}>
-                      {copied ? "Copiado" : "Copiar"}
+                      {copied ? t("downloadSheet.copied") : t("downloadSheet.copy")}
                     </Text>
                   </Pressable>
                 </View>
@@ -406,7 +393,7 @@ function DownloadHelpDialog({ open, onClose }: { open: boolean; onClose: () => v
               }}
               style={({ pressed }) => [styles.helpDone, { opacity: pressed ? 0.86 : 1 }]}
             >
-              <Text style={styles.helpDoneText}>Entendido</Text>
+              <Text style={styles.helpDoneText}>{t("common.understood")}</Text>
             </Pressable>
           </View>
         </View>

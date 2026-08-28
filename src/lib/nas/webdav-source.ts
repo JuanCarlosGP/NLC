@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { collateLocale, t } from "@/lib/i18n/runtime";
 import type { NasSettings } from "@/lib/settings/storage";
 import { nasBaseUrl } from "@/lib/settings/storage";
 import type {
@@ -51,7 +52,7 @@ async function webGet(nasUrl: string, headers: Record<string, string>, method = 
     }
     return response;
   }
-  return last ?? new Response("No hay proxy del NAS.", { status: 502 });
+  return last ?? new Response(t("nasExtra.noNasProxy"), { status: 502 });
 }
 
 async function webMutate(
@@ -74,7 +75,7 @@ async function webMutate(
     }
     return response;
   }
-  return last ?? new Response("No hay proxy del NAS.", { status: 502 });
+  return last ?? new Response(t("nasExtra.noNasProxy"), { status: 502 });
 }
 
 function webNasUri(nasUrl: string, extra?: Record<string, string>): string {
@@ -170,7 +171,167 @@ export async function probeWebDav(settings: NasSettings, password: string): Prom
   }
 }
 
-function throwIfDavWriteFailed(response: Response, body: string, action: string): void {
+/** Auth + reachability only. Does not require a music share path. */
+export async function pingNasConnection(settings: NasSettings, password: string): Promise<PingResult> {
+  try {
+    if (!settings.host.trim()) return { ok: false, message: t("nas.missingHost") };
+    if (!settings.username.trim() && !password) {
+      return { ok: false, message: t("nas.missingUserPass") };
+    }
+    if (!settings.username.trim()) return { ok: false, message: t("nas.missingUser") };
+    if (!password) return { ok: false, message: t("nas.missingPass") };
+    if (!isLanHttpUrl(nasBaseUrl(settings))) {
+      return { ok: false, message: t("nas.lanOnly") };
+    }
+    const { davFetch } = createDavTransport({ ...settings, sharePath: "/" }, password);
+    const listed = await davFetch("/", {
+      method: "PROPFIND",
+      headers: {
+        Depth: "0",
+        "Content-Type": "application/xml; charset=utf-8",
+      },
+      body: PROPFIND_BODY,
+    });
+    if (listed.status === 401) return { ok: false, message: t("nas.badAuth") };
+    if (listed.ok || listed.status === 207) {
+      return { ok: true, message: t("nas.connected"), serverName: "NAS" };
+    }
+    const fallback = await davFetch("/");
+    if (fallback.status === 401) return { ok: false, message: t("nas.badAuth") };
+    if (fallback.ok) {
+      return { ok: true, message: t("nas.connected"), serverName: "NAS" };
+    }
+    return { ok: false, message: t("nas.httpFail", { status: listed.status }) };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : t("nas.connectFail"),
+    };
+  }
+}
+
+const MKCOL_OK = new Set([200, 201, 204, 301, 405, 409]);
+
+function dirEntries(path: string, raw: WebDavEntry[]): WebDavEntry[] {
+  const self = path.replace(/\/+$/, "") || "/";
+  const seen = new Set<string>();
+  const entries: WebDavEntry[] = [];
+  for (const entry of raw) {
+    const normalized = entry.path.replace(/\/+$/, "") || "/";
+    if (normalized === self || seen.has(normalized)) continue;
+    seen.add(normalized);
+    entries.push({ ...entry, path: normalized });
+  }
+  entries.sort((a, b) => {
+    if (a.dir !== b.dir) return a.dir ? -1 : 1;
+    return a.name.localeCompare(b.name, collateLocale(), { sensitivity: "base" });
+  });
+  return entries;
+}
+
+/** Immediate children of `path`. Uses `/` as WebDAV root (not the music share). */
+export async function listWebDavDir(
+  settings: NasSettings,
+  password: string,
+  path: string,
+): Promise<WebDavEntry[]> {
+  const davPath = toWebDavPath(path) || "/";
+  const dirPath = davPath.endsWith("/") ? davPath : `${davPath}/`;
+  const { davFetch } = createDavTransport({ ...settings, sharePath: "/" }, password);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(t("nas.timeout"))),
+      10_000,
+    );
+  });
+  try {
+    return await Promise.race([listWebDavDirOnce(davFetch, davPath, dirPath), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function listWebDavDirOnce(
+  davFetch: (path: string, init?: RequestInit) => Promise<Response>,
+  davPath: string,
+  dirPath: string,
+): Promise<WebDavEntry[]> {
+  try {
+    const propfind = await davFetch(dirPath, {
+      method: "PROPFIND",
+      headers: {
+        Depth: "1",
+        "Content-Type": "application/xml; charset=utf-8",
+      },
+      body: PROPFIND_BODY,
+    });
+    if (propfind.status === 401) throw new Error(t("nas.badAuth"));
+    if (propfind.ok || propfind.status === 207) {
+      return dirEntries(davPath, parsePropfind(await propfind.text()));
+    }
+    if (propfind.status === 404) {
+      throw new Error(t("nas.missingPath"));
+    }
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("password") ||
+        error.message.includes("incorrect") ||
+        error.message.includes("incorrectos") ||
+        error.message.includes("not on the server") ||
+        error.message.includes("No existe"))
+    ) {
+      throw error;
+    }
+  }
+
+  const listed = await davFetch(dirPath);
+  const listedBody = await listed.text();
+  if (listed.status === 401) throw new Error(t("nas.badAuth"));
+  if (listed.status === 404) {
+    throw new Error(t("nas.missingPath"));
+  }
+  if (!listed.ok) {
+    throw new Error(t("nasExtra.httpResponded", { status: listed.status }));
+  }
+  return dirEntries(davPath, parseHtmlIndex(listedBody, davPath));
+}
+
+/** Create `path` and missing parents. Existing folders count as success. */
+export async function ensureWebDavDir(
+  settings: NasSettings,
+  password: string,
+  path: string,
+): Promise<void> {
+  const normalized = toWebDavPath(path);
+  if (!normalized || normalized === "/") return;
+  const { davFetch } = createDavTransport({ ...settings, sharePath: "/" }, password);
+  const parts = normalized.split("/").filter(Boolean);
+  let cursor = "";
+  for (const part of parts) {
+    cursor += `/${part}`;
+    const exists = await davFetch(`${cursor}/`, {
+      method: "PROPFIND",
+      headers: {
+        Depth: "0",
+        "Content-Type": "application/xml; charset=utf-8",
+      },
+      body: PROPFIND_BODY,
+    });
+    if (exists.ok || exists.status === 207) continue;
+    const created = await davFetch(cursor, { method: "MKCOL" });
+    if (created.status === 401) throw new Error(t("nas.badAuth"));
+    if (created.status === 403) {
+      throw new Error(t("nasExtra.writeDenied"));
+    }
+    if (MKCOL_OK.has(created.status) || created.ok) continue;
+    const body = await created.text();
+    throwIfDavWriteFailed(created, body);
+  }
+}
+
+function throwIfDavWriteFailed(response: Response, body: string): void {
   let proxyError = "";
   try {
     const parsed = JSON.parse(body) as { error?: string };
@@ -178,18 +339,16 @@ function throwIfDavWriteFailed(response: Response, body: string, action: string)
   } catch {
     // HTML or empty WebDAV body.
   }
-  if (response.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+  if (response.status === 401) throw new Error(t("nas.badAuth"));
   if (response.status === 403) {
-    throw new Error(
-      "El usuario no tiene permiso de escritura en esa carpeta. Revisa la ruta y los permisos del usuario.",
-    );
+    throw new Error(t("nasExtra.writeDenied"));
   }
-  if (response.status === 404) throw new Error("No existe la carpeta de la compartición. Revisa la ruta.");
+  if (response.status === 404) throw new Error(t("nasExtra.shareMissing"));
   if (response.status === 405) {
-    throw new Error(`El NAS no permite ${action} por WebDAV con esta cuenta.`);
+    throw new Error(t("nasExtra.methodDenied"));
   }
   if (!response.ok && response.status !== 201 && response.status !== 204) {
-    throw new Error(proxyError || `El NAS respondió HTTP ${response.status} al ${action}.`);
+    throw new Error(proxyError || t("nasExtra.writeFail"));
   }
 }
 
@@ -202,11 +361,11 @@ export async function getWebDavText(
   const response = await davFetch(path, { method: "GET" });
   const body = await response.text();
   if (response.status === 404) {
-    throw new Error("No hay configuración guardada en la carpeta.");
+    throw new Error(t("nasExtra.configMissing"));
   }
-  if (response.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+  if (response.status === 401) throw new Error(t("nas.badAuth"));
   if (!response.ok) {
-    throw new Error(`El NAS respondió HTTP ${response.status} al leer el archivo.`);
+    throw new Error(t("nasExtra.httpResponded", { status: response.status }));
   }
   return body;
 }
@@ -227,7 +386,7 @@ export async function putWebDavText(
     body: text,
   });
   const body = await response.text();
-  throwIfDavWriteFailed(response, body, "guardar el archivo");
+  throwIfDavWriteFailed(response, body);
 }
 
 export async function putWebDavBytes(
@@ -247,7 +406,7 @@ export async function putWebDavBytes(
     body: bytes as unknown as BodyInit,
   });
   const body = await response.text();
-  throwIfDavWriteFailed(response, body, "guardar la carátula");
+  throwIfDavWriteFailed(response, body);
 }
 
 export async function deleteWebDavFile(
@@ -265,20 +424,18 @@ export async function deleteWebDavFile(
   } catch {
     // HTML or empty WebDAV body.
   }
-  if (response.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+  if (response.status === 401) throw new Error(t("nas.badAuth"));
   if (response.status === 403) {
-    throw new Error(
-      "El usuario no tiene permiso de escritura en esa carpeta. Revisa la ruta y los permisos del usuario.",
-    );
+    throw new Error(t("nasExtra.writeDenied"));
   }
   // Already gone — treat as success so the app can purge recents/favorites.
   if (response.status === 404) return;
   if (response.status === 405) {
-    throw new Error("El NAS no permite borrar archivos por WebDAV con esta cuenta.");
+    throw new Error(t("nasExtra.methodDenied"));
   }
   // 204 No Content / 200 OK are success; some servers also return 202.
   if (!response.ok && response.status !== 204) {
-    throw new Error(proxyError || `El NAS respondió HTTP ${response.status} al borrar el archivo.`);
+    throw new Error(proxyError || t("nasExtra.deleteFail"));
   }
 }
 
@@ -297,7 +454,7 @@ export async function moveWebDavPath(
     },
   });
   const body = await response.text();
-  throwIfDavWriteFailed(response, body, "renombrar");
+  throwIfDavWriteFailed(response, body);
 }
 
 export function createWebDavSource(settings: NasSettings, password: string): MusicSource {
@@ -347,17 +504,15 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
 
     const listed = await davFetch(dirPath);
     const listedBody = await listed.text();
-    if (listed.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+    if (listed.status === 401) throw new Error(t("nas.badAuth"));
     if (!listed.ok) {
       if (listed.status === 404 && listedBody.includes("expo-reset")) {
-        throw new Error("El navegador no está llegando al NAS. Reinicia expo start y vuelve a probar.");
+        throw new Error(t("nasExtra.browserNoNas"));
       }
       if (listed.status === 404) {
-        throw new Error(
-          `No existe «${path.replace(/\/+$/, "") || "/"}» en el servidor. Usa la ruta de File Station, por ejemplo /volume1/Music.`,
-        );
+        throw new Error(t("nas.missingPath"));
       }
-      throw new Error(`El NAS respondió HTTP ${listed.status}.`);
+      throw new Error(t("nasExtra.httpResponded", { status: listed.status }));
     }
     return parseHtmlIndex(listedBody, davPath.replace(/\/+$/, "") || "/");
   }
@@ -369,7 +524,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
       const files: WebDavEntry[] = [];
       const covers = new Map<string, string>();
       const sidecars = new Map<string, string>();
-      if (!rootPath) throw new Error("Falta la ruta absoluta de la carpeta de música.");
+      if (!rootPath) throw new Error(t("nasExtra.missingMusicPath"));
       const queue = [rootPath];
       if (podcastRoot && !isPathInside(rootPath, podcastRoot)) queue.push(podcastRoot);
       const seen = new Set<string>();
@@ -445,15 +600,15 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
 
     async ping(): Promise<PingResult> {
       try {
-        if (!settings.host.trim()) return { ok: false, message: "Falta la IP del servidor." };
-        if (!rootPath) return { ok: false, message: "Falta la ruta absoluta de la carpeta." };
+        if (!settings.host.trim()) return { ok: false, message: t("nas.missingHost") };
+        if (!rootPath) return { ok: false, message: t("nas.missingPath") };
         if (!settings.username.trim() && !password) {
-          return { ok: false, message: "Faltan el usuario y la contraseña." };
+          return { ok: false, message: t("nas.missingUserPass") };
         }
-        if (!settings.username.trim()) return { ok: false, message: "Falta el usuario." };
-        if (!password) return { ok: false, message: "Falta la contraseña." };
+        if (!settings.username.trim()) return { ok: false, message: t("nas.missingUser") };
+        if (!password) return { ok: false, message: t("nas.missingPass") };
         if (!isLanHttpUrl(nasBaseUrl(settings))) {
-          return { ok: false, message: "La IP tiene que ser de tu red local." };
+          return { ok: false, message: t("nas.lanOnly") };
         }
         const listed = await listDir(rootPath);
         const dirs = listed.filter((entry) => entry.dir).length;
@@ -461,8 +616,8 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
         if (!dirs && !files) {
           return {
             ok: true,
-            message: `Hay conexión, pero ${rootPath} está vacía.`,
-            serverName: "Carpeta compartida",
+            message: t("nasExtra.connectedEmptyPath", { path: rootPath }),
+            serverName: "NAS",
           };
         }
         index = null;
@@ -471,13 +626,16 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
         const musicAlbums = library.albums.filter((album) => !isPodcastAlbum(album));
         return {
           ok: true,
-          message: `Hay conexión. ${musicTracks.length} canciones en ${musicAlbums.length} álbumes.`,
-          serverName: "Carpeta compartida",
+          message: t("nasExtra.connectedStats", {
+            tracks: musicTracks.length,
+            albums: musicAlbums.length,
+          }),
+          serverName: "NAS",
         };
       } catch (error) {
         return {
           ok: false,
-          message: error instanceof Error ? error.message : "No se pudo conectar al NAS.",
+          message: error instanceof Error ? error.message : t("nas.connectFail"),
         };
       }
     },
@@ -495,7 +653,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
     async getAlbum(id: string): Promise<AlbumDetail> {
       const library = await scan();
       const album = library.albums.find((item) => item.id === id);
-      if (!album) throw new Error("Álbum no encontrado.");
+      if (!album) throw new Error(t("nasExtra.albumMissing"));
       return { ...album, tracks: library.albumTracks[id] ?? [] };
     },
 
@@ -519,7 +677,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
     },
 
     async streamUrl(trackId: string): Promise<PlayableSource> {
-      if (!trackId.startsWith("/")) throw new Error("Pista WebDAV no válida.");
+      if (!trackId.startsWith("/")) throw new Error(t("nasExtra.invalidTrack"));
       return playable(trackId);
     },
 
@@ -544,7 +702,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
     },
 
     async deleteTrack(trackId: string): Promise<void> {
-      if (!trackId.startsWith("/")) throw new Error("Pista WebDAV no válida.");
+      if (!trackId.startsWith("/")) throw new Error(t("nasExtra.invalidTrack"));
       await deleteWebDavFile(settings, password, trackId);
       index = null;
       scanPromise = null;
@@ -586,7 +744,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
       });
       const body = await response.text();
       if (response.status === 412 || response.status === 409) return dest;
-      throwIfDavWriteFailed(response, body, "guardar la carátula");
+      throwIfDavWriteFailed(response, body);
       index = null;
       scanPromise = null;
       return dest;

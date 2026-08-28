@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getAlbum } from "@/lib/db/catalog";
 import { nasScanOk } from "@/lib/db/from-source";
 import { subscribeLibraryChanged } from "@/lib/library/cache";
+import { t } from "@/lib/i18n/runtime";
 import type { AlbumDetail } from "@/lib/nas/types";
 import { useSettings } from "@/lib/settings/settings-context";
 
@@ -23,9 +24,9 @@ export function useAlbum(id: string | undefined) {
         return;
       }
       if (online) setAlbum(await source.getAlbum(id));
-      else throw new Error("Este álbum no está en el teléfono.");
+      else throw new Error(t("album.notOnPhone"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo abrir el álbum.");
+      setError(err instanceof Error ? err.message : t("album.openError"));
     } finally {
       setLoading(false);
     }

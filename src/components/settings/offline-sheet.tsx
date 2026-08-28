@@ -5,15 +5,16 @@ import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { OfflineItem, OfflineKind } from "@/lib/db/catalog";
+import { useI18n } from "@/lib/i18n/context";
 import { formatOfflineBytes } from "@/lib/offline/downloader";
 import { useOffline } from "@/lib/offline/offline-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
-const KINDS: { id: OfflineKind; label: string; Icon: typeof Music2 }[] = [
-  { id: "music", label: "Música", Icon: Music2 },
-  { id: "podcast", label: "Podcasts", Icon: Mic },
-  { id: "video", label: "Vídeo", Icon: Clapperboard },
+const KIND_IDS: { id: OfflineKind; labelKey: string; Icon: typeof Music2 }[] = [
+  { id: "music", labelKey: "offlineSheet.music", Icon: Music2 },
+  { id: "podcast", labelKey: "offlineSheet.podcasts", Icon: Mic },
+  { id: "video", labelKey: "offlineSheet.video", Icon: Clapperboard },
 ];
 
 export function OfflineSheet({
@@ -25,6 +26,7 @@ export function OfflineSheet({
   onOpenChange: (open: boolean) => void;
   lockedKind?: OfflineKind;
 }) {
+  const { t } = useI18n();
   const { progress, readyTracks, pendingTracks, start, pause, clear, remove } = useOffline();
   const [kind, setKind] = useState<OfflineKind>(lockedKind ?? "music");
   const activeKind = lockedKind ?? kind;
@@ -44,42 +46,65 @@ export function OfflineSheet({
     return next;
   }, [readyTracks]);
   const pct = scopedTotal > 0 ? Math.min(1, ready.length / scopedTotal) : 0;
-  const kindLabel = activeKind === "podcast" ? "podcasts" : isVideo ? "capítulos" : "música";
+
+  const syncLabel =
+    activeKind === "podcast" ? t("offlineSheet.syncPodcasts") : t("offlineSheet.syncMusic");
+  const clearKindLabel =
+    activeKind === "podcast"
+      ? t("offlineSheet.clearPodcasts")
+      : isVideo
+        ? t("offlineSheet.clearEpisodes")
+        : t("offlineSheet.clearMusic");
+  const clearTitle =
+    activeKind === "podcast"
+      ? t("offlineSheet.clearTitlePodcasts")
+      : isVideo
+        ? t("offlineSheet.clearTitleChapters")
+        : t("offlineSheet.clearTitleMusic");
+  const clearMessage =
+    activeKind === "podcast"
+      ? t("offlineSheet.clearMessagePodcasts")
+      : isVideo
+        ? t("offlineSheet.clearMessageChapters")
+        : t("offlineSheet.clearMessageMusic");
+
   const status = !supported
-    ? "Las copias se guardan en el teléfono"
+    ? t("offlineSheet.statusPhoneStorage")
     : progress.paused
-      ? "En pausa"
+      ? t("offlineSheet.statusPaused")
       : progress.running
         ? progress.currentTitle
-          ? `Bajando ${progress.currentTitle}`
-          : `Bajando ${progress.done} de ${progress.total}`
+          ? t("offlineSheet.statusDownloadingTitle", { title: progress.currentTitle })
+          : t("offlineSheet.statusDownloadingCount", { done: progress.done, total: progress.total })
         : pending.length
-          ? `${pending.length} pendientes`
+          ? t("offlineSheet.statusPending", { count: pending.length })
           : scopedTotal
-            ? `Toda la ${activeKind === "podcast" ? "lista" : "música"} en el teléfono`
-            : "Nada guardado";
+            ? activeKind === "podcast"
+              ? t("offlineSheet.statusAllPodcasts")
+              : t("offlineSheet.statusAllMusic")
+            : t("offlineSheet.statusNothingSaved");
 
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar espacio interno"
+      accessibilityCloseLabel={t("offlineSheet.close")}
       viewportRatio={0.82}
     >
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.titleMeta}>
-          <Text style={type.label}>Espacio interno</Text>
+          <Text style={type.label}>{t("offlineSheet.title")}</Text>
           <Text style={type.pageTitle}>NLC</Text>
         </View>
 
         {lockedKind ? null : (
         <View style={styles.switch}>
-          {KINDS.map((item) => {
+          {KIND_IDS.map((item) => {
             const active = activeKind === item.id;
             return (
               <Pressable
                 key={item.id}
-                accessibilityLabel={item.label}
+                accessibilityLabel={t(item.labelKey)}
                 accessibilityState={{ selected: active }}
                 onPress={() => {
                   triggerUiHaptic();
@@ -89,7 +114,7 @@ export function OfflineSheet({
               >
                 <item.Icon size={15} color={active ? colors.void : colors.inkSoft} strokeWidth={1.9} />
                 <Text style={[styles.switchLabel, active && styles.switchLabelActive]}>
-                  {item.label}
+                  {t(item.labelKey)}
                   {counts[item.id] ? ` ${counts[item.id]}` : ""}
                 </Text>
               </Pressable>
@@ -100,12 +125,9 @@ export function OfflineSheet({
 
         {isVideo ? (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Videoteca</Text>
+            <Text style={styles.sectionLabel}>{t("offlineSheet.videoLib")}</Text>
             <View style={styles.card}>
-              <Text style={styles.empty}>
-                One Piece y las películas están en Inicio. NLC no copia la serie entera al teléfono: ocupa demasiado. Un
-                capítulo concreto se guarda desde la serie, no desde aquí.
-              </Text>
+              <Text style={styles.empty}>{t("offlineSheet.videoLibHint")}</Text>
               {ready.length ? (
                 <View style={styles.actions}>
                   <Pressable
@@ -117,7 +139,7 @@ export function OfflineSheet({
                       { opacity: !supported ? 0.4 : pressed ? 0.7 : 1 },
                     ]}
                   >
-                    <Text style={styles.btnDangerText}>Vaciar capítulos</Text>
+                    <Text style={styles.btnDangerText}>{t("offlineSheet.clearEpisodes")}</Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -125,11 +147,12 @@ export function OfflineSheet({
           </View>
         ) : (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Progreso</Text>
+            <Text style={styles.sectionLabel}>{t("offlineSheet.progress")}</Text>
             <View style={styles.card}>
               <View style={styles.cardBody}>
                 <Text style={styles.progressLabel}>
-                  {ready.length} de {scopedTotal} · {formatOfflineBytes(readyBytes)}
+                  {t("offlineSheet.progressOf", { ready: ready.length, total: scopedTotal })} ·{" "}
+                  {formatOfflineBytes(readyBytes)}
                 </Text>
                 <View style={styles.barTrack}>
                   <View style={[styles.barFill, { width: `${Math.round(pct * 100)}%` }]} />
@@ -147,7 +170,7 @@ export function OfflineSheet({
                   ]}
                 >
                   <Text style={styles.btnGhostText}>
-                    {progress.running && !progress.paused ? "Pausar" : `Sincronizar ${kindLabel}`}
+                    {progress.running && !progress.paused ? t("offlineSheet.pause") : syncLabel}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -159,7 +182,7 @@ export function OfflineSheet({
                     { opacity: !supported || !ready.length ? 0.4 : pressed ? 0.7 : 1 },
                   ]}
                 >
-                  <Text style={styles.btnDangerText}>Vaciar {kindLabel}</Text>
+                  <Text style={styles.btnDangerText}>{clearKindLabel}</Text>
                 </Pressable>
               </View>
             </View>
@@ -167,40 +190,34 @@ export function OfflineSheet({
         )}
 
         <InventorySection
-          title="En el teléfono"
+          title={t("offlineSheet.onPhone")}
           countLabel={ready.length ? `${ready.length} · ${formatOfflineBytes(readyBytes)}` : String(ready.length)}
           items={ready}
-          empty={
-            isVideo
-              ? "Ningún capítulo guardado en NLC. La lista de series no cuenta aquí."
-              : "Nada descargado."
-          }
+          empty={isVideo ? t("offlineSheet.videoReadyEmpty") : t("offlineSheet.readyEmpty")}
           supported={supported}
           onRemove={(item) => {
             triggerUiHaptic();
             setPendingRemove(item);
           }}
+          t={t}
         />
         {canSync ? (
           <InventorySection
-            title="Solo NAS"
+            title={t("offlineSheet.nasOnly")}
             countLabel={String(pending.length)}
             items={pending}
-            empty="Nada pendiente."
+            empty={t("offlineSheet.pendingEmpty")}
+            t={t}
           />
         ) : null}
       </SheetScrollView>
 
       <ConfirmDialog
         open={Boolean(pendingRemove)}
-        title="Quitar del teléfono"
-        message={
-          pendingRemove
-            ? `Se borra la copia local de «${pendingRemove.title}». El archivo del NAS no se toca.`
-            : ""
-        }
-        confirmLabel="Quitar"
-        cancelLabel="Cancelar"
+        title={t("offlineSheet.removeTitle")}
+        message={pendingRemove ? t("offlineSheet.removeMessage", { title: pendingRemove.title }) : ""}
+        confirmLabel={t("common.remove")}
+        cancelLabel={t("common.cancel")}
         busy={removing}
         onCancel={() => {
           if (!removing) setPendingRemove(null);
@@ -217,10 +234,10 @@ export function OfflineSheet({
       />
       <ConfirmDialog
         open={clearOpen}
-        title={`Vaciar ${kindLabel}`}
-        message={`Se borran las copias de ${kindLabel} del teléfono. El NAS no se toca.`}
-        confirmLabel="Vaciar"
-        cancelLabel="Cancelar"
+        title={clearTitle}
+        message={clearMessage}
+        confirmLabel={t("settings.clearDoneAction")}
+        cancelLabel={t("common.cancel")}
         onCancel={() => setClearOpen(false)}
         onConfirm={() => {
           void (async () => {
@@ -240,6 +257,7 @@ function InventorySection({
   empty,
   supported,
   onRemove,
+  t,
 }: {
   title: string;
   countLabel: string;
@@ -247,6 +265,7 @@ function InventorySection({
   empty: string;
   supported?: boolean;
   onRemove?: (item: OfflineItem) => void;
+  t: (path: string, vars?: Record<string, string | number>) => string;
 }) {
   return (
     <View style={styles.section}>
@@ -269,7 +288,7 @@ function InventorySection({
               </View>
               {onRemove && supported ? (
                 <Pressable
-                  accessibilityLabel={`Quitar ${item.title} del teléfono`}
+                  accessibilityLabel={t("offlineSheet.removeA11y", { title: item.title })}
                   onPress={() => onRemove(item)}
                   hitSlop={8}
                   style={({ pressed }) => [styles.trash, { opacity: pressed ? 0.6 : 1 }]}
@@ -282,7 +301,9 @@ function InventorySection({
         ) : (
           <Text style={styles.empty}>{empty}</Text>
         )}
-        {items.length > 80 ? <Text style={styles.more}>y {items.length - 80} más</Text> : null}
+        {items.length > 80 ? (
+          <Text style={styles.more}>{t("offlineSheet.moreCount", { count: items.length - 80 })}</Text>
+        ) : null}
       </View>
     </View>
   );

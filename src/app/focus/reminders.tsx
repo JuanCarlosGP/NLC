@@ -4,19 +4,21 @@ import { Bell, Plus } from "lucide-react-native";
 import { ReminderComposerSheet } from "@/components/productivity/reminder-composer-sheet";
 import { ReminderRow, reminderListStyle } from "@/components/productivity/reminder-row";
 import { Screen } from "@/components/ui/screen";
+import { useI18n } from "@/lib/i18n/context";
 import { useReminders } from "@/lib/reminders/reminders-context";
 import type { ProdReminder } from "@/lib/reminders/types";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, type } from "@/lib/theme";
 
 export default function RemindersScreen() {
+  const { t } = useI18n();
   const { reminders, updateReminder } = useReminders();
   const [composeOpen, setComposeOpen] = useState(false);
   const [editing, setEditing] = useState<ProdReminder | null>(null);
 
   const count = reminders.length
-    ? `${reminders.length} ${reminders.length === 1 ? "aviso" : "avisos"}`
-    : "Ningún aviso";
+    ? t(reminders.length === 1 ? "reminders.alertOne" : "reminders.alertMany", { count: reminders.length })
+    : t("reminders.none");
 
   const sorted = useMemo(
     () =>
@@ -36,12 +38,12 @@ export default function RemindersScreen() {
           </View>
           <View style={styles.heading}>
             <View style={styles.headingText}>
-              <Text style={type.label}>Productividad</Text>
-              <Text style={type.pageTitle}>Recordatorios</Text>
+              <Text style={type.label}>{t("focus.productivity")}</Text>
+              <Text style={type.pageTitle}>{t("focus.reminders")}</Text>
               <Text style={type.meta}>{count}</Text>
             </View>
             <Pressable
-              accessibilityLabel="Nuevo recordatorio"
+              accessibilityLabel={t("focus.newReminder")}
               onPress={() => {
                 triggerUiHaptic();
                 setEditing(null);
@@ -54,7 +56,7 @@ export default function RemindersScreen() {
           </View>
         </View>
         {Platform.OS === "web" ? (
-          <Text style={type.body}>Los avisos se programan en el teléfono, con la APK.</Text>
+          <Text style={type.body}>{t("focus.reminderHint")}</Text>
         ) : null}
         {sorted.length ? (
           <View style={reminderListStyle}>
@@ -73,9 +75,7 @@ export default function RemindersScreen() {
             ))}
           </View>
         ) : (
-          <Text style={type.body}>
-            Nada programado. Crea un aviso con + y elige el mensaje, la hora y si se repite.
-          </Text>
+          <Text style={type.body}>{t("reminders.emptyHint")}</Text>
         )}
       </Screen>
       <ReminderComposerSheet

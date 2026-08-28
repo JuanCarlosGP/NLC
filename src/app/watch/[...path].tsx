@@ -20,6 +20,8 @@ import {
   updateWatchProgress,
 } from "@/lib/video/watch-history";
 import type { VideoEpisode } from "@/lib/video/types";
+import { useI18n } from "@/lib/i18n/context";
+import { t as rt } from "@/lib/i18n/runtime";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
@@ -55,7 +57,7 @@ class PlayerBoundary extends Component<{ children: ReactNode; resetKey: string }
     return (
       <View style={styles.center}>
         <Text style={styles.error}>
-          No se pudo reproducir este episodio.
+          {rt("watch.playError")}
           {"\n"}
           {this.state.error.message}
         </Text>
@@ -203,6 +205,7 @@ function EpisodePlayer({
 
 export default function WatchScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const { settings, password } = useSettings();
   const { pause } = usePlayer();
@@ -299,7 +302,7 @@ export default function WatchScreen() {
               id: encodeURIComponent(initialPath),
               path: initialPath,
               number: Number(initialPath.match(/(\d+)(?:\.\w+)?$/)?.[1] ?? 0),
-              title: "Episodio",
+              title: t("watch.episode"),
               arcPath: "",
             },
           ]);
@@ -318,7 +321,7 @@ export default function WatchScreen() {
         setReady(true);
       } catch (err) {
         if (cancelled) return;
-        setBootError(err instanceof Error ? err.message : "No se pudo abrir el episodio.");
+        setBootError(err instanceof Error ? err.message : t("watch.openEpisodeError"));
         setReady(true);
       }
     })();
@@ -383,7 +386,7 @@ export default function WatchScreen() {
         paddingRight={insets.right + 8}
       >
         <Pressable
-          accessibilityLabel="Cerrar"
+          accessibilityLabel={t("watch.close")}
           onPress={() => router.back()}
           style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
         >
@@ -391,7 +394,7 @@ export default function WatchScreen() {
         </Pressable>
         <View style={styles.headMeta}>
           <Text style={styles.headTitle} numberOfLines={1}>
-            {current ? current.title : "Reproduciendo…"}
+            {current ? current.title : t("watch.playing")}
           </Text>
           {arcTitle ? (
             <Text style={styles.headSub} numberOfLines={1}>
@@ -401,7 +404,7 @@ export default function WatchScreen() {
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={landscape ? "Volver a vertical" : "Ver en horizontal"}
+          accessibilityLabel={landscape ? t("watch.portrait") : t("watch.landscape")}
           accessibilityState={{ selected: landscape }}
           onPress={() => {
             triggerUiHaptic();
@@ -413,7 +416,7 @@ export default function WatchScreen() {
         </Pressable>
         {nextEpisode ? (
           <Pressable
-            accessibilityLabel="Siguiente episodio"
+            accessibilityLabel={t("watch.next")}
             onPress={playNext}
             style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
           >
@@ -447,7 +450,7 @@ export default function WatchScreen() {
       {videoReady && !showChrome ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Mostrar controles"
+          accessibilityLabel={t("watch.showControls")}
           onPress={() => setChromeVisible(true)}
           style={styles.tapCatch}
         />

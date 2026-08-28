@@ -1,3 +1,4 @@
+import { dateLocale, t } from "@/lib/i18n/runtime";
 import type { TaskStatus } from "@/lib/productivity/types";
 
 const DAY_MS = 86_400_000;
@@ -34,8 +35,8 @@ export function isOverdue(dueAt: number | null, status: TaskStatus): boolean {
 export function formatDue(dueAt: number): string {
   const start = startOfDay(dueAt);
   const today = startOfDay();
-  if (start === today) return "Hoy";
-  if (start === today + DAY_MS) return "Mañana";
-  if (start === today - DAY_MS) return "Ayer";
-  return new Date(dueAt).toLocaleDateString("es", { day: "numeric", month: "short" });
+  if (start === today) return t("dates.today");
+  if (start === today + DAY_MS) return t("dates.tomorrow");
+  if (start === today - DAY_MS) return t("dates.yesterday");
+  return new Date(dueAt).toLocaleDateString(dateLocale(), { day: "numeric", month: "short" });
 }

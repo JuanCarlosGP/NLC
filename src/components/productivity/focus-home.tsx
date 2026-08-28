@@ -6,6 +6,7 @@ import { ZoneSwitch } from "@/components/layout/zone-switch";
 import { ShortcutCard } from "@/components/home/shortcut-card";
 import { TaskRow, taskListStyle } from "@/components/productivity/task-row";
 import { Screen } from "@/components/ui/screen";
+import { useI18n } from "@/lib/i18n/context";
 import { taskHref } from "@/lib/library/href";
 import { useActiveProjects, useVisibleTasks } from "@/lib/productivity/productivity-context";
 import { useTaskActions } from "@/lib/productivity/task-actions-context";
@@ -13,6 +14,7 @@ import { INBOX_PROJECT_ID } from "@/lib/productivity/types";
 import { type } from "@/lib/theme";
 
 export function FocusHome() {
+  const { t } = useI18n();
   const router = useRouter();
   const projects = useActiveProjects();
   const tasks = useVisibleTasks();
@@ -49,25 +51,25 @@ export function FocusHome() {
       <View style={styles.shortcuts}>
         <ShortcutCard
           id="focus-today"
-          title="Hoy"
+          title={t("focus.today")}
           focus="today"
           onPress={() => router.push("/focus/today")}
         />
         <ShortcutCard
           id="focus-inbox"
-          title="Bandeja"
+          title={t("focus.inbox")}
           focus="inbox"
           onPress={() => router.push("/focus/inbox")}
         />
         <ShortcutCard
           id="focus-projects"
-          title="Proyectos"
+          title={t("projects.title")}
           focus="projects"
           onPress={() => router.push("/projects")}
         />
         <ShortcutCard
           id="focus-reminders"
-          title="Recordatorios"
+          title={t("focus.reminders")}
           focus="reminders"
           onPress={() => router.push("/focus/reminders")}
         />
@@ -75,7 +77,7 @@ export function FocusHome() {
 
       {doing.length ? (
         <View style={styles.section}>
-          <Text style={type.sectionTitle}>En curso</Text>
+          <Text style={type.sectionTitle}>{t("focus.inProgress")}</Text>
           <View style={taskListStyle}>
             {doing.map((task) => (
               <TaskRow
@@ -92,7 +94,7 @@ export function FocusHome() {
 
       {upcoming.length ? (
         <View style={styles.section}>
-          <Text style={type.sectionTitle}>Próximas</Text>
+          <Text style={type.sectionTitle}>{t("focus.upcoming")}</Text>
           <View style={taskListStyle}>
             {upcoming.map((task) => (
               <TaskRow
@@ -108,7 +110,7 @@ export function FocusHome() {
       ) : null}
 
       {!doing.length && !upcoming.length ? (
-        <Text style={type.body}>Nada en curso. Crea una tarea en Biblioteca.</Text>
+        <Text style={type.body}>{t("focus.emptyHomeHint")}</Text>
       ) : null}
     </Screen>
   );

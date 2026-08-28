@@ -2,6 +2,7 @@ import {
   downloadBaseUrl,
   type DownloadSettings,
 } from "@/lib/podcasts/download-settings";
+import { t } from "@/lib/i18n/runtime";
 
 export type DownloadJobStatus = "queued" | "running" | "done" | "error";
 export type DownloadMediaKind = "podcast" | "song" | "video" | "auto";
@@ -49,25 +50,23 @@ async function readError(response: Response): Promise<string> {
     if (Array.isArray(data.detail) && data.detail.length) {
       const first = data.detail[0]!;
       const loc = Array.isArray(first.loc) ? first.loc.filter((p) => p !== "body").join(".") : "";
-      const msg = first.msg || "Error de validación";
+      const msg = first.msg || t("feedback.validationError");
       // Old downloader only accepted `url` — new app sends `query` (+ duration).
       if (/field required/i.test(msg) && (!loc || loc === "url")) {
-        return "El downloader del NAS está desactualizado. Reinicia el contenedor nlc-podcast-downloader en Container Manager.";
+        return t("feedback.downloaderOutdated");
       }
       return loc ? `${loc}: ${msg}` : msg;
     }
   } catch {
     // ignore
   }
-  return `Error ${response.status}`;
+  return t("feedback.httpError", { status: response.status });
 }
 
 function networkError(err: unknown, base: string): Error {
   const msg = err instanceof Error ? err.message : String(err);
   if (/failed to fetch|network request failed|load failed|fetch/i.test(msg)) {
-    return new Error(
-      `No hay respuesta en ${base}. ¿El contenedor yt-dlp está en marcha en el NAS (puerto 8091)?`,
-    );
+    return new Error(t("feedback.networkNoResponse", { base }));
   }
   return err instanceof Error ? err : new Error(msg);
 }
@@ -104,9 +103,9 @@ export async function enqueueDownload(
   kind: DownloadMediaKind = "song",
 ): Promise<{ id: string; status: DownloadJobStatus }> {
   const trimmed = url.trim();
-  if (!trimmed) throw new Error("Pega una URL.");
+  if (!trimmed) throw new Error(t("feedback.pasteUrl"));
   if (/open\.spotify\.com|spotify:/i.test(trimmed)) {
-    throw new Error("Spotify no se descarga aquí. Usa YouTube, RSS u otra URL que yt-dlp soporte.");
+    throw new Error(t("feedback.spotifyNoDownload"));
   }
 
   const response = await downloaderFetch(settings, "/download", {
@@ -137,7 +136,7 @@ export async function enqueueSearchDownload(
   durationMs?: number | null,
 ): Promise<{ id: string; status: DownloadJobStatus }> {
   const trimmed = query.trim();
-  if (!trimmed) throw new Error("Falta el título o artista.");
+  if (!trimmed) throw new Error(t("feedback.missingTitleArtist"));
 
   const payload: { query: string; kind: DownloadMediaKind; durationMs?: number } = {
     query: trimmed,
@@ -183,7 +182,7 @@ export async function waitForDownloadJob(
   onUpdate?.(current);
   while (current.status === "queued" || current.status === "running") {
     if (Date.now() - started > 15 * 60 * 1000) {
-      throw new Error("La descarga tarda demasiado. Revisa el contenedor.");
+      throw new Error(t("feedback.downloadSlow"));
     }
     await new Promise((r) => setTimeout(r, 1500));
     current = await getDownloadJob(settings, token, jobId);
@@ -193,8 +192,8 @@ export async function waitForDownloadJob(
 }
 
 export function jobStatusLabel(status: DownloadJobStatus): string {
-  if (status === "queued") return "En cola";
-  if (status === "running") return "Descargando…";
-  if (status === "done") return "Listo";
-  return "Error";
+  if (status === "queued") return t("downloadSheet.jobQueued");
+  if (status === "running") return t("downloadSheet.jobRunning");
+  if (status === "done") return t("downloadSheet.jobDone");
+  return t("downloadSheet.jobError");
 }

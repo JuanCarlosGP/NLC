@@ -1,3 +1,4 @@
+import { collateLocale } from "@/lib/i18n/runtime";
 import type { NasSettings } from "@/lib/settings/storage";
 import { videoSourceSettings } from "@/lib/settings/storage";
 import { createVideoClient } from "@/lib/video/source";
@@ -103,5 +104,5 @@ export async function listVideoShows(settings: NasSettings, password: string): P
       seen.add(item.path);
       return true;
     })
-    .sort((a, b) => a.title.localeCompare(b.title, "es"));
+    .sort((a, b) => a.title.localeCompare(b.title, collateLocale()));
 }

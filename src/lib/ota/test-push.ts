@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { isRunningInExpoGo } from "expo";
+import { t } from "@/lib/i18n/runtime";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const OTA_CHANNEL = "ota";
@@ -16,16 +17,16 @@ function projectId(): string | undefined {
 
 export async function sendTestPush(): Promise<TestPushResult> {
   if (Platform.OS !== "android") {
-    return { ok: false, message: "El push solo se prueba en la APK del teléfono" };
+    return { ok: false, message: t("push.apkOnly") };
   }
   if (isRunningInExpoGo()) {
-    return { ok: false, message: "El push no funciona en Expo Go. Pruébalo en la APK." };
+    return { ok: false, message: t("push.expoGo") };
   }
 
   const Notifications = await import("expo-notifications");
 
   await Notifications.setNotificationChannelAsync(OTA_CHANNEL, {
-    name: "Actualizaciones",
+    name: t("push.channel"),
     importance: Notifications.AndroidImportance.HIGH,
     vibrationPattern: [0, 160, 80, 160],
     lightColor: "#E4D5B8",
@@ -39,12 +40,12 @@ export async function sendTestPush(): Promise<TestPushResult> {
     status = asked.status;
   }
   if (status !== "granted") {
-    return { ok: false, message: "Sin permiso de notificaciones. Actívalo en Ajustes del sistema." };
+    return { ok: false, message: t("push.noPermission") };
   }
 
   const id = projectId();
   if (!id) {
-    return { ok: false, message: "Esta instalación no tiene proyecto EAS. Usa la APK de GitHub." };
+    return { ok: false, message: t("push.noEas") };
   }
 
   let token: string | null = null;
@@ -58,7 +59,7 @@ export async function sendTestPush(): Promise<TestPushResult> {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "NLC",
-        body: "Aviso local. El push remoto no está listo (falta FCM en EAS).",
+        body: t("push.localBody"),
         sound: "default",
         data: { test: true },
       },
@@ -66,7 +67,7 @@ export async function sendTestPush(): Promise<TestPushResult> {
     });
     return {
       ok: false,
-      message: "Salió un aviso local. El push de verdad necesita FCM en Expo.",
+      message: t("push.localNotice"),
     };
   }
 
@@ -81,7 +82,7 @@ export async function sendTestPush(): Promise<TestPushResult> {
       body: JSON.stringify({
         to: token,
         title: "NLC",
-        body: "Prueba de push. Si ves esto, las notificaciones llegan.",
+        body: t("push.testBody"),
         sound: "default",
         channelId: OTA_CHANNEL,
         data: { test: true },
@@ -91,14 +92,14 @@ export async function sendTestPush(): Promise<TestPushResult> {
       data?: { status?: string } | { status?: string }[];
     };
     if (!response.ok) {
-      return { ok: false, message: "Expo no pudo enviar el push. Prueba otra vez." };
+      return { ok: false, message: t("push.expoFail") };
     }
     const ticket = Array.isArray(payload.data) ? payload.data[0] : payload.data;
     if (ticket && ticket.status === "error") {
-      return { ok: false, message: "Expo rechazó el token. Reinstala la APK." };
+      return { ok: false, message: t("push.tokenRejected") };
     }
-    return { ok: true, message: "Push enviada. Mira la barra de notificaciones." };
+    return { ok: true, message: t("push.sent") };
   } catch {
-    return { ok: false, message: "Sin red. No se pudo enviar la prueba." };
+    return { ok: false, message: t("push.noNetwork") };
   }
 }

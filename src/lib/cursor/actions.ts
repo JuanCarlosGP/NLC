@@ -67,6 +67,7 @@ import {
   updateReminder,
 } from "@/lib/reminders/store";
 import type { ReminderFrequency } from "@/lib/reminders/types";
+import { t } from "@/lib/i18n/runtime";
 
 export type AssistantAction = {
   op: string;
@@ -409,7 +410,7 @@ export async function executeAssistantActions(
     } catch (error) {
       results.push({
         ok: false,
-        message: error instanceof Error ? error.message : `No se pudo hacer ${action.op}.`,
+        message: error instanceof Error ? error.message : t("cursor.actionFailed", { op: action.op }),
       });
     }
   }
@@ -421,7 +422,7 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   const op = action.op.trim();
   if (op === "create_task") {
     const title = action.title?.trim();
-    if (!title) return { ok: false, message: "Falta el título de la tarea." };
+    if (!title) return { ok: false, message: t("cursor.missingTaskTitle") };
     const projectId = await resolveProjectId(action.project);
     const task = await createTask({
       title,
@@ -431,11 +432,11 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       dueAt: parseDue(action.due) ?? null,
     });
     if (action.starred) await updateTask(task.id, { starred: true });
-    return { ok: true, message: `Creada «${task.title}».` };
+    return { ok: true, message: t("cursor.createdTask", { title: task.title }) };
   }
   if (op === "update_task" || op === "move_task") {
     const task = await resolveTask(action.match || action.title);
-    if (!task) return { ok: false, message: `No encuentro la tarea «${action.match || action.title}».` };
+    if (!task) return { ok: false, message: t("cursor.taskNotFound", { match: action.match || action.title || "" }) };
     const notes =
       action.append_notes != null
         ? [task.notes.trim(), action.append_notes.trim()].filter(Boolean).join("\n")
@@ -448,37 +449,37 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       starred: action.starred,
       projectId: action.project ? await resolveProjectId(action.project) : undefined,
     });
-    return { ok: true, message: `Actualizada «${action.title?.trim() || task.title}».` };
+    return { ok: true, message: t("cursor.updatedTask", { title: action.title?.trim() || task.title }) };
   }
   if (op === "delete_task") {
     const task = await resolveTask(action.match || action.title);
-    if (!task) return { ok: false, message: `No encuentro la tarea «${action.match || action.title}».` };
+    if (!task) return { ok: false, message: t("cursor.taskNotFound", { match: action.match || action.title || "" }) };
     await deleteTask(task.id);
-    return { ok: true, message: `Eliminada «${task.title}».` };
+    return { ok: true, message: t("cursor.deletedTask", { title: task.title }) };
   }
   if (op === "create_project") {
     const name = action.name?.trim() || action.title?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre del proyecto." };
+    if (!name) return { ok: false, message: t("cursor.missingProjectName") };
     const project = await createProject(name);
-    return { ok: true, message: `Proyecto «${project.name}» creado.` };
+    return { ok: true, message: t("cursor.createdProject", { name: project.name }) };
   }
   if (op === "rename_project") {
     const project = await resolveProject(action.match);
-    if (!project) return { ok: false, message: `No encuentro el proyecto «${action.match}».` };
+    if (!project) return { ok: false, message: t("cursor.projectNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre nuevo." };
+    if (!name) return { ok: false, message: t("cursor.missingNewName") };
     await renameProject(project.id, name);
-    return { ok: true, message: `Proyecto «${project.name}» → «${name}».` };
+    return { ok: true, message: t("cursor.renamedProject", { from: project.name, to: name }) };
   }
   if (op === "archive_project") {
     const project = await resolveProject(action.match || action.name);
-    if (!project) return { ok: false, message: `No encuentro el proyecto «${action.match}».` };
+    if (!project) return { ok: false, message: t("cursor.projectNotFound", { match: action.match ?? "" }) };
     await archiveProject(project.id, true);
-    return { ok: true, message: `Archivado «${project.name}».` };
+    return { ok: true, message: t("cursor.archivedProject", { name: project.name }) };
   }
   if (op === "create_playlist") {
     const name = action.name?.trim() || action.title?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre de la playlist." };
+    if (!name) return { ok: false, message: t("cursor.missingPlaylistName") };
     await createEmptyImportedPlaylist(name);
     if (action.tracks?.length) {
       const lists = await loadImportedPlaylists();
@@ -488,50 +489,60 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
         if (found.length) await addTracksToImportedPlaylist(playlist.id, found);
       }
     }
-    return { ok: true, message: `Playlist «${name}» creada.` };
+    return { ok: true, message: t("cursor.createdPlaylist", { name }) };
   }
   if (op === "rename_playlist") {
     const playlist = await resolvePlaylist(action.match);
-    if (!playlist) return { ok: false, message: `No encuentro la playlist «${action.match}».` };
+    if (!playlist) return { ok: false, message: t("cursor.playlistNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre nuevo." };
+    if (!name) return { ok: false, message: t("cursor.missingNewName") };
     await renameImportedPlaylist(playlist.id, name);
-    return { ok: true, message: `Playlist «${playlist.name}» → «${name}».` };
+    return { ok: true, message: t("cursor.renamedPlaylist", { from: playlist.name, to: name }) };
   }
   if (op === "delete_playlist") {
     const playlist = await resolvePlaylist(action.match || action.name);
-    if (!playlist) return { ok: false, message: `No encuentro la playlist «${action.match}».` };
+    if (!playlist) return { ok: false, message: t("cursor.playlistNotFound", { match: action.match ?? "" }) };
     await removeImportedPlaylist(playlist.id);
-    return { ok: true, message: `Eliminada la playlist «${playlist.name}».` };
+    return { ok: true, message: t("cursor.deletedPlaylist", { name: playlist.name }) };
   }
   if (op === "like_playlist") {
     const playlist = await resolvePlaylist(action.match || action.name);
-    if (!playlist) return { ok: false, message: `No encuentro la playlist «${action.match}».` };
+    if (!playlist) return { ok: false, message: t("cursor.playlistNotFound", { match: action.match ?? "" }) };
     const want = action.liked !== false;
     if (Boolean(playlist.liked) !== want) await toggleImportedPlaylistLiked(playlist.id);
-    return { ok: true, message: want ? `«${playlist.name}» en inicio.` : `«${playlist.name}» quitada de inicio.` };
+    return {
+      ok: true,
+      message: want
+        ? t("cursor.playlistHomeOn", { name: playlist.name })
+        : t("cursor.playlistHomeOff", { name: playlist.name }),
+    };
   }
   if (op === "add_to_playlist") {
     const playlist = await resolvePlaylist(action.playlist || action.match);
-    if (!playlist) return { ok: false, message: `No encuentro la playlist «${action.playlist}».` };
+    if (!playlist) return { ok: false, message: t("cursor.playlistNotFound", { match: action.playlist ?? "" }) };
     const found = await resolveTracks(action.tracks ?? []);
-    if (!found.length) return { ok: false, message: "No encontré esas canciones." };
+    if (!found.length) return { ok: false, message: t("cursor.missingTracks") };
     await addTracksToImportedPlaylist(playlist.id, found);
-    return { ok: true, message: `${found.length} tema(s) en «${playlist.name}».` };
+    return { ok: true, message: t("cursor.tracksAdded", { count: found.length, name: playlist.name }) };
   }
   if (op === "favorite_track") {
     const [track] = await resolveTracks([action.match || action.title || ""]);
-    if (!track) return { ok: false, message: `No encuentro «${action.match}».` };
+    if (!track) return { ok: false, message: t("cursor.trackNotFound", { match: action.match ?? "" }) };
     const liked = (await loadFavorites()).some((item) => item.id === track.id);
     const want = action.liked !== false;
     if (liked !== want) await toggleFavorite(track);
-    return { ok: true, message: want ? `«${track.title}» en favoritos.` : `«${track.title}» fuera de favoritos.` };
+    return {
+      ok: true,
+      message: want
+        ? t("cursor.trackFavOn", { title: track.title })
+        : t("cursor.trackFavOff", { title: track.title }),
+    };
   }
   if (op === "rename_track") {
     const [track] = await resolveTracks([action.match || ""]);
-    if (!track) return { ok: false, message: `No encuentro la pista «${action.match}».` };
+    if (!track) return { ok: false, message: t("cursor.trackRenameNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim() || action.title?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre nuevo." };
+    if (!name) return { ok: false, message: t("cursor.missingNewName") };
     await renameTrackTitle(track.id, name);
     const moved = track.id.startsWith("/")
       ? await tryMove(runtime.settings, runtime.password, track.id, withNewName(track.id, name))
@@ -539,16 +550,16 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     return {
       ok: true,
       message: moved
-        ? `Canción «${track.title}» → «${name}» (también en el NAS).`
-        : `Canción «${track.title}» → «${name}» en la app.`,
+        ? t("cursor.trackRenamedNas", { from: track.title, to: name })
+        : t("cursor.trackRenamedApp", { from: track.title, to: name }),
     };
   }
   if (op === "rename_album") {
     const albums = await getAlbums();
     const album = bestMatch(albums, (item) => item.name, action.match || "");
-    if (!album) return { ok: false, message: `No encuentro el álbum «${action.match}».` };
+    if (!album) return { ok: false, message: t("cursor.albumNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre nuevo." };
+    if (!name) return { ok: false, message: t("cursor.missingNewName") };
     await renameAlbumName(album.id, name);
     const moved = album.id.startsWith("/")
       ? await tryMove(runtime.settings, runtime.password, album.id, withNewName(album.id, name))
@@ -556,16 +567,16 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     return {
       ok: true,
       message: moved
-        ? `Álbum «${album.name}» → «${name}» (también en el NAS).`
-        : `Álbum «${album.name}» → «${name}» en la app.`,
+        ? t("cursor.albumRenamedNas", { from: album.name, to: name })
+        : t("cursor.albumRenamedApp", { from: album.name, to: name }),
     };
   }
   if (op === "rename_artist") {
     const artists = await getArtists();
     const artist = bestMatch(artists, (item) => item.name, action.match || "");
-    if (!artist) return { ok: false, message: `No encuentro el artista «${action.match}».` };
+    if (!artist) return { ok: false, message: t("cursor.artistNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre nuevo." };
+    if (!name) return { ok: false, message: t("cursor.missingNewName") };
     await renameArtistName(artist.id, name);
     const moved = artist.id.startsWith("/")
       ? await tryMove(runtime.settings, runtime.password, artist.id, withNewName(artist.id, name))
@@ -573,28 +584,28 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     return {
       ok: true,
       message: moved
-        ? `Artista «${artist.name}» → «${name}» (también en el NAS).`
-        : `Artista «${artist.name}» → «${name}» en la app.`,
+        ? t("cursor.artistRenamedNas", { from: artist.name, to: name })
+        : t("cursor.artistRenamedApp", { from: artist.name, to: name }),
     };
   }
   if (op === "rename_video") {
     const shows = await listVideoShows(runtime.settings, runtime.password).catch(() => []);
     const show = bestMatch(shows, (item) => item.title, action.match || "");
-    if (!show) return { ok: false, message: `No encuentro el vídeo «${action.match}».` };
+    if (!show) return { ok: false, message: t("cursor.videoNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre nuevo." };
+    if (!name) return { ok: false, message: t("cursor.missingNewName") };
     const moved = await tryMove(runtime.settings, runtime.password, show.path, withNewName(show.path, name));
     return {
       ok: Boolean(moved),
       message: moved
-        ? `Vídeo «${show.title}» → «${name}» en el NAS.`
-        : `No pude renombrar «${show.title}» en el NAS.`,
+        ? t("cursor.videoRenamed", { from: show.title, to: name })
+        : t("cursor.videoRenameFail", { title: show.title }),
     };
   }
   if (op === "favorite_video") {
     const shows = await listVideoShows(runtime.settings, runtime.password).catch(() => []);
     const show = bestMatch(shows, (item) => item.title, action.match || "");
-    if (!show) return { ok: false, message: `No encuentro el vídeo «${action.match}».` };
+    if (!show) return { ok: false, message: t("cursor.videoNotFound", { match: action.match ?? "" }) };
     const fav: VideoFavorite = {
       id: show.id,
       path: show.path,
@@ -604,7 +615,7 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     };
     await loadVideoFavorites();
     await toggleVideoFavorite(fav);
-    return { ok: true, message: `Favorito de vídeo: «${show.title}».` };
+    return { ok: true, message: t("cursor.videoFav", { title: show.title }) };
   }
   if (op === "create_tx") {
     const kind = parseTxKind(action.kind) ?? "expense";
@@ -612,16 +623,16 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     const price = parseMoney(action.price);
     const amount = parseMoney(action.amount) ?? (quantity != null && price != null ? quantity * price : undefined);
     const title = action.title?.trim() || action.name?.trim() || action.asset?.trim();
-    if (amount == null || !(amount > 0)) return { ok: false, message: "Falta el importe del movimiento." };
-    if (!title) return { ok: false, message: "Falta el concepto del movimiento." };
+    if (amount == null || !(amount > 0)) return { ok: false, message: t("cursor.missingAmount") };
+    if (!title) return { ok: false, message: t("cursor.missingConcept") };
     const account = await resolveAccount(action.account);
     const counter = await resolveAccount(action.counter);
     if (kind === "transfer" && !counter) {
-      return { ok: false, message: "Falta la cuenta destino del traspaso." };
+      return { ok: false, message: t("cursor.missingTransferTo") };
     }
     const asset = await resolveAsset(action.asset || (kind === "sell" ? title : undefined));
     if (kind === "sell" && !asset) {
-      return { ok: false, message: "Elige la inversión que vendes." };
+      return { ok: false, message: t("cursor.missingSellAsset") };
     }
     const tx = await createTx({
       kind,
@@ -639,43 +650,49 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       assetTicker: action.ticker,
       assetKind: parseAssetKind(action.asset_kind) ?? (kind === "buy" ? "stock" : undefined),
     });
-    return { ok: true, message: `Movimiento «${tx.title}» · ${tx.kind} ${tx.amount} €.` };
+    return { ok: true, message: t("cursor.createdTx", { title: tx.title, kind: tx.kind, amount: tx.amount }) };
   }
   if (op === "delete_tx") {
     const tx = await resolveTx(action.match || action.title);
-    if (!tx) return { ok: false, message: `No encuentro el movimiento «${action.match || action.title}».` };
+    if (!tx) return { ok: false, message: t("cursor.txNotFound", { match: action.match || action.title || "" }) };
     await deleteTx(tx.id);
-    return { ok: true, message: `Eliminado «${tx.title}».` };
+    return { ok: true, message: t("cursor.deletedTx", { title: tx.title }) };
   }
   if (op === "create_account") {
     const name = action.name?.trim() || action.title?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre de la cuenta." };
+    if (!name) return { ok: false, message: t("cursor.missingAccountName") };
     const account = await createAccount(name, parseAccountKind(action.kind) ?? "bank");
-    return { ok: true, message: `Cuenta «${account.name}» creada.` };
+    return { ok: true, message: t("cursor.createdAccount", { name: account.name }) };
   }
   if (op === "rename_account") {
     const account = await resolveAccount(action.match);
-    if (!account) return { ok: false, message: `No encuentro la cuenta «${action.match}».` };
+    if (!account) return { ok: false, message: t("cursor.accountNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre nuevo." };
+    if (!name) return { ok: false, message: t("cursor.missingNewName") };
     await renameAccount(account.id, name);
-    return { ok: true, message: `Cuenta «${account.name}» → «${name}».` };
+    return { ok: true, message: t("cursor.renamedAccount", { from: account.name, to: name }) };
   }
   if (op === "archive_account") {
     const account = await resolveAccount(action.match || action.name);
-    if (!account) return { ok: false, message: `No encuentro la cuenta «${action.match}».` };
+    if (!account) return { ok: false, message: t("cursor.accountNotFound", { match: action.match ?? "" }) };
     await archiveAccount(account.id, action.archived !== false);
-    return { ok: true, message: action.archived === false ? `Cuenta «${account.name}» restaurada.` : `Archivada «${account.name}».` };
+    return {
+      ok: true,
+      message:
+        action.archived === false
+          ? t("cursor.accountRestored", { name: account.name })
+          : t("cursor.accountArchived", { name: account.name }),
+    };
   }
   if (op === "create_asset") {
     const name = action.name?.trim() || action.title?.trim();
-    if (!name) return { ok: false, message: "Falta el nombre de la inversión." };
+    if (!name) return { ok: false, message: t("cursor.missingAssetName") };
     const quantity = parseMoney(action.quantity, 8) ?? 0;
     const price = parseMoney(action.price) ?? 0;
     let accountId: string | null = null;
     if (action.account) {
       const account = await resolveAccount(action.account);
-      if (!account) return { ok: false, message: `No encuentro la cuenta «${action.account}».` };
+      if (!account) return { ok: false, message: t("cursor.accountNotFound", { match: action.account ?? "" }) };
       accountId = account.id;
     }
     const asset = await createAsset({
@@ -687,18 +704,18 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       price,
       costBasis: parseMoney(action.cost_basis) ?? quantity * price,
     });
-    return { ok: true, message: `Inversión «${asset.name}» creada.` };
+    return { ok: true, message: t("cursor.createdAsset", { name: asset.name }) };
   }
   if (op === "update_asset" || op === "archive_asset") {
     const asset = await resolveAsset(action.match || action.name || action.ticker || action.title);
-    if (!asset) return { ok: false, message: `No encuentro la inversión «${action.match || action.name}».` };
+    if (!asset) return { ok: false, message: t("cursor.assetNotFound", { match: action.match || action.name || "" }) };
     let accountId: string | null | undefined;
     if (op === "update_asset" && action.account != null) {
       const raw = String(action.account).trim();
       if (!raw || raw === "none" || raw === "ninguna") accountId = null;
       else {
         const account = await resolveAccount(raw);
-        if (!account) return { ok: false, message: `No encuentro la cuenta «${action.account}».` };
+        if (!account) return { ok: false, message: t("cursor.accountNotFound", { match: action.account ?? "" }) };
         accountId = account.id;
       }
     }
@@ -712,33 +729,33 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       costBasis: parseMoney(action.cost_basis),
       archived: op === "archive_asset" ? action.archived !== false : action.archived,
     });
-    return { ok: true, message: `Inversión «${asset.name}» actualizada.` };
+    return { ok: true, message: t("cursor.updatedAsset", { name: asset.name }) };
   }
   if (op === "quote_asset") {
     const asset = await resolveAsset(action.match || action.name || action.ticker || action.title);
-    if (!asset) return { ok: false, message: `No encuentro la inversión «${action.match || action.name}».` };
+    if (!asset) return { ok: false, message: t("cursor.assetNotFound", { match: action.match || action.name || "" }) };
     const price = parseMoney(action.price);
-    if (price == null || !(price > 0)) return { ok: false, message: "Falta el precio." };
+    if (price == null || !(price > 0)) return { ok: false, message: t("cursor.missingPrice") };
     await createQuote({
       assetId: asset.id,
       price,
       bookedAt: parseDue(action.due) ?? undefined,
     });
-    return { ok: true, message: `Valor de «${asset.name}» registrado: ${price} €.` };
+    return { ok: true, message: t("cursor.assetQuoted", { name: asset.name, price }) };
   }
   if (op === "create_goal") {
     const name = action.name?.trim() || action.title?.trim();
     const target = parseMoney(action.target) ?? parseMoney(action.amount);
-    if (!name) return { ok: false, message: "Falta el nombre del objetivo." };
-    if (target == null || !(target > 0)) return { ok: false, message: "Falta el importe del objetivo." };
+    if (!name) return { ok: false, message: t("cursor.missingGoalName") };
+    if (target == null || !(target > 0)) return { ok: false, message: t("cursor.missingGoalAmount") };
     const scope = parseGoalScope(action.scope) ?? "networth";
     const account = await resolveAccount(action.account);
     const asset = await resolveAsset(action.asset);
     if (scope === "account" && !account) {
-      return { ok: false, message: "Elige la cuenta del objetivo." };
+      return { ok: false, message: t("cursor.missingGoalAccount") };
     }
     if (scope === "asset" && !asset) {
-      return { ok: false, message: "Elige la inversión del objetivo." };
+      return { ok: false, message: t("cursor.missingGoalAsset") };
     }
     const goal = await createGoal({
       name,
@@ -748,11 +765,11 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       assetId: asset?.id ?? null,
       deadlineAt: parseDue(action.due) ?? null,
     });
-    return { ok: true, message: `Objetivo «${goal.name}» · ${goal.target} €.` };
+    return { ok: true, message: t("cursor.createdGoal", { name: goal.name, target: goal.target }) };
   }
   if (op === "update_goal") {
     const goal = await resolveGoal(action.match || action.title || action.name);
-    if (!goal) return { ok: false, message: `No encuentro el objetivo «${action.match || action.name}».` };
+    if (!goal) return { ok: false, message: t("cursor.goalNotFound", { match: action.match || action.name || "" }) };
     const scope = parseGoalScope(action.scope);
     const account = action.account ? await resolveAccount(action.account) : null;
     const asset = action.asset ? await resolveAsset(action.asset) : null;
@@ -765,18 +782,24 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       deadlineAt: parseDue(action.due),
       archived: action.archived,
     });
-    return { ok: true, message: `Objetivo «${goal.name}» actualizado.` };
+    return { ok: true, message: t("cursor.updatedGoal", { name: goal.name }) };
   }
   if (op === "archive_goal" || op === "delete_goal") {
     const goal = await resolveGoal(action.match || action.title || action.name);
-    if (!goal) return { ok: false, message: `No encuentro el objetivo «${action.match || action.name}».` };
+    if (!goal) return { ok: false, message: t("cursor.goalNotFound", { match: action.match || action.name || "" }) };
     if (op === "delete_goal") await deleteGoal(goal.id);
     else await updateGoal(goal.id, { archived: action.archived !== false });
-    return { ok: true, message: `Objetivo «${goal.name}» ${op === "delete_goal" ? "eliminado" : "archivado"}.` };
+    return {
+      ok: true,
+      message:
+        op === "delete_goal"
+          ? t("cursor.deletedGoal", { name: goal.name })
+          : t("cursor.archivedGoal", { name: goal.name }),
+    };
   }
   if (op === "create_reminder") {
     const title = action.title?.trim() || action.name?.trim();
-    if (!title) return { ok: false, message: "Falta el mensaje del recordatorio." };
+    if (!title) return { ok: false, message: t("cursor.missingReminder") };
     const clock = parseClock(action) ?? { hour: 9, minute: 0 };
     const reminder = await createReminder({
       title,
@@ -788,11 +811,11 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       onceAt: parseDue(action.due) ?? null,
       enabled: action.enabled !== false,
     });
-    return { ok: true, message: `Recordatorio «${reminder.title}» creado.` };
+    return { ok: true, message: t("cursor.createdReminder", { title: reminder.title }) };
   }
   if (op === "update_reminder") {
     const reminder = await resolveReminder(action.match || action.title);
-    if (!reminder) return { ok: false, message: `No encuentro el recordatorio «${action.match}».` };
+    if (!reminder) return { ok: false, message: t("cursor.reminderNotFound", { match: action.match ?? "" }) };
     const clock = parseClock(action);
     await updateReminder(reminder.id, {
       title: action.title || action.name,
@@ -804,23 +827,23 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       onceAt: parseDue(action.due),
       enabled: action.enabled,
     });
-    return { ok: true, message: `Recordatorio «${reminder.title}» actualizado.` };
+    return { ok: true, message: t("cursor.updatedReminder", { title: reminder.title }) };
   }
   if (op === "delete_reminder") {
     const reminder = await resolveReminder(action.match || action.title);
-    if (!reminder) return { ok: false, message: `No encuentro el recordatorio «${action.match}».` };
+    if (!reminder) return { ok: false, message: t("cursor.reminderNotFound", { match: action.match ?? "" }) };
     await deleteReminder(reminder.id);
-    return { ok: true, message: `Eliminado el recordatorio «${reminder.title}».` };
+    return { ok: true, message: t("cursor.deletedReminder", { title: reminder.title }) };
   }
   if (op === "set_zone") {
     const zone = parseZone(action.zone || action.name || action.match);
-    if (!zone) return { ok: false, message: "Zona no válida. Usa música, podcasts, vídeo, tareas o patrimonio." };
+    if (!zone) return { ok: false, message: t("cursor.badZone") };
     if (!runtime.setZone(zone)) {
-      return { ok: false, message: "Ese apartado está oculto en Ajustes." };
+      return { ok: false, message: t("cursor.zoneHidden") };
     }
-    return { ok: true, message: `Zona: ${zone}.` };
+    return { ok: true, message: t("cursor.zoneSet", { zone }) };
   }
-  return { ok: false, message: `No conozco la acción «${op}».` };
+  return { ok: false, message: t("cursor.unknownAction", { op }) };
 }
 
 async function resolveProject(match?: string) {

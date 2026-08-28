@@ -1,17 +1,27 @@
-const euro = new Intl.NumberFormat("es-ES", {
-  style: "currency",
-  currency: "EUR",
-  maximumFractionDigits: 2,
-});
+import { numberLocale } from "@/lib/i18n/runtime";
 
-const compact = new Intl.NumberFormat("es-ES", {
+const euroOptions: Intl.NumberFormatOptions = {
   style: "currency",
   currency: "EUR",
   maximumFractionDigits: 2,
-  notation: "standard",
-});
+};
+
+let cachedLocale = "";
+let euro: Intl.NumberFormat;
+let compact: Intl.NumberFormat;
+
+function formatters() {
+  const locale = numberLocale();
+  if (cachedLocale !== locale) {
+    cachedLocale = locale;
+    euro = new Intl.NumberFormat(locale, euroOptions);
+    compact = new Intl.NumberFormat(locale, { ...euroOptions, notation: "standard" });
+  }
+  return { euro, compact };
+}
 
 export function formatEuro(value: number): string {
+  const { euro, compact } = formatters();
   if (!Number.isFinite(value)) return compact.format(0);
   return euro.format(value);
 }
@@ -27,7 +37,7 @@ export function formatPct(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return "—";
   const abs = Math.abs(value);
   const digits = abs >= 100 ? 0 : abs >= 10 ? 1 : 2;
-  const body = abs.toLocaleString("es-ES", {
+  const body = abs.toLocaleString(numberLocale(), {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -48,11 +58,20 @@ export function roundMoney(value: number): number {
   return roundTo(value, 2);
 }
 
-/** Display in the field after blur: 1234.5 → "1.234,5" */
+/** Display in the field after blur: 1234.5 → "1.234,5" or "1,234.5". */
 export function formatAmountInput(value: number, decimals = 2): string {
   if (!Number.isFinite(value)) return "";
-  return roundTo(value, decimals).toLocaleString("es-ES", {
+  return roundTo(value, decimals).toLocaleString(numberLocale(), {
     minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+    useGrouping: true,
+  });
+}
+
+/** Placeholder that matches the active decimal style: 0,00 vs 0.00. */
+export function amountPlaceholder(value = 0, decimals = 2): string {
+  return roundTo(value, decimals).toLocaleString(numberLocale(), {
+    minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
     useGrouping: true,
   });

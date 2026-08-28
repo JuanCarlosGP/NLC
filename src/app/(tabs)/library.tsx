@@ -27,6 +27,8 @@ import { useVideoActions } from "@/lib/video/video-actions-context";
 import { loadWatchHistory, peekWatchHistory, watchMatchesPath } from "@/lib/video/watch-history";
 import { watchRoute } from "@/lib/video/onepiece";
 import { colors, fonts, layout, type } from "@/lib/theme";
+import { useI18n } from "@/lib/i18n/context";
+import { collateLocale } from "@/lib/i18n/runtime";
 import { useZone } from "@/lib/zone/zone-context";
 import {
   isPodcastAlbum,
@@ -37,24 +39,12 @@ import {
 } from "@/lib/nas/webdav";
 import type { Album, Artist } from "@/lib/nas/types";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
-
-const MUSIC_TABS: { id: LibraryTab; label: string }[] = [
-  { id: "recents", label: "General" },
-  { id: "playlists", label: "Playlists" },
-  { id: "tracks", label: "Canciones" },
-  { id: "artists", label: "Artistas" },
-  { id: "albums", label: "Álbumes" },
-];
-
-const PODCAST_TABS: { id: LibraryTab; label: string }[] = [
-  { id: "podcasts", label: "Programas" },
-  { id: "tracks", label: "Episodios" },
-];
+import type { I18nVars } from "@/lib/i18n/t";
 
 const GENERAL_RECENT_LIMIT = 8;
 
 function compareText(a: string, b: string): number {
-  return a.localeCompare(b, "es", { sensitivity: "base" });
+  return a.localeCompare(b, collateLocale(), { sensitivity: "base" });
 }
 
 type PlaylistEntry = { playlist: ImportedPlaylist; album: Album };
@@ -68,10 +58,10 @@ function albumDisplayName(album: Album): string {
   return isSongsFolderName(album.name) ? album.artistName : album.name;
 }
 
-function albumDisplaySubtitle(album: Album): string {
-  if (isPodcastAlbum(album)) return "Podcast";
-  if (isSongsFolderName(album.name)) return "Canciones";
-  return `Álbum · ${album.artistName}`;
+function albumDisplaySubtitle(album: Album, t: (path: string, vars?: I18nVars) => string): string {
+  if (isPodcastAlbum(album)) return t("library.podcast");
+  if (isSongsFolderName(album.name)) return t("library.songs");
+  return t("library.albumBy", { artist: album.artistName });
 }
 
 function itemTitle(item: MixItem): string {
@@ -110,9 +100,25 @@ function Cell({ children }: { children: ReactNode }) {
 
 export default function LibraryScreen() {
   const router = useRouter();
+  const { t } = useI18n();
   const { zone } = useZone();
   const { tab, setTab, artists, albums, tracks, error } = useLibrary();
-  const tabs = zone === "podcast" ? PODCAST_TABS : MUSIC_TABS;
+  const tabs = useMemo(
+    () =>
+      zone === "podcast"
+        ? ([
+            { id: "podcasts" as LibraryTab, label: t("library.tabShows") },
+            { id: "tracks" as LibraryTab, label: t("library.tabEpisodes") },
+          ] satisfies { id: LibraryTab; label: string }[])
+        : ([
+            { id: "recents" as LibraryTab, label: t("library.tabGeneral") },
+            { id: "playlists" as LibraryTab, label: t("library.tabPlaylists") },
+            { id: "tracks" as LibraryTab, label: t("library.tabTracks") },
+            { id: "artists" as LibraryTab, label: t("library.tabArtists") },
+            { id: "albums" as LibraryTab, label: t("library.tabAlbums") },
+          ] satisfies { id: LibraryTab; label: string }[]),
+    [t, zone],
+  );
   const { items: visibleTracks, isExiting } = useExitingList(tracks);
   const { playTracks } = usePlayer();
   const { playlists } = useSpotify();
@@ -233,10 +239,10 @@ export default function LibraryScreen() {
     if (item.kind === "album") {
       return wrap(
         item.key,
-        albumNode(item.album, albumDisplaySubtitle(item.album)),
+        albumNode(item.album, albumDisplaySubtitle(item.album, t)),
       );
     }
-    return wrap(item.key, artistNode(item.artist, "Artista"));
+    return wrap(item.key, artistNode(item.artist, t("library.artist")));
   }
 
   function wrap(key: string, node: ReactNode) {
@@ -246,7 +252,7 @@ export default function LibraryScreen() {
   function playlistNode(playlist: ImportedPlaylist, album: Album) {
     const go = () => router.push(`/imported/${playlist.id}`);
     const configure = () => openPlaylistActions(playlist);
-    const subtitle = `Playlist · ${playlist.ownerName}`;
+    const subtitle = t("library.playlistBy", { owner: playlist.ownerName });
     return grid ? (
       <AlbumTile
         album={album}
@@ -266,7 +272,7 @@ export default function LibraryScreen() {
     );
   }
 
-  function albumNode(album: Album, subtitle = albumDisplaySubtitle(album)) {
+  function albumNode(album: Album, subtitle = albumDisplaySubtitle(album, t)) {
     const go = () => router.push(albumHref(album.id));
     const shown = { ...album, name: albumDisplayName(album) };
     return grid ? (
@@ -302,10 +308,10 @@ export default function LibraryScreen() {
     <>
       <Screen>
         <View style={styles.header}>
-          <Text style={[type.pageTitle, styles.title]}>Biblioteca</Text>
+          <Text style={[type.pageTitle, styles.title]}>{t("library.title")}</Text>
           {zone === "music" ? (
             <Pressable
-              accessibilityLabel="Importar"
+              accessibilityLabel={t("common.import")}
               onPress={() => setImportOpen(true)}
               style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
             >
@@ -349,7 +355,7 @@ export default function LibraryScreen() {
               <Text style={styles.sortLabel}>{librarySortLabel(sort)}</Text>
             </Pressable>
             <Pressable
-              accessibilityLabel={grid ? "Ver lista" : "Ver cuadrícula"}
+              accessibilityLabel={grid ? t("common.viewList") : t("common.viewGrid")}
               onPress={() => setViewMode(grid ? "list" : "grid")}
               style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
             >
@@ -370,18 +376,18 @@ export default function LibraryScreen() {
           <>
             {recentMix.length ? (
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Recientes</Text>
+                <Text style={styles.sectionLabel}>{t("library.recents")}</Text>
                 <Collection>{recentMix.map((item) => renderMixItem(item))}</Collection>
               </View>
             ) : null}
             {restMix.length ? (
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Todo</Text>
+                <Text style={styles.sectionLabel}>{t("library.all")}</Text>
                 <Collection>{restMix.map((item) => renderMixItem(item))}</Collection>
               </View>
             ) : null}
             {!recentMix.length && !restMix.length ? (
-              <Text style={type.body}>Aún no hay nada en la biblioteca.</Text>
+              <Text style={type.body}>{t("library.emptyLibrary")}</Text>
             ) : null}
           </>
         ) : null}
@@ -394,19 +400,17 @@ export default function LibraryScreen() {
               )}
             </Collection>
           ) : (
-            <Text style={type.body}>Aún no hay playlists. Pulsa + para importar un enlace.</Text>
+            <Text style={type.body}>{t("library.emptyPlaylistsImport")}</Text>
           )
         ) : null}
 
         {tab === "podcasts" ? (
           podcastAlbums.length ? (
             <Collection>
-              {podcastAlbums.map((album) => wrap(album.id, albumNode(album, "Podcast")))}
+              {podcastAlbums.map((album) => wrap(album.id, albumNode(album, t("library.podcast"))))}
             </Collection>
           ) : (
-            <Text style={type.body}>
-              Aún no hay podcasts. Descarga uno en Ajustes → Podcasts (yt-dlp) a Music/Podcasts.
-            </Text>
+            <Text style={type.body}>{t("library.emptyPodcastsSettings")}</Text>
           )
         ) : null}
 
@@ -416,12 +420,19 @@ export default function LibraryScreen() {
               {sortedArtists.map((artist) =>
                 wrap(
                   artist.id,
-                  artistNode(artist, artist.albumCount ? `${artist.albumCount} ${artist.albumCount === 1 ? "álbum" : "álbumes"}` : "Artista"),
+                  artistNode(
+                    artist,
+                    artist.albumCount
+                      ? t(artist.albumCount === 1 ? "library.albumOne" : "library.albumMany", {
+                          count: artist.albumCount,
+                        })
+                      : t("library.artist"),
+                  ),
                 ),
               )}
             </Collection>
           ) : (
-            <Text style={type.body}>Aún no hay artistas en la biblioteca.</Text>
+            <Text style={type.body}>{t("library.emptyArtists")}</Text>
           )
         ) : null}
 
@@ -431,7 +442,7 @@ export default function LibraryScreen() {
               {sortedAlbums.map((album) => wrap(album.id, albumNode(album)))}
             </Collection>
           ) : (
-            <Text style={type.body}>Aún no hay álbumes en la biblioteca.</Text>
+            <Text style={type.body}>{t("library.emptyAlbums")}</Text>
           )
         ) : null}
 
@@ -451,7 +462,7 @@ export default function LibraryScreen() {
                   }}
                 />
               ))
-            : <Text style={type.body}>{zone === "podcast" ? "Aún no hay episodios." : "Aún no hay canciones en la biblioteca."}</Text>
+            : <Text style={type.body}>{zone === "podcast" ? t("library.emptyEpisodes") : t("library.emptyTracks")}</Text>
           : null}
           </>
         ) : null}
@@ -492,6 +503,7 @@ function VideoLibrary({
   browseReady: boolean;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
   const { settings, password, ready } = useSettings();
   const { openVideoActions } = useVideoActions();
   const [shows, setShows] = useState<VideoShow[]>([]);
@@ -505,12 +517,12 @@ function VideoLibrary({
       await loadWatchHistory();
       setShows(await listVideoShows(settings, password));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cargar el vídeo.");
+      setError(err instanceof Error ? err.message : t("library.videoError"));
       setShows([]);
     } finally {
       setLoading(false);
     }
-  }, [password, settings]);
+  }, [password, settings, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -548,6 +560,20 @@ function VideoLibrary({
   const series = restShows.filter((show) => show.kind === "series");
   const movies = restShows.filter((show) => show.kind === "movie");
 
+  const countLabel = useMemo(() => {
+    if (loading) return t("common.loading");
+    if (!shows.length) return t("library.videoEmptyNas");
+    const parts = [
+      seriesCount
+        ? t(seriesCount === 1 ? "library.seriesOne" : "library.seriesMany", { count: seriesCount })
+        : "",
+      moviesCount
+        ? t(moviesCount === 1 ? "library.movieOne" : "library.movieMany", { count: moviesCount })
+        : "",
+    ].filter(Boolean);
+    return parts.join(" · ");
+  }, [loading, moviesCount, seriesCount, shows.length, t]);
+
   function openShow(show: VideoShow) {
     if (show.kind === "movie" && show.file) {
       router.push(watchRoute(show.path, show.path.replace(/\/[^/]+$/, "") || show.path));
@@ -564,7 +590,7 @@ function VideoLibrary({
   }
 
   function renderShow(show: VideoShow) {
-    const subtitle = show.kind === "movie" ? "Película" : "Serie";
+    const subtitle = show.kind === "movie" ? t("library.movie") : t("library.seriesKind");
     if (grid) {
       return (
         <View key={show.id} style={styles.cell}>
@@ -604,13 +630,7 @@ function VideoLibrary({
 
   return (
     <View style={styles.section}>
-      <Text style={type.meta}>
-        {loading
-          ? "Cargando…"
-          : shows.length
-            ? `${seriesCount ? `${seriesCount} serie${seriesCount === 1 ? "" : "s"}` : ""}${seriesCount && moviesCount ? " · " : ""}${moviesCount ? `${moviesCount} película${moviesCount === 1 ? "" : "s"}` : ""}`
-            : "Sin series ni películas en el NAS"}
-      </Text>
+      <Text style={type.meta}>{countLabel}</Text>
 
       {browseReady ? (
         <View style={styles.sortBar}>
@@ -622,7 +642,7 @@ function VideoLibrary({
             <Text style={styles.sortLabel}>{librarySortLabel(sort)}</Text>
           </Pressable>
           <Pressable
-            accessibilityLabel={grid ? "Ver lista" : "Ver cuadrícula"}
+            accessibilityLabel={grid ? t("common.viewList") : t("common.viewGrid")}
             onPress={onToggleView}
             style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
           >
@@ -639,20 +659,20 @@ function VideoLibrary({
 
       {recentShows.length ? (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Recientes</Text>
+          <Text style={styles.sectionLabel}>{t("library.recents")}</Text>
           <Collection items={recentShows} inset />
         </View>
       ) : null}
 
       {series.length ? (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Series</Text>
+          <Text style={styles.sectionLabel}>{t("library.series")}</Text>
           <Collection items={series} inset />
         </View>
       ) : null}
       {movies.length ? (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Películas</Text>
+          <Text style={styles.sectionLabel}>{t("library.movies")}</Text>
           <Collection items={movies} inset />
         </View>
       ) : null}

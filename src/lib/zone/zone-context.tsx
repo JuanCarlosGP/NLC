@@ -3,12 +3,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type AppZone = "music" | "podcast" | "video" | "focus" | "wealth";
 
-export const APP_ZONES: { id: AppZone; label: string }[] = [
-  { id: "music", label: "Música" },
-  { id: "podcast", label: "Podcasts" },
-  { id: "video", label: "Vídeo" },
-  { id: "focus", label: "Tareas" },
-  { id: "wealth", label: "Patrimonio" },
+export const APP_ZONES: { id: AppZone }[] = [
+  { id: "music" },
+  { id: "podcast" },
+  { id: "video" },
+  { id: "focus" },
+  { id: "wealth" },
 ];
 
 export type EnabledZones = Record<AppZone, boolean>;

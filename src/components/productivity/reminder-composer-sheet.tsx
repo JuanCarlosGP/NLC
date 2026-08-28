@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n/context";
 import { dueToday, dueTomorrow, startOfDay } from "@/lib/productivity/dates";
 import { useReminders } from "@/lib/reminders/reminders-context";
 import {
@@ -33,11 +34,12 @@ export function ReminderComposerSheet({
   onOpenChange: (open: boolean) => void;
   reminder?: ProdReminder | null;
 }) {
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar recordatorio"
+      accessibilityCloseLabel={t("reminders.closeReminder")}
       viewportRatio={0.82}
     >
       <ReminderComposerBody open={open} reminder={reminder ?? null} onDone={() => onOpenChange(false)} />
@@ -54,6 +56,7 @@ function ReminderComposerBody({
   reminder: ProdReminder | null;
   onDone: () => void;
 }) {
+  const { t } = useI18n();
   const { createReminder, updateReminder, deleteReminder } = useReminders();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -116,11 +119,11 @@ function ReminderComposerBody({
   return (
     <>
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text style={type.sectionTitle}>{reminder ? "Editar recordatorio" : "Nuevo recordatorio"}</Text>
+        <Text style={type.sectionTitle}>{reminder ? t("reminders.editTitle") : t("reminders.newTitle")}</Text>
         <TextInput
           value={title}
           onChangeText={setTitle}
-          placeholder="Mensaje de la notificación"
+          placeholder={t("reminders.notificationPlaceholder")}
           placeholderTextColor={colors.muted}
           autoFocus={!reminder}
           style={styles.input}
@@ -129,13 +132,13 @@ function ReminderComposerBody({
         <TextInput
           value={body}
           onChangeText={setBody}
-          placeholder="Texto extra (opcional)"
+          placeholder={t("reminders.extraPlaceholder")}
           placeholderTextColor={colors.muted}
           multiline
           style={[styles.input, styles.notes]}
         />
 
-        <Text style={type.label}>Frecuencia</Text>
+        <Text style={type.label}>{t("reminders.frequency")}</Text>
         <View style={styles.chips}>
           {FREQUENCIES.map((id) => {
             const active = frequency === id;
@@ -156,12 +159,12 @@ function ReminderComposerBody({
 
         {frequency === "once" ? (
           <>
-            <Text style={type.label}>Cuándo</Text>
+            <Text style={type.label}>{t("reminders.when")}</Text>
             <View style={styles.chips}>
               {(
                 [
-                  ["today", "Hoy"],
-                  ["tomorrow", "Mañana"],
+                  ["today", t("dates.today")],
+                  ["tomorrow", t("dates.tomorrow")],
                 ] as const
               ).map(([id, label]) => (
                 <Pressable
@@ -181,7 +184,7 @@ function ReminderComposerBody({
 
         {frequency === "weekly" ? (
           <>
-            <Text style={type.label}>Día</Text>
+            <Text style={type.label}>{t("reminders.day")}</Text>
             <View style={styles.chips}>
               {WEEKDAYS.map((day) => {
                 const active = weekday === day.id;
@@ -202,10 +205,10 @@ function ReminderComposerBody({
           </>
         ) : null}
 
-        <Text style={type.label}>Hora</Text>
+        <Text style={type.label}>{t("reminders.time")}</Text>
         <View style={styles.timeRow}>
           <Pressable
-            accessibilityLabel="Quince minutos menos"
+            accessibilityLabel={t("reminders.minus15")}
             onPress={() => stepTime(-15)}
             style={({ pressed }) => [styles.step, { opacity: pressed ? 0.7 : 1 }]}
           >
@@ -213,7 +216,7 @@ function ReminderComposerBody({
           </Pressable>
           <Text style={styles.time}>{formatReminderTime(hour, minute)}</Text>
           <Pressable
-            accessibilityLabel="Quince minutos más"
+            accessibilityLabel={t("reminders.plus15")}
             onPress={() => stepTime(15)}
             style={({ pressed }) => [styles.step, { opacity: pressed ? 0.7 : 1 }]}
           >
@@ -248,7 +251,7 @@ function ReminderComposerBody({
             { opacity: !title.trim() || busy ? 0.4 : pressed ? 0.86 : 1 },
           ]}
         >
-          <Text style={styles.submitText}>{busy ? "…" : reminder ? "Guardar" : "Crear"}</Text>
+          <Text style={styles.submitText}>{busy ? "…" : reminder ? t("common.save") : t("common.create")}</Text>
         </Pressable>
         {reminder ? (
           <Pressable
@@ -256,15 +259,15 @@ function ReminderComposerBody({
             onPress={() => setConfirmDelete(true)}
             style={({ pressed }) => [styles.deleteBtn, { opacity: pressed ? 0.8 : 1 }]}
           >
-            <Text style={styles.deleteText}>Eliminar</Text>
+            <Text style={styles.deleteText}>{t("common.delete")}</Text>
           </Pressable>
         ) : null}
       </SheetScrollView>
       <ConfirmDialog
         open={confirmDelete}
-        title="¿Eliminar este recordatorio?"
-        message="Dejará de avisar en el teléfono."
-        confirmLabel="Eliminar"
+        title={t("reminders.deleteConfirmTitle")}
+        message={t("reminders.deleteConfirmMessage")}
+        confirmLabel={t("common.delete")}
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => {
           if (!reminder) return;

@@ -6,6 +6,7 @@ import { nasScanOk } from "@/lib/db/from-source";
 import { withTracksArtwork } from "@/lib/library/artwork-cache";
 import { subscribeLibraryChanged } from "@/lib/library/cache";
 import type { Album, Artist, Track } from "@/lib/nas/types";
+import { t } from "@/lib/i18n/runtime";
 import { useSettings } from "@/lib/settings/settings-context";
 import { useZone } from "@/lib/zone/zone-context";
 
@@ -56,10 +57,10 @@ export function useLibrary() {
       setAlbums(nextAlbums);
       setTracks([]);
       if (nextOffline && !(await catalogTrackCount())) {
-        setError("Sin conexión al NAS y sin copias en el teléfono.");
+        setError(t("home.nasOfflineNoCache"));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo leer la biblioteca.");
+      setError(err instanceof Error ? err.message : t("library.readFail"));
     } finally {
       setLoading(false);
     }
@@ -71,7 +72,7 @@ export function useLibrary() {
       const songs = await getTracks({ kind: trackKind, offlineOnly });
       setTracks(withTracksArtwork(songs));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron listar las canciones.");
+      setError(err instanceof Error ? err.message : t("library.listTracksFail"));
     }
   }, [offlineOnly, trackKind, tracks.length]);
 

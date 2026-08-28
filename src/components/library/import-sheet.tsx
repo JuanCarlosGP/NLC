@@ -12,6 +12,7 @@ import { useSettings } from "@/lib/settings/settings-context";
 import { useSpotify } from "@/lib/spotify/spotify-context";
 import { isPodcastTrack } from "@/lib/nas/webdav";
 import type { Track } from "@/lib/nas/types";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts, type } from "@/lib/theme";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
 
@@ -26,11 +27,12 @@ export function ImportSheet({
   onOpenChange: (open: boolean) => void;
   onImported: (playlist: ImportedPlaylist) => void;
 }) {
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar importar"
+      accessibilityCloseLabel={t("importSheet.close")}
       viewportRatio={0.92}
     >
       <ImportSheetBody
@@ -88,6 +90,7 @@ function ImportSheetBody({
   open: boolean;
   onImported: (playlist: ImportedPlaylist) => void;
 }) {
+  const { t } = useI18n();
   const spotify = useSpotify();
   const { source } = useSettings();
   const [mode, setMode] = useState<Mode>("choose");
@@ -158,7 +161,7 @@ function ImportSheetBody({
       setUrl("");
       onImported(playlist);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo cargar.");
+      setError(err instanceof Error ? err.message : t("importSheet.loadFail"));
     } finally {
       setBusy(false);
     }
@@ -177,7 +180,7 @@ function ImportSheetBody({
       setPicked(new Set());
       onImported(playlist);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo crear.");
+      setError(err instanceof Error ? err.message : t("importSheet.createFail"));
     } finally {
       setBusy(false);
     }
@@ -192,15 +195,15 @@ function ImportSheetBody({
     <View style={styles.panel}>
       {mode === "choose" ? (
         <View style={styles.chooser}>
-          <Text style={type.label}>Añadir</Text>
-          <Text style={type.pageTitle}>¿De dónde?</Text>
+          <Text style={type.label}>{t("importSheet.add")}</Text>
+          <Text style={type.pageTitle}>{t("importSheet.where")}</Text>
           <Pressable
             onPress={() => go("spotify")}
             style={({ pressed }) => [styles.choice, { opacity: pressed ? 0.86 : 1 }]}
           >
             <View style={styles.choiceText}>
-              <Text style={styles.choiceTitle}>Spotify</Text>
-              <Text style={styles.choiceHint}>Importar un enlace de playlist, álbum o canción</Text>
+              <Text style={styles.choiceTitle}>{t("importSheet.spotify")}</Text>
+              <Text style={styles.choiceHint}>{t("importSheet.spotifyHint")}</Text>
             </View>
           </Pressable>
           <Pressable
@@ -208,8 +211,8 @@ function ImportSheetBody({
             style={({ pressed }) => [styles.choice, { opacity: pressed ? 0.86 : 1 }]}
           >
             <View style={styles.choiceText}>
-              <Text style={styles.choiceTitle}>YouTube Music</Text>
-              <Text style={styles.choiceHint}>Playlist, álbum, canción o mix</Text>
+              <Text style={styles.choiceTitle}>{t("importSheet.youtube")}</Text>
+              <Text style={styles.choiceHint}>{t("importSheet.youtubeHint")}</Text>
             </View>
           </Pressable>
           <Pressable
@@ -217,8 +220,8 @@ function ImportSheetBody({
             style={({ pressed }) => [styles.choice, { opacity: pressed ? 0.86 : 1 }]}
           >
             <View style={styles.choiceText}>
-              <Text style={styles.choiceTitle}>Nuestras</Text>
-              <Text style={styles.choiceHint}>Crear una playlist con canciones del NAS</Text>
+              <Text style={styles.choiceTitle}>{t("importSheet.ours")}</Text>
+              <Text style={styles.choiceHint}>{t("importSheet.oursHint")}</Text>
             </View>
           </Pressable>
         </View>
@@ -230,15 +233,15 @@ function ImportSheetBody({
             onPress={() => go("choose")}
             style={({ pressed }) => [styles.back, { opacity: pressed ? 0.7 : 1 }]}
             accessibilityRole="button"
-            accessibilityLabel="Volver"
+            accessibilityLabel={t("importSheet.back")}
           >
             <ChevronLeft color={colors.ink} size={22} strokeWidth={1.8} />
-            <Text style={styles.backLabel}>Volver</Text>
+            <Text style={styles.backLabel}>{t("importSheet.back")}</Text>
           </Pressable>
           <Text style={type.label}>
-            {mode === "spotify" ? "Spotify" : mode === "youtube" ? "YouTube Music" : "NAS"}
+            {mode === "spotify" ? t("importSheet.spotify") : mode === "youtube" ? t("importSheet.youtube") : t("importSheet.nas")}
           </Text>
-          <Text style={type.pageTitle}>{mode === "nas" ? "Nueva playlist" : "Importar"}</Text>
+          <Text style={type.pageTitle}>{mode === "nas" ? t("importSheet.newPlaylist") : t("importSheet.import")}</Text>
         </View>
       ) : null}
 
@@ -267,7 +270,7 @@ function ImportSheetBody({
               { opacity: busy || !url.trim() ? 0.5 : pressed ? 0.85 : 1 },
             ]}
           >
-            <Text style={styles.loadBtnText}>{busy ? "Cargando…" : "Cargar"}</Text>
+            <Text style={styles.loadBtnText}>{busy ? t("importSheet.loading") : t("importSheet.load")}</Text>
           </Pressable>
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </SheetScrollView>
@@ -279,14 +282,14 @@ function ImportSheetBody({
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="Nombre de la playlist"
+              placeholder={t("importSheet.playlistName")}
               placeholderTextColor={colors.muted}
               style={styles.input}
             />
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Buscar canción o artista"
+              placeholder={t("importSheet.searchPlaceholder")}
               placeholderTextColor={colors.muted}
               autoCorrect={false}
               style={styles.input}
@@ -305,7 +308,7 @@ function ImportSheetBody({
           </SheetScrollView>
           <View style={[styles.footer, { paddingBottom: footerPad }]}>
             <Text style={styles.count}>
-              {picked.size ? `${picked.size} elegidas` : "Elige canciones"}
+              {picked.size ? t("importSheet.picked", { count: picked.size }) : t("importSheet.pickTracks")}
             </Text>
             <Pressable
               onPress={() => void createNas()}
@@ -315,7 +318,7 @@ function ImportSheetBody({
                 { opacity: busy || !name.trim() || picked.size === 0 ? 0.45 : pressed ? 0.85 : 1 },
               ]}
             >
-              <Text style={styles.loadBtnText}>{busy ? "Creando…" : "Crear"}</Text>
+              <Text style={styles.loadBtnText}>{busy ? t("importSheet.creating") : t("importSheet.create")}</Text>
             </Pressable>
           </View>
           {error ? <Text style={[styles.error, styles.footerError]}>{error}</Text> : null}

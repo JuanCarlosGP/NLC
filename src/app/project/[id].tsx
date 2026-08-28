@@ -3,11 +3,14 @@ import { View, StyleSheet } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { FocusListScreen } from "@/components/productivity/focus-list-screen";
 import { TaskComposerSheet } from "@/components/productivity/task-composer-sheet";
+import { useI18n } from "@/lib/i18n/context";
 import { libraryParamId } from "@/lib/library/href";
 import { useActiveProjects, useVisibleTasks } from "@/lib/productivity/productivity-context";
+import { projectDisplayName } from "@/lib/productivity/types";
 import { colors } from "@/lib/theme";
 
 export default function ProjectScreen() {
+  const { t } = useI18n();
   const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
   const id = libraryParamId(rawId);
   const projects = useActiveProjects();
@@ -19,16 +22,16 @@ export default function ProjectScreen() {
     [id, tasks],
   );
   const count = list.length
-    ? `${list.length} ${list.length === 1 ? "tarea" : "tareas"}`
-    : "Sin tareas abiertas";
+    ? t(list.length === 1 ? "projects.taskOne" : "projects.taskMany", { count: list.length })
+    : t("projects.noOpenTasks");
 
   if (!project) {
     return (
       <FocusListScreen
-        title="Proyecto"
-        label="Productividad"
-        countLabel="No encontrado"
-        empty="Este proyecto no existe o está archivado."
+        title={t("projects.one")}
+        label={t("focus.productivity")}
+        countLabel={t("projects.notFound")}
+        empty={t("projects.notFoundBody")}
         tint={colors.sheetRaised}
         art={null}
         tasks={[]}
@@ -39,10 +42,10 @@ export default function ProjectScreen() {
   return (
     <>
       <FocusListScreen
-        title={project.name}
-        label="Proyecto"
+        title={projectDisplayName(project)}
+        label={t("projects.one")}
         countLabel={count}
-        empty="Aún no hay tareas abiertas en este proyecto."
+        empty={t("projects.emptyOpenTasks")}
         tint={project.color}
         art={<View style={[styles.dot, { backgroundColor: colors.accent }]} />}
         tasks={list}

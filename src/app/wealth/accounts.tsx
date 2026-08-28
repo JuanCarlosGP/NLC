@@ -4,13 +4,15 @@ import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { AccountActivitySheet } from "@/components/wealth/account-activity-sheet";
 import { AccountComposerSheet, AssetComposerSheet } from "@/components/wealth/account-composer-sheet";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { formatEuro } from "@/lib/wealth/money";
-import { ACCOUNT_KIND_LABEL, type WealthAccount, type WealthAsset } from "@/lib/wealth/types";
+import { ACCOUNT_KIND_LABEL, accountDisplayName, type WealthAccount, type WealthAsset } from "@/lib/wealth/types";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 
 export default function WealthAccountsScreen() {
+  const { t } = useI18n();
   const { balanceOf, holdingsOf, totalOf } = useWealth();
   const accounts = useLiveAccounts();
   const [open, setOpen] = useState(false);
@@ -30,9 +32,9 @@ export default function WealthAccountsScreen() {
     <>
       <Screen>
         <View style={styles.header}>
-          <Text style={[type.pageTitle, styles.title]}>Cuentas</Text>
+          <Text style={[type.pageTitle, styles.title]}>{t("wealth.accounts")}</Text>
           <Pressable
-            accessibilityLabel="Nueva cuenta"
+            accessibilityLabel={t("wealth.newAccount")}
             onPress={() => {
               triggerUiHaptic();
               setOpen(true);
@@ -48,13 +50,13 @@ export default function WealthAccountsScreen() {
           const total = totalOf(account.id);
           const meta =
             invested > 0.004
-              ? `Efectivo ${formatEuro(cash)} · Invertido ${formatEuro(invested)}`
+              ? `${t("wealth.cashAmount")} ${formatEuro(cash)} · ${t("wealth.investedIn", { amount: formatEuro(invested) })}`
               : ACCOUNT_KIND_LABEL[account.kind];
           return (
             <Pressable
               key={account.id}
               accessibilityRole="button"
-              accessibilityLabel={`${account.name}, ${formatEuro(total)}`}
+              accessibilityLabel={`${accountDisplayName(account)}, ${formatEuro(total)}`}
               onPress={() => {
                 triggerUiHaptic();
                 setPreview(account);
@@ -62,7 +64,7 @@ export default function WealthAccountsScreen() {
               style={({ pressed }) => [styles.row, { opacity: pressed ? 0.72 : 1 }]}
             >
               <View style={styles.meta}>
-                <Text style={styles.name}>{account.name}</Text>
+                <Text style={styles.name}>{accountDisplayName(account)}</Text>
                 <Text style={type.meta}>{meta}</Text>
               </View>
               <Text style={styles.value}>{formatEuro(total)}</Text>

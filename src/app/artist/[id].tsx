@@ -8,12 +8,14 @@ import { useArtist } from "@/hooks/use-artist";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import { usePlayer } from "@/lib/player/player-context";
 import { useSettings } from "@/lib/settings/settings-context";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function ArtistScreen() {
   const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
   const id = libraryParamId(rawId);
   const router = useRouter();
+  const { t } = useI18n();
   const { source } = useSettings();
   const { artist, albums, loading, error, name } = useArtist(id);
   const { playTracks } = usePlayer();
@@ -29,25 +31,27 @@ export default function ArtistScreen() {
 
   return (
     <Screen>
-      {loading ? <Text style={type.meta}>Cargando artista…</Text> : null}
+      {loading ? <Text style={type.meta}>{t("artist.loading")}</Text> : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <View style={styles.header}>
         <Cover id={id ?? name} label={name} uri={cover} size={96} radius={48} />
         <Text style={type.pageTitle}>{name}</Text>
-        <Text style={type.meta}>{albums.length} álbumes</Text>
+        <Text style={type.meta}>
+          {t(albums.length === 1 ? "library.albumOne" : "library.albumMany", { count: albums.length })}
+        </Text>
       </View>
       <View style={styles.actions}>
         <Pressable
           onPress={() => void playAll()}
           style={({ pressed }) => [styles.btn, styles.solid, { opacity: pressed ? 0.8 : 1 }]}
         >
-          <Text style={styles.solidText}>Reproducir</Text>
+          <Text style={styles.solidText}>{t("common.play")}</Text>
         </Pressable>
         <Pressable
           onPress={() => void playAll()}
           style={({ pressed }) => [styles.btn, styles.ghost, { opacity: pressed ? 0.8 : 1 }]}
         >
-          <Text style={styles.ghostText}>Álbumes</Text>
+          <Text style={styles.ghostText}>{t("artist.albums")}</Text>
         </Pressable>
       </View>
       {albums.length ? (
@@ -55,7 +59,7 @@ export default function ArtistScreen() {
           <AlbumRow key={album.id} album={album} onPress={() => router.push(albumHref(album.id))} />
         ))
       ) : loading ? null : (
-        <Text style={type.body}>Este artista aún no tiene álbumes.</Text>
+        <Text style={type.body}>{t("artist.empty")}</Text>
       )}
     </Screen>
   );

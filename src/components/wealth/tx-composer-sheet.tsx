@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 import { AmountInput } from "@/components/wealth/amount-input";
@@ -10,6 +11,7 @@ import { formatAmountInput, parseAmount } from "@/lib/wealth/money";
 import { useTxActions } from "@/lib/wealth/tx-actions-context";
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 import {
+  accountDisplayName,
   ASSET_KIND_LABEL,
   ASSET_KINDS,
   CASH_ACCOUNT_ID,
@@ -44,11 +46,12 @@ export function TxComposerSheet({
   defaultCounterId?: string;
   tx?: WealthTx | null;
 }) {
+  const { t } = useI18n();
   return (
     <BottomSheet
       open={open}
       onOpenChange={onOpenChange}
-      accessibilityCloseLabel="Cerrar movimiento"
+      accessibilityCloseLabel={t("wealth.closeTx")}
       viewportRatio={0.86}
     >
       <TxComposerBody
@@ -81,6 +84,7 @@ function TxComposerBody({
   tx: WealthTx | null;
   onDone: () => void;
 }) {
+  const { t } = useI18n();
   const { createTx, updateTx, deleteTx, assets } = useWealth();
   const accounts = useLiveAccounts();
   const liveAssets = useMemo(() => {
@@ -187,7 +191,7 @@ function TxComposerBody({
       triggerUiHaptic();
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar.");
+      setError(err instanceof Error ? err.message : t("wealth.saveFail"));
     } finally {
       setBusy(false);
     }
@@ -196,7 +200,7 @@ function TxComposerBody({
   return (
     <>
       <SheetScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text style={type.sectionTitle}>{tx ? "Editar movimiento" : "Movimiento"}</Text>
+        <Text style={type.sectionTitle}>{tx ? t("wealth.editMovement") : t("wealth.movement")}</Text>
         <View style={styles.chips}>
           {TX_KINDS.map((id) => {
             const active = kind === id;
@@ -217,15 +221,15 @@ function TxComposerBody({
         <TextInput
           value={title}
           onChangeText={setTitle}
-          placeholder={kind === "buy" ? "Nombre de la inversión" : "Concepto"}
+          placeholder={kind === "buy" ? t("wealth.assetNamePlaceholder") : t("wealth.concept")}
           placeholderTextColor={colors.muted}
           style={styles.input}
         />
         <AmountInput
           value={amount}
           onChangeText={setAmount}
-          placeholder="Importe, 12,50 o 1.234,56"
-          accessibilityLabel="Importe"
+          placeholder={t("wealth.amountPlaceholder")}
+          accessibilityLabel={t("wealth.amountA11y")}
           style={styles.input}
         />
         {kind === "buy" || kind === "sell" ? (
@@ -233,8 +237,8 @@ function TxComposerBody({
             value={quantity}
             onChangeText={setQuantity}
             decimals={8}
-            placeholder="Cantidad, 2 o 0,5"
-            accessibilityLabel="Cantidad"
+            placeholder={t("wealth.quantityPlaceholder")}
+            accessibilityLabel={t("wealth.quantityA11y")}
             style={styles.input}
           />
         ) : null}
@@ -243,7 +247,7 @@ function TxComposerBody({
             <TextInput
               value={assetName}
               onChangeText={setAssetName}
-              placeholder="Ticker o nombre (opcional)"
+              placeholder={t("wealth.tickerPlaceholder")}
               placeholderTextColor={colors.muted}
               autoCapitalize="characters"
               style={styles.input}
@@ -269,7 +273,7 @@ function TxComposerBody({
         ) : null}
         {kind === "buy" || kind === "sell" ? (
           <>
-            <Text style={type.label}>Inversión</Text>
+            <Text style={type.label}>{t("wealth.investment")}</Text>
             <View style={styles.chips}>
               {kind === "buy" ? (
                 <Pressable
@@ -279,7 +283,7 @@ function TxComposerBody({
                   }}
                   style={[styles.chip, !assetId && styles.chipOn]}
                 >
-                  <Text style={[styles.chipLabel, !assetId && styles.chipLabelOn]}>Nueva</Text>
+                  <Text style={[styles.chipLabel, !assetId && styles.chipLabelOn]}>{t("wealth.newInvestment")}</Text>
                 </Pressable>
               ) : null}
               {liveAssets.map((asset) => {
@@ -306,7 +310,7 @@ function TxComposerBody({
         ) : null}
         {kind !== "transfer" ? (
           <>
-            <Text style={type.label}>Cuenta</Text>
+            <Text style={type.label}>{t("wealth.account")}</Text>
             <View style={styles.chips}>
               {accounts.map((account) => {
                 const active = accountId === account.id;
@@ -319,7 +323,7 @@ function TxComposerBody({
                     }}
                     style={[styles.chip, active && styles.chipOn]}
                   >
-                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{account.name}</Text>
+                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{accountDisplayName(account)}</Text>
                   </Pressable>
                 );
               })}
@@ -327,7 +331,7 @@ function TxComposerBody({
           </>
         ) : (
           <>
-            <Text style={type.label}>Desde</Text>
+            <Text style={type.label}>{t("wealth.from")}</Text>
             <View style={styles.chips}>
               {accounts.map((account) => {
                 const active = accountId === account.id;
@@ -340,12 +344,12 @@ function TxComposerBody({
                     }}
                     style={[styles.chip, active && styles.chipOn]}
                   >
-                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{account.name}</Text>
+                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{accountDisplayName(account)}</Text>
                   </Pressable>
                 );
               })}
             </View>
-            <Text style={type.label}>Hacia</Text>
+            <Text style={type.label}>{t("wealth.to")}</Text>
             <View style={styles.chips}>
               {accounts
                 .filter((account) => account.id !== accountId)
@@ -360,7 +364,7 @@ function TxComposerBody({
                       }}
                       style={[styles.chip, active && styles.chipOn]}
                     >
-                      <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{account.name}</Text>
+                      <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{accountDisplayName(account)}</Text>
                     </Pressable>
                   );
                 })}
@@ -369,10 +373,14 @@ function TxComposerBody({
         )}
         {categories.length ? (
           <>
-            <Text style={type.label}>Categoría</Text>
+            <Text style={type.label}>{t("wealth.category")}</Text>
             <View style={styles.chips}>
               {categories.map((item) => {
                 const active = category === item;
+                const label =
+                  kind === "income"
+                    ? t(`wealth.incomeCat.${item}`)
+                    : t(`wealth.expenseCat.${item}`);
                 return (
                   <Pressable
                     key={item}
@@ -382,7 +390,7 @@ function TxComposerBody({
                     }}
                     style={[styles.chip, active && styles.chipOn]}
                   >
-                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{item}</Text>
+                    <Text style={[styles.chipLabel, active && styles.chipLabelOn]}>{label}</Text>
                   </Pressable>
                 );
               })}
@@ -396,7 +404,7 @@ function TxComposerBody({
           onPress={() => void submit()}
           style={({ pressed }) => [styles.submit, { opacity: !canSubmit || busy ? 0.4 : pressed ? 0.86 : 1 }]}
         >
-          <Text style={styles.submitText}>{busy ? "…" : "Guardar"}</Text>
+          <Text style={styles.submitText}>{busy ? "…" : t("common.save")}</Text>
         </Pressable>
         {tx ? (
           <Pressable
@@ -406,16 +414,16 @@ function TxComposerBody({
             }}
             style={({ pressed }) => [styles.remove, { opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={styles.removeText}>Eliminar</Text>
+            <Text style={styles.removeText}>{t("common.delete")}</Text>
           </Pressable>
         ) : null}
       </SheetScrollView>
       <ConfirmDialog
         open={confirmDelete}
-        title="Eliminar movimiento"
-        message={tx ? `Se borra «${tx.title}» y se deshace su efecto en caja e inversiones.` : ""}
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        title={t("wealth.deleteTx")}
+        message={tx ? t("wealth.deleteTxConfirm", { title: tx.title }) : ""}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={busy}
         onCancel={() => {
@@ -430,7 +438,7 @@ function TxComposerBody({
               setConfirmDelete(false);
               onDone();
             } catch (err) {
-              setError(err instanceof Error ? err.message : "No se pudo eliminar.");
+              setError(err instanceof Error ? err.message : t("wealth.deleteFail"));
               setConfirmDelete(false);
             } finally {
               setBusy(false);

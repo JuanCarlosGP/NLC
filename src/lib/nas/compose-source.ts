@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { getAlbum, getAlbums, getArtists, searchCatalog } from "@/lib/db/catalog";
 import type { Album, AlbumDetail, Artist, MusicSource, PingResult, SearchResults } from "@/lib/nas/types";
 
@@ -39,7 +40,7 @@ export function composeSources(primary: MusicSource, extra: MusicSource): MusicS
     async getAlbum(id: string): Promise<AlbumDetail> {
       await hydrate();
       const album = await getAlbum(id);
-      if (!album) throw new Error("Álbum no encontrado.");
+      if (!album) throw new Error(t("nasExtra.albumMissing"));
       return album;
     },
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAlbums, getArtists } from "@/lib/db/catalog";
 import { nasScanOk } from "@/lib/db/from-source";
 import type { Album, Artist } from "@/lib/nas/types";
+import { t } from "@/lib/i18n/runtime";
 import { useSettings } from "@/lib/settings/settings-context";
 
 export function useArtist(id: string | undefined) {
@@ -24,7 +25,7 @@ export function useArtist(id: string | undefined) {
       setArtist(artists.find((item) => item.id === id) ?? null);
       setAlbums(allAlbums.filter((item) => item.artistId === id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo abrir el artista.");
+      setError(err instanceof Error ? err.message : t("artist.openError"));
     } finally {
       setLoading(false);
     }
@@ -34,7 +35,7 @@ export function useArtist(id: string | undefined) {
     if (ready) void refresh();
   }, [ready, refresh]);
 
-  const name = useMemo(() => artist?.name ?? "Artista", [artist]);
+  const name = useMemo(() => artist?.name ?? t("library.artist"), [artist]);
 
   return { artist, albums, loading, error, name };
 }

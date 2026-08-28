@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { loadPlaylists, savePlaylists } from "@/lib/db/catalog";
 import { getTrackArtworkUrl } from "@/lib/library/artwork-cache";
 import type { Track } from "@/lib/nas/types";
@@ -25,7 +26,7 @@ export async function upsertImportedPlaylist(playlist: ImportedPlaylist): Promis
 
 export async function renameImportedPlaylist(id: string, name: string): Promise<ImportedPlaylist[]> {
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("La playlist necesita un nombre.");
+  if (!trimmed) throw new Error(t("nasExtra.playlistNeedName"));
   const current = await loadPlaylists();
   const next = current.map((item) => (item.id === id ? { ...item, name: trimmed } : item));
   await savePlaylists(next);
@@ -34,7 +35,7 @@ export async function renameImportedPlaylist(id: string, name: string): Promise<
 
 export async function createEmptyImportedPlaylist(name: string): Promise<ImportedPlaylist[]> {
   const trimmed = name.trim();
-  if (!trimmed) throw new Error("La playlist necesita un nombre.");
+  if (!trimmed) throw new Error(t("nasExtra.playlistNeedName"));
   const playlist: ImportedPlaylist = {
     id: `local-${Date.now()}`,
     kind: "local",

@@ -34,6 +34,7 @@ import { formatPlaylistDuration } from "@/lib/spotify/txt";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
 import { usePlaylistActions } from "@/lib/spotify/playlist-actions-context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
+import { useI18n } from "@/lib/i18n/context";
 import { colors, coverTint, fonts, layout } from "@/lib/theme";
 
 const PAGE = 20;
@@ -48,6 +49,7 @@ export function ImportedEntityView({
   onDelete?: () => void | Promise<void>;
   onToggleLiked?: () => void;
 }) {
+  const { t } = useI18n();
   const { playTracks, current, playing, togglePlay, shuffle, toggleShuffle } = usePlayer();
   const { settings, token, ready: downloadReady } = useDownloadSettings();
   const { rematchPlaylist, reorderPlaylistTracks } = useSpotify();
@@ -98,9 +100,9 @@ export function ImportedEntityView({
     const offLabel =
       offTitles.length <= 4
         ? offTitles.join(", ")
-        : `${offTitles.slice(0, 4).join(", ")} y ${offTitles.length - 4} más`;
+        : t("importedEntity.andMore", { list: offTitles.slice(0, 4).join(", "), count: offTitles.length - 4 });
     return { inMobile, onNas, exact, offLabel, offCount: offTime.length };
-  }, [playlist.tracks]);
+  }, [playlist.tracks, t]);
   const rematchTried = useRef<string | null>(null);
 
   const local = playlist.kind === "local";
@@ -123,10 +125,10 @@ export function ImportedEntityView({
   const playingHere = Boolean(current && playable.some((track) => track.id === current.id));
   const tint = coverTint(playlist.id);
   const nasLabel = missing.length
-    ? `Descargar ${missing.length} con yt-dlp`
+    ? t("importedEntity.downloadPending", { count: missing.length })
     : playable.length
-      ? `${playable.length} en NAS`
-      : "Nada en NAS";
+      ? t("importedEntity.onNas", { count: playable.length })
+      : t("importedEntity.nothingOnNas");
   const nasColor = missing.length
     ? colors.accent
     : playable.length
@@ -153,7 +155,7 @@ export function ImportedEntityView({
       return;
     }
     if (!downloadReady) {
-      setFetchNote("Configura yt-dlp en Ajustes.");
+      setFetchNote(t("importedEntity.configureYtdlp"));
       return;
     }
     setConfirmSuccess(false);
@@ -169,7 +171,7 @@ export function ImportedEntityView({
     try {
       await checkDownloaderHealth(settings, token);
     } catch (err) {
-      setFetchNote(err instanceof Error ? err.message : "No se pudo conectar al downloader.");
+      setFetchNote(err instanceof Error ? err.message : t("importedEntity.downloaderFail"));
       setFetching(false);
       return;
     }
@@ -205,17 +207,17 @@ export function ImportedEntityView({
         }
         setFetchNote(
           failed
-            ? `Listo: ${done} descargadas, ${failed} con error. Rematcheando…`
-            : `${done} descargadas. Rematcheando con el NAS…`,
+            ? t("importedEntity.fetchPartialRematch", { done, failed })
+            : t("importedEntity.fetchOkRematch", { done }),
         );
         await rematchPlaylist(playlist.id);
         setFetchNote(
           failed
-            ? `Hecho: ${done} ok, ${failed} fallaron. Revisa Music/Canciones.`
-            : `Hecho: ${done} en Music/Canciones. Coincidencias actualizadas.`,
+            ? t("importedEntity.fetchPartialDone", { done, failed })
+            : t("importedEntity.fetchOkDone", { done }),
         );
       } catch (err) {
-        setFetchNote(err instanceof Error ? err.message : "No se pudo descargar.");
+        setFetchNote(err instanceof Error ? err.message : t("importedEntity.downloadFail"));
       } finally {
         setFetching(false);
       }
@@ -279,7 +281,7 @@ export function ImportedEntityView({
       <GestureDetector gesture={searchTap}>
       <Pressable
         accessibilityRole="search"
-        accessibilityLabel="Buscar canciones"
+        accessibilityLabel={t("importedEntity.searchTracks")}
         onPress={focusSearch}
         style={styles.searchBox}
       >
@@ -288,7 +290,7 @@ export function ImportedEntityView({
           ref={searchRef}
           value={query}
           onChangeText={setQuery}
-          placeholder="Buscar canciones"
+          placeholder={t("importedEntity.searchTracks")}
           placeholderTextColor={colors.muted}
           autoCorrect={false}
           autoCapitalize="none"
@@ -299,7 +301,7 @@ export function ImportedEntityView({
         {searching ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Borrar búsqueda"
+            accessibilityLabel={t("importedEntity.clearSearch")}
             hitSlop={8}
             onPress={() => setQuery("")}
           >
@@ -311,7 +313,7 @@ export function ImportedEntityView({
       <View style={styles.coverWrap}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Opciones de la playlist"
+          accessibilityLabel={t("importedEntity.options")}
           delayLongPress={350}
           onLongPress={() => openPlaylistActions(playlist)}
           style={styles.coverShadow}
@@ -327,8 +329,11 @@ export function ImportedEntityView({
         <Text style={styles.meta}>
           {[
             formatPlaylistDuration(totalMs),
-            `${playlist.tracks.length} temas`,
-            local ? "NAS" : `${playable.length} en NAS`,
+            t(
+              playlist.tracks.length === 1 ? "importedEntity.tracksOne" : "importedEntity.tracksMany",
+              { count: playlist.tracks.length },
+            ),
+            local ? t("importSheet.nas") : t("importedEntity.onNas", { count: playable.length }),
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -345,7 +350,7 @@ export function ImportedEntityView({
             )}
           </IconButton>
           <IconButton
-            label={liked ? "Quitar de inicio" : "Añadir a inicio"}
+            label={liked ? t("importedEntity.removeHome") : t("importedEntity.addHome")}
             onPress={() => onToggleLiked?.()}
           >
             <Heart
@@ -357,7 +362,7 @@ export function ImportedEntityView({
           </IconButton>
           {onDelete ? (
             <IconButton
-              label="Quitar playlist"
+              label={t("importedEntity.removePlaylist")}
               onPress={() => setConfirmRemove(true)}
             >
               <Trash2 size={20} color={colors.danger} strokeWidth={1.75} />
@@ -365,12 +370,12 @@ export function ImportedEntityView({
           ) : null}
         </View>
         <View style={styles.actionRight}>
-          <IconButton label={shuffle ? "Desactivar aleatorio" : "Aleatorio"} onPress={toggleShuffle}>
+          <IconButton label={shuffle ? t("importedEntity.shuffleOff") : t("importedEntity.shuffleOn")} onPress={toggleShuffle}>
             <Shuffle size={22} color={shuffle ? colors.accent : colors.inkSoft} strokeWidth={1.75} />
           </IconButton>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={playingHere && playing ? "Pausar" : "Reproducir"}
+            accessibilityLabel={playingHere && playing ? t("common.pause") : t("common.play")}
             disabled={!playable.length && !playingHere}
             onPress={onMainPlay}
             style={({ pressed }) => [
@@ -392,7 +397,7 @@ export function ImportedEntityView({
       {fetchNote ? <Text style={styles.fetchNote}>{fetchNote}</Text> : null}
 
       {searching && !filtered.length ? (
-        <Text style={styles.fetchNote}>Nada en esta playlist para «{query.trim()}».</Text>
+        <Text style={styles.fetchNote}>{t("importedEntity.emptySearch", { query: query.trim() })}</Text>
       ) : null}
 
       <SortablePlaylistTracks
@@ -427,16 +432,18 @@ export function ImportedEntityView({
           onPress={() => setVisible((count) => count + PAGE)}
           style={({ pressed }) => [styles.more, { opacity: pressed ? 0.8 : 1 }]}
         >
-          <Text style={styles.moreText}>Mostrar más ({playlist.tracks.length - visible} restantes)</Text>
+          <Text style={styles.moreText}>
+            {t("importedEntity.showMore", { count: playlist.tracks.length - visible })}
+          </Text>
         </Pressable>
       ) : null}
 
       <ConfirmDialog
         open={confirmRemove}
-        title="Eliminar playlist"
-        message={`Se quitará «${playlist.name}» de la biblioteca. Los archivos del NAS no se borran.`}
-        confirmLabel="Eliminar"
-        cancelLabel="Cancelar"
+        title={t("importedEntity.deleteTitle")}
+        message={t("importedEntity.deleteMessage")}
+        confirmLabel={t("common.delete")}
+        cancelLabel={t("common.cancel")}
         destructive
         busy={removing}
         onCancel={() => {
@@ -454,10 +461,10 @@ export function ImportedEntityView({
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Descargar al NAS"
-        message={`${missing.length} temas pendientes de descargar al NAS.`}
-        confirmLabel="Descargar"
-        cancelLabel="Cancelar"
+        title={t("importedEntity.downloadTitle")}
+        message={t("importedEntity.downloadMessage", { count: missing.length })}
+        confirmLabel={t("importedEntity.downloadTitle")}
+        cancelLabel={t("common.cancel")}
         destructive={false}
         busy={fetching && confirmOpen && !confirmSuccess}
         success={confirmSuccess}
@@ -469,17 +476,17 @@ export function ImportedEntityView({
 
       <ConfirmDialog
         open={infoOpen}
-        title="Estado en el NAS"
+        title={t("importedEntity.nasState")}
         message={[
-          `${nasStats.onNas} pistas en el NAS.`,
-          `${nasStats.inMobile} pistas en el móvil.`,
+          t("importedEntity.nasTracksOnNas", { count: nasStats.onNas }),
+          t("importedEntity.nasTracksOnPhone", { count: nasStats.inMobile }),
           nasStats.exact
-            ? "Coincidencia exacta en minutos con la playlist original."
+            ? t("importedEntity.nasExactMatch")
             : nasStats.offCount
-              ? `Sin tiempo exacto: ${nasStats.offLabel}.`
-              : "No hay coincidencia exacta de minutos con la playlist original.",
+              ? t("importedEntity.nasOffTime", { labels: nasStats.offLabel })
+              : t("importedEntity.nasNoExactMatch"),
         ].join("\n")}
-        confirmLabel="Entendido"
+        confirmLabel={t("common.understood")}
         info
         destructive={false}
         onCancel={() => setInfoOpen(false)}

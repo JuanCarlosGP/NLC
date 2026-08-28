@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import { Platform } from "react-native";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
 import { fetchYoutubeMusicEntity } from "@/lib/youtube/innertube";
@@ -16,22 +17,22 @@ async function fetchViaLocalApi(url: string): Promise<Omit<ImportedPlaylist, "im
     });
   } catch (err) {
     if (asNetworkError(err)) {
-      throw new Error("No hay respuesta del servidor web. Recarga la página.");
+      throw new Error(t("nasExtra.youtubeNoServer"));
     }
-    throw err instanceof Error ? err : new Error("No se pudo leer YouTube Music.");
+    throw err instanceof Error ? err : new Error(t("nasExtra.youtubeReadFail"));
   }
 
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
-    throw new Error("El servidor web no devolvió YouTube Music.");
+    throw new Error(t("nasExtra.youtubeBadResponse"));
   }
 
   const payload = (await response.json()) as Omit<ImportedPlaylist, "importedAt"> & { error?: string };
   if (!response.ok) {
-    throw new Error(payload.error || "No se pudo leer YouTube Music.");
+    throw new Error(payload.error || t("nasExtra.youtubeReadFail"));
   }
   if (!Array.isArray(payload.tracks) || !payload.tracks.length) {
-    throw new Error("Ese enlace no trajo canciones.");
+    throw new Error(t("nasExtra.youtubeEmpty"));
   }
   return payload;
 }
@@ -42,7 +43,7 @@ export async function fetchPublicYoutubeMusic(
 ): Promise<Omit<ImportedPlaylist, "importedAt">> {
   const ref = parsed ?? parseYoutubeMusicUrl(url);
   if (!ref) {
-    throw new Error("Pega un enlace de playlist, álbum, canción o mix de YouTube Music.");
+    throw new Error(t("nasExtra.youtubeInvalidUrl"));
   }
 
   if (Platform.OS === "web") {

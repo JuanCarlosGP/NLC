@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n/runtime";
 import type { NasSettings } from "@/lib/settings/storage";
 import { nasBaseUrl } from "@/lib/settings/storage";
 import type {
@@ -43,7 +44,7 @@ function encodePassword(password: string): string {
 function mapArtist(raw: Record<string, unknown>): Artist {
   return {
     id: String(raw.id ?? ""),
-    name: String(raw.name ?? "Artista"),
+    name: String(raw.name ?? t("nasExtra.unknownArtist")),
     albumCount: typeof raw.albumCount === "number" ? raw.albumCount : undefined,
     coverId: raw.coverArt ? String(raw.coverArt) : raw.id ? String(raw.id) : null,
   };
@@ -52,9 +53,9 @@ function mapArtist(raw: Record<string, unknown>): Artist {
 function mapAlbum(raw: Record<string, unknown>): Album {
   return {
     id: String(raw.id ?? ""),
-    name: String(raw.name ?? raw.album ?? "Álbum"),
+    name: String(raw.name ?? raw.album ?? t("playlistActions.album")),
     artistId: String(raw.artistId ?? ""),
-    artistName: String(raw.artist ?? "Artista"),
+    artistName: String(raw.artist ?? t("nasExtra.unknownArtist")),
     year: typeof raw.year === "number" ? raw.year : null,
     coverId: raw.coverArt ? String(raw.coverArt) : raw.id ? String(raw.id) : null,
     trackCount: typeof raw.songCount === "number" ? raw.songCount : undefined,
@@ -65,7 +66,7 @@ function mapTrack(raw: Record<string, unknown>): Track {
   const durationSec = typeof raw.duration === "number" ? raw.duration : 0;
   return {
     id: String(raw.id ?? ""),
-    title: String(raw.title ?? "Pista"),
+    title: String(raw.title ?? t("nasExtra.unknownTrack")),
     albumId: String(raw.albumId ?? ""),
     albumName: String(raw.album ?? ""),
     artistId: String(raw.artistId ?? ""),
@@ -117,14 +118,14 @@ export function createOpenSubsonicSource(
       }
       const json = (await response.json()) as SubsonicEnvelope;
       const body = json["subsonic-response"];
-      if (!body) throw new Error("Respuesta OpenSubsonic vacía.");
+      if (!body) throw new Error(t("nasExtra.subsonicFail"));
       if (body.status === "failed") {
-        throw new Error(body.error?.message ?? "Error del servidor de música.");
+        throw new Error(body.error?.message ?? t("nasExtra.subsonicFail"));
       }
       return body;
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        throw new Error("Sin respuesta del NAS. ¿Está Navidrome en marcha?");
+        throw new Error(t("nas.timeout"));
       }
       throw error;
     } finally {
@@ -138,25 +139,25 @@ export function createOpenSubsonicSource(
     async ping(): Promise<PingResult> {
       try {
         if (!settings.host.trim()) {
-          return { ok: false, message: "Falta la IP del servidor." };
+          return { ok: false, message: t("nasExtra.subsonicHost") };
         }
         if (!settings.username.trim() && !password) {
-          return { ok: false, message: "Faltan el usuario y la contraseña." };
+          return { ok: false, message: t("nasExtra.subsonicAuth") };
         }
-        if (!settings.username.trim()) return { ok: false, message: "Falta el usuario." };
-        if (!password) return { ok: false, message: "Falta la contraseña." };
+        if (!settings.username.trim()) return { ok: false, message: t("nas.missingUser") };
+        if (!password) return { ok: false, message: t("nas.missingPass") };
         const body = await request("ping.view");
         const name = body.type ? String(body.type) : "Navidrome";
         return {
           ok: true,
-          message: `Hay conexión con ${name}.`,
+          message: t("nas.connected"),
           serverName: name,
           version: body.version,
         };
       } catch (error) {
         return {
           ok: false,
-          message: error instanceof Error ? error.message : "No se pudo conectar.",
+          message: error instanceof Error ? error.message : t("nasExtra.subsonicFail"),
         };
       }
     },

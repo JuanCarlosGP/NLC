@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { colors, fonts } from "@/lib/theme";
+import { useI18n } from "@/lib/i18n/context";
 import { formatGoalEta, type GoalProgress } from "@/lib/wealth/compute";
 import { formatEuro } from "@/lib/wealth/money";
 
@@ -10,6 +11,7 @@ export function GoalRow({
   progress: GoalProgress;
   onPress: () => void;
 }) {
+  const { t } = useI18n();
   const pctLabel = `${Math.round(progress.pct * 100)} %`;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.72 : 1 }]}>
@@ -19,7 +21,10 @@ export function GoalRow({
             {progress.goal.name}
           </Text>
           <Text numberOfLines={1} style={styles.sub}>
-            {progress.scopeLabel} · {formatEuro(progress.current)} de {formatEuro(progress.goal.target)}
+            {progress.scopeLabel} · {t("wealth.amountOf", {
+              current: formatEuro(progress.current),
+              target: formatEuro(progress.goal.target),
+            })}
           </Text>
         </View>
         <Text style={[styles.pct, progress.reached && styles.pctDone]}>{pctLabel}</Text>

@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 const EAS_PROJECT_ID = "eaae8e25-f5ae-48b4-9ca5-1023d77701f7";
+const easBuild = process.env.EAS_BUILD === "true";
 const googleServices = fs.existsSync(path.join(__dirname, "google-services.json"))
   ? "./google-services.json"
   : undefined;
@@ -12,14 +13,18 @@ export default {
     name: "NLC",
     slug: "nlc",
     version: pkg.version,
-    runtimeVersion: {
-      policy: "appVersion",
-    },
-    updates: {
-      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
-      fallbackToCacheTimeout: 0,
-      checkAutomatically: "ON_ERROR_RECOVERY",
-    },
+    // Expo Go speaks exposdk:54.x and loads JS from Metro.
+    // EAS APKs use appVersion + u.expo.dev for OTA.
+    runtimeVersion: easBuild ? { policy: "appVersion" } : { policy: "sdkVersion" },
+    ...(easBuild
+      ? {
+          updates: {
+            url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+            fallbackToCacheTimeout: 0,
+            checkAutomatically: "ON_ERROR_RECOVERY",
+          },
+        }
+      : {}),
     scheme: "nlc",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -88,7 +93,8 @@ export default {
       ],
     ],
     web: {
-      output: "server",
+      // "server" makes GET / HTML; Expo Go then fails to load the native bundle.
+      output: easBuild ? "server" : "single",
     },
     experiments: {
       typedRoutes: true,
