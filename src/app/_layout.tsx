@@ -29,6 +29,7 @@ import { PlayerUiProvider } from "@/lib/player/player-ui-context";
 import { TrackActionsProvider } from "@/lib/player/track-actions-context";
 import { VideoActionsProvider } from "@/lib/video/video-actions-context";
 import { OfflineProvider } from "@/lib/offline/offline-context";
+import { BridgeHost } from "@/lib/bridge/bridge-host";
 import { SettingsProvider, useSettings } from "@/lib/settings/settings-context";
 import { LocaleProvider, useI18n } from "@/lib/i18n/context";
 import { ProductivityProvider } from "@/lib/productivity/productivity-context";
@@ -80,6 +81,7 @@ export default function RootLayout() {
     <ErrorBoundary>
     <SafeAreaProvider>
       <SettingsProvider>
+        <BridgeHost>
         <LocaleProvider>
         <OtaBootstrap />
         <OnboardingGate>
@@ -167,6 +169,7 @@ export default function RootLayout() {
         </ZoneProvider>
         </OnboardingGate>
         </LocaleProvider>
+        </BridgeHost>
       </SettingsProvider>
     </SafeAreaProvider>
     </ErrorBoundary>

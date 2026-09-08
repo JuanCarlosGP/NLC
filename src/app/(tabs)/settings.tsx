@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react-native";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useActiveProjects, useProductivity } from "@/lib/productivity/productivity-context";
 import { useWealth } from "@/lib/wealth/wealth-context";
+import { DesktopBridgeSheet } from "@/components/settings/desktop-bridge-sheet";
 import { DownloadSheet } from "@/components/settings/download-sheet";
 import { NasExplorerSheet } from "@/components/settings/nas-explorer-sheet";
 import { OfflineSheet } from "@/components/settings/offline-sheet";
@@ -15,6 +16,7 @@ import { Screen } from "@/components/ui/screen";
 import { useAppUpdate } from "@/hooks/use-app-update";
 import { useDownloadSettings } from "@/hooks/use-download-settings";
 import { useNasSettings } from "@/hooks/use-nas-settings";
+import { loadBridgeToken, loadDesktopHost } from "@/lib/bridge/session";
 import { sendTestPush } from "@/lib/ota/test-push";
 import { formatOfflineBytes } from "@/lib/offline/downloader";
 import { useOffline } from "@/lib/offline/offline-context";
@@ -54,6 +56,9 @@ export default function SettingsScreen() {
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [zonesOpen, setZonesOpen] = useState(false);
   const [explorerOpen, setExplorerOpen] = useState(false);
+  const [desktopOpen, setDesktopOpen] = useState(false);
+  const [desktopLinked, setDesktopLinked] = useState(false);
+  const [desktopSummary, setDesktopSummary] = useState(() => t("settings.desktopIdle"));
   const [pushStatus, setPushStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
   const [pushSummary, setPushSummary] = useState(() => t("settings.pushIdle"));
   const videoSettings = videoSourceSettings(settings);
@@ -75,6 +80,24 @@ export default function SettingsScreen() {
       useHttps: false,
     });
   }, [setSettings, settings]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const [token, host] = await Promise.all([loadBridgeToken(), loadDesktopHost()]);
+      if (cancelled) return;
+      if (token && host) {
+        setDesktopLinked(true);
+        setDesktopSummary(t("settings.desktopLinked", { host }));
+      } else {
+        setDesktopLinked(false);
+        setDesktopSummary(t("settings.desktopIdle"));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
 
   const localSummary = settings.localFolderUri
     ? settings.localFolderName || t("common.phoneFolder")
@@ -400,6 +423,19 @@ export default function SettingsScreen() {
           </>
         ) : null}
 
+        <SettingsGroup label={t("settings.desktop")} hint={t("desktop.hint")}>
+          <SettingsRow
+            title={t("desktop.title")}
+            summary={desktopSummary}
+            ready={desktopLinked}
+            showStatus
+            onPress={() => {
+              triggerUiHaptic();
+              setDesktopOpen(true);
+            }}
+          />
+        </SettingsGroup>
+
         <SettingsGroup label={t("settings.zones")}>
           <SettingsRow
             title={t("settings.zonePicker")}
@@ -594,6 +630,16 @@ export default function SettingsScreen() {
         onOpenChange={setExplorerOpen}
         settings={settings}
         password={password}
+      />
+      <DesktopBridgeSheet
+        open={desktopOpen}
+        onOpenChange={setDesktopOpen}
+        onStatus={(linked, summary) => {
+          setDesktopLinked(linked);
+          setDesktopSummary(
+            linked ? t("settings.desktopLinked", { host: summary }) : summary,
+          );
+        }}
       />
       <ConfirmDialog
         open={clearOpen}

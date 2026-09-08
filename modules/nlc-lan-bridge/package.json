@@ -1,0 +1,10 @@
+{
+  "name": "nlc-lan-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "react-native": "src/index.ts",
+  "types": "src/index.ts",
+  "description": "LAN HTTP bridge so a desktop TUI can use this phone as a NAS proxy.",
+  "keywords": ["react-native", "expo"]
+}

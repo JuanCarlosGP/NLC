@@ -31,12 +31,15 @@
     "start": "expo start",
     "start:clean": "expo start --clear",
     "start:go": "adb reverse tcp:8082 tcp:8082 && EXPO_OFFLINE=1 expo start --localhost --port 8082",
-    "android": "expo start --android",
+    "android": "expo run:android",
     "postinstall": "node scripts/fix-expo-platform-header.mjs",
     "typecheck": "tsc --noEmit",
+    "tui": "cargo run --manifest-path tui/Cargo.toml",
+    "tui:test": "cargo test --manifest-path tui/Cargo.toml",
     "update:preview": "eas update --channel preview && node scripts/notify-ota.mjs preview",
     "update:production": "eas update --channel production && node scripts/notify-ota.mjs production",
-    "apk:release": "node scripts/release-apk.mjs"
+    "apk:release": "node scripts/release-apk.mjs",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
@@ -48,6 +51,7 @@
     "expo-asset": "~12.0.13",
     "expo-audio": "~1.1.1",
     "expo-auth-session": "~7.0.11",
+    "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.9",
     "expo-crypto": "~15.0.9",
     "expo-file-system": "~19.0.24",
@@ -67,6 +71,7 @@
     "expo-video": "~3.0.16",
     "expo-web-browser": "~15.0.11",
     "lucide-react-native": "^1.23.0",
+    "nlc-lan-bridge": "file:modules/nlc-lan-bridge",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",

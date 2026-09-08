@@ -13,18 +13,15 @@ export default {
     name: "NLC",
     slug: "nlc",
     version: pkg.version,
-    // Expo Go speaks exposdk:54.x and loads JS from Metro.
-    // EAS APKs use appVersion + u.expo.dev for OTA.
-    runtimeVersion: easBuild ? { policy: "appVersion" } : { policy: "sdkVersion" },
-    ...(easBuild
-      ? {
-          updates: {
-            url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
-            fallbackToCacheTimeout: 0,
-            checkAutomatically: "ON_ERROR_RECOVERY",
-          },
-        }
-      : {}),
+    // Same value locally and on EAS. Gating this on EAS_BUILD made the CLI
+    // fingerprint exposdk:54.0.0 while the worker used appVersion, and
+    // Configure expo-updates aborted.
+    runtimeVersion: { policy: "appVersion" },
+    updates: {
+      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+      fallbackToCacheTimeout: 0,
+      checkAutomatically: "ON_ERROR_RECOVERY",
+    },
     scheme: "nlc",
     orientation: "portrait",
     icon: "./assets/icon.png",
@@ -45,6 +42,7 @@ export default {
         "android.permission.INTERNET",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
         "android.permission.WAKE_LOCK",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM",
@@ -69,6 +67,13 @@ export default {
         {
           microphonePermission: false,
           recordAudioAndroid: false,
+        },
+      ],
+      "./plugins/with-lan-bridge.js",
+      [
+        "expo-camera",
+        {
+          cameraPermission: "NLC uses the camera to pair the desktop TUI.",
         },
       ],
       "./plugins/with-media-skip-buttons.js",
