@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import { isLanBridgeAvailable, startLanBridge, stopLanBridge } from "nlc-lan-bridge";
+import { startLanBridge, stopLanBridge } from "nlc-lan-bridge";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { Field } from "@/components/settings/source-fields";
@@ -19,6 +18,11 @@ import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
+type QrScannerProps = {
+  enabled: boolean;
+  onScan: (data: string) => void;
+};
+
 export function DesktopBridgeSheet({
   open,
   onOpenChange,
@@ -29,12 +33,12 @@ export function DesktopBridgeSheet({
   onStatus: (linked: boolean, summary: string) => void;
 }) {
   const { t } = useI18n();
-  const [permission, requestPermission] = useCameraPermissions();
   const [paste, setPaste] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [linkedHost, setLinkedHost] = useState<string | null>(null);
   const [scanned, setScanned] = useState(false);
+  const [Scanner, setScanner] = useState<ComponentType<QrScannerProps> | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -49,6 +53,21 @@ export function DesktopBridgeSheet({
       setLinkedHost(token && host ? host : null);
     })();
   }, [open]);
+
+  useEffect(() => {
+    if (!open || linkedHost || Scanner) return;
+    let cancelled = false;
+    void import("@/components/settings/desktop-qr-scanner")
+      .then((mod) => {
+        if (!cancelled) setScanner(() => mod.DesktopQrScanner);
+      })
+      .catch(() => {
+        // Camera native module missing: pairing still works by pasting the link.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, linkedHost, Scanner]);
 
   async function ensureNotifyPermission() {
     if (Platform.OS !== "android" || Platform.Version < 33) return;
@@ -101,8 +120,6 @@ export function DesktopBridgeSheet({
     }
   }
 
-  const cameraOn = isLanBridgeAvailable && open && !linkedHost && !busy && Boolean(permission?.granted);
-
   return (
     <BottomSheet
       open={open}
@@ -117,7 +134,7 @@ export function DesktopBridgeSheet({
           <Text style={styles.hint}>{t("desktop.hint")}</Text>
         </View>
 
-        {!isLanBridgeAvailable ? <Text style={styles.error}>{t("desktop.androidOnly")}</Text> : null}
+        {Platform.OS !== "android" ? <Text style={styles.error}>{t("desktop.androidOnly")}</Text> : null}
 
         {linkedHost ? (
           <View style={styles.block}>
@@ -128,34 +145,17 @@ export function DesktopBridgeSheet({
           </View>
         ) : (
           <>
-            {permission && !permission.granted ? (
-              <Pressable
-                onPress={() => {
+            {Scanner ? (
+              <Scanner
+                enabled={!busy}
+                onScan={(data) => {
+                  if (scanned || busy) return;
+                  setScanned(true);
                   triggerUiHaptic();
-                  void requestPermission();
+                  void connect(data);
                 }}
-                style={styles.button}
-              >
-                <Text style={styles.buttonLabel}>{t("desktop.camera")}</Text>
-              </Pressable>
+              />
             ) : null}
-
-            {cameraOn ? (
-              <View style={styles.cameraWrap}>
-                <CameraView
-                  style={styles.camera}
-                  facing="back"
-                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                  onBarcodeScanned={({ data }) => {
-                    if (scanned || busy) return;
-                    setScanned(true);
-                    triggerUiHaptic();
-                    void connect(data);
-                  }}
-                />
-              </View>
-            ) : null}
-
             <Field
               label={t("desktop.paste")}
               value={paste}
@@ -189,13 +189,6 @@ const styles = StyleSheet.create({
   hint: { color: colors.muted, fontFamily: fonts.sans, fontSize: 14, lineHeight: 20 },
   block: { gap: 12 },
   status: { color: colors.inkSoft, fontFamily: fonts.sans, fontSize: 15 },
-  cameraWrap: {
-    height: 240,
-    overflow: "hidden",
-    borderRadius: 16,
-    backgroundColor: colors.sheetRaised,
-  },
-  camera: { flex: 1 },
   button: {
     backgroundColor: colors.accent,
     borderRadius: 12,

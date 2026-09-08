@@ -3,6 +3,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { useActiveProjects, useProductivity } from "@/lib/productivity/productivity-context";
 import { useWealth } from "@/lib/wealth/wealth-context";
 import { DesktopBridgeSheet } from "@/components/settings/desktop-bridge-sheet";
@@ -631,6 +632,7 @@ export default function SettingsScreen() {
         settings={settings}
         password={password}
       />
+      <ErrorBoundary>
       <DesktopBridgeSheet
         open={desktopOpen}
         onOpenChange={setDesktopOpen}
@@ -641,6 +643,7 @@ export default function SettingsScreen() {
           );
         }}
       />
+      </ErrorBoundary>
       <ConfirmDialog
         open={clearOpen}
         title={t("settings.clearDoneTitle")}
