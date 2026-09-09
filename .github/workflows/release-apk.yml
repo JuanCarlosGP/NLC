@@ -25,7 +25,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  gradle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Compile Android debug APK
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.1.12297006"
+          npm run apk:check
+
   apk:
+    needs: gradle
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
