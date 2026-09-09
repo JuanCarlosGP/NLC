@@ -50,8 +50,8 @@ export default function DesktopBridgeScreen() {
         }
       }
       const { startLanBridge } = await import("nlc-lan-bridge");
-      await startLanBridge(BRIDGE_PORT, parsed.token);
-      await pairWithDesktop(parsed.host, parsed.port, parsed.token);
+      const started = await startLanBridge(BRIDGE_PORT, parsed.token);
+      await pairWithDesktop(parsed.host, parsed.port, parsed.token, started.lanAddress);
       await saveBridgeToken(parsed.token);
       await saveDesktopHost(parsed.host);
       setLinkedHost(parsed.host);
