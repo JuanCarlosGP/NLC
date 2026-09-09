@@ -1,5 +1,5 @@
 {
-  "platforms": [],
+  "platforms": ["android"],
   "android": {
     "modules": ["app.nlc.lanbridge.NlcLanBridgeModule"]
   }

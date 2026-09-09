@@ -41,7 +41,7 @@ export const isLanBridgeAvailable = Platform.OS === "android" && loadNative() !=
 
 export async function startLanBridge(port: number, token: string): Promise<BridgeStartResult> {
   const mod = loadNative();
-  if (!mod) throw new Error("Lan bridge is Android-only");
+  if (!mod) throw new Error("Lan bridge native module is missing");
   return mod.start(port, token);
 }
 

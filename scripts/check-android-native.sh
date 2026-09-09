@@ -17,8 +17,8 @@ cd "$root"
 export CI=1
 npx expo prebuild --platform android --no-install
 
-if grep -R -q "nlc-lan-bridge" android --include='*.gradle' --include='*.kts' 2>/dev/null; then
-  echo "nlc-lan-bridge sigue enlazado en android/. Ese módulo ha tumbado EAS."
+if ! npx expo-modules-autolinking resolve --platform android 2>/dev/null | grep -q "nlc-lan-bridge"; then
+  echo "nlc-lan-bridge is not autolinked. The TUI pair will not work."
   exit 1
 fi
 

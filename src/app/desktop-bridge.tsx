@@ -3,6 +3,7 @@ import { PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from 
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/ui/screen";
 import { Field } from "@/components/settings/source-fields";
+import { DesktopQrCamera } from "@/components/settings/desktop-qr-camera";
 import { pairWithDesktop } from "@/lib/bridge/pair";
 import {
   BRIDGE_PORT,
@@ -57,7 +58,10 @@ export default function DesktopBridgeScreen() {
       if (router.canGoBack()) router.back();
       else router.replace("/(tabs)/settings");
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("desktop.pairFail"));
+      const message = err instanceof Error ? err.message : "";
+      setError(
+        message.includes("native module") ? t("desktop.androidOnly") : message || t("desktop.pairFail"),
+      );
       try {
         const { stopLanBridge } = await import("nlc-lan-bridge");
         await stopLanBridge();
@@ -97,6 +101,7 @@ export default function DesktopBridgeScreen() {
         </View>
       ) : (
         <View style={styles.block}>
+          <DesktopQrCamera disabled={busy} onScan={(raw) => void connect(raw)} />
           <Field
             label={t("desktop.paste")}
             value={paste}

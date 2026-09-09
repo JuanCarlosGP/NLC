@@ -118,7 +118,7 @@ object LanBridgeServer {
         writeStatus(socket.getOutputStream(), 401, "application/json", """{"error":"unauthorized"}""")
         return
       }
-      const method = parsed.method.uppercase()
+      val method = parsed.method.uppercase()
       if (method != "GET" && method != "HEAD") {
         writeStatus(socket.getOutputStream(), 405, "application/json", """{"error":"method"}""")
         return

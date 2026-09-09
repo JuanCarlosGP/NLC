@@ -4,6 +4,7 @@ dist/
 web-build/
 /android/
 /ios/
+modules/**/android/build/
 *.jks
 *.p8
 *.p12
