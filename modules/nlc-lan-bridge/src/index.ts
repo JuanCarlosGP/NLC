@@ -37,7 +37,7 @@ function loadNative(): NativeBridge | null {
   }
 }
 
-export const isLanBridgeAvailable = Platform.OS === "android";
+export const isLanBridgeAvailable = Platform.OS === "android" && loadNative() != null;
 
 export async function startLanBridge(port: number, token: string): Promise<BridgeStartResult> {
   const mod = loadNative();
