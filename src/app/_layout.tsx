@@ -139,6 +139,7 @@ export default function RootLayout() {
                       <Stack.Screen name="wealth/asset/[id]" />
                       <Stack.Screen name="now-playing" />
                       <Stack.Screen name="queue" />
+                      <Stack.Screen name="desktop-bridge" />
                     </Stack>
                     <MiniPlayer />
                     <Dock />

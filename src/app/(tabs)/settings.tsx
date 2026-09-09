@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { useActiveProjects, useProductivity } from "@/lib/productivity/productivity-context";
 import { useWealth } from "@/lib/wealth/wealth-context";
-import { DesktopBridgeSheet } from "@/components/settings/desktop-bridge-sheet";
 import { DownloadSheet } from "@/components/settings/download-sheet";
 import { NasExplorerSheet } from "@/components/settings/nas-explorer-sheet";
 import { OfflineSheet } from "@/components/settings/offline-sheet";
@@ -57,7 +55,6 @@ export default function SettingsScreen() {
   const [offlineOpen, setOfflineOpen] = useState(false);
   const [zonesOpen, setZonesOpen] = useState(false);
   const [explorerOpen, setExplorerOpen] = useState(false);
-  const [desktopOpen, setDesktopOpen] = useState(false);
   const [desktopLinked, setDesktopLinked] = useState(false);
   const [desktopSummary, setDesktopSummary] = useState(() => t("settings.desktopIdle"));
   const [pushStatus, setPushStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
@@ -432,7 +429,7 @@ export default function SettingsScreen() {
             showStatus
             onPress={() => {
               triggerUiHaptic();
-              setDesktopOpen(true);
+              router.push("/desktop-bridge" as Href);
             }}
           />
         </SettingsGroup>
@@ -632,18 +629,6 @@ export default function SettingsScreen() {
         settings={settings}
         password={password}
       />
-      <ErrorBoundary>
-      <DesktopBridgeSheet
-        open={desktopOpen}
-        onOpenChange={setDesktopOpen}
-        onStatus={(linked, summary) => {
-          setDesktopLinked(linked);
-          setDesktopSummary(
-            linked ? t("settings.desktopLinked", { host: summary }) : summary,
-          );
-        }}
-      />
-      </ErrorBoundary>
       <ConfirmDialog
         open={clearOpen}
         title={t("settings.clearDoneTitle")}
