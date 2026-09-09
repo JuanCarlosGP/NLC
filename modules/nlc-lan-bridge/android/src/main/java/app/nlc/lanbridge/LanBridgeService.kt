@@ -9,7 +9,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import androidx.core.app.NotificationCompat
 
 class LanBridgeService : Service() {
   override fun onBind(intent: Intent?): IBinder? = null
@@ -17,7 +16,7 @@ class LanBridgeService : Service() {
   override fun onCreate() {
     super.onCreate()
     ensureChannel()
-    val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+    val notification = notificationBuilder()
       .setContentTitle("NLC")
       .setContentText("Desktop bridge")
       .setSmallIcon(android.R.drawable.stat_sys_upload)
@@ -36,6 +35,15 @@ class LanBridgeService : Service() {
   override fun onDestroy() {
     LanBridgeServer.stop()
     super.onDestroy()
+  }
+
+  private fun notificationBuilder(): Notification.Builder {
+    return if (Build.VERSION.SDK_INT >= 26) {
+      Notification.Builder(this, CHANNEL_ID)
+    } else {
+      @Suppress("DEPRECATION")
+      Notification.Builder(this)
+    }
   }
 
   private fun ensureChannel() {
