@@ -5,4 +5,8 @@ plugins {
 
 android {
   namespace "app.nlc.lanbridge"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
 }
