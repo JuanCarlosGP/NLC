@@ -21,6 +21,12 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<Receiver<Session>, String> {
     let _ = (offer.ip, offer.url);
     thread::spawn(move || {
         for mut request in server.incoming_requests() {
+            eprintln!(
+                "nlc-tui pair {} {} from {:?}",
+                request.method(),
+                request.url(),
+                request.remote_addr()
+            );
             let ok_method = *request.method() == Method::Post && request.url().starts_with("/pair");
             let auth = request
                 .headers()

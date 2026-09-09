@@ -94,6 +94,7 @@ export const settingsEn = {
     linkedTo: "Linked to {host}",
     badQr: "That code is not an NLC desktop pair.",
     pairFail: "Could not reach the TUI. Same Wi-Fi?",
+    pairNetwork: "No reply from {url}. Is the TUI still on the QR, on this Wi-Fi, with port 7420 open?",
   },
   sourceSheet: {
     title: "Source",
@@ -459,6 +460,7 @@ export const settingsEs = {
     linkedTo: "Vinculado a {host}",
     badQr: "Ese código no es un emparejamiento NLC.",
     pairFail: "No se alcanzó la TUI. ¿Misma Wi-Fi?",
+    pairNetwork: "No hay respuesta de {url}. ¿La TUI sigue en el QR, en este Wi-Fi y con el puerto 7420 abierto?",
   },
   sourceSheet: {
     title: "Fuente",
