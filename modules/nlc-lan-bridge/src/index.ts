@@ -18,6 +18,7 @@ type NativeBridge = {
   start(port: number, token: string): Promise<BridgeStartResult>;
   stop(): Promise<void>;
   getLanAddress(): string;
+  pairToDesktop(host: string, port: number, token: string, jsonBody: string): Promise<string>;
   resolveJson(id: string, status: number, body: string): void;
   resolveStream(id: string, uri: string, headersJson: string): void;
   fail(id: string, status: number, message: string): void;
@@ -49,8 +50,10 @@ export async function stopLanBridge(): Promise<void> {
   await loadNative()?.stop();
 }
 
-export function getLanAddress(): string {
-  return loadNative()?.getLanAddress() ?? "0.0.0.0";
+export async function pairToDesktop(host: string, port: number, token: string, jsonBody: string): Promise<string> {
+  const mod = loadNative();
+  if (!mod) throw new Error("Lan bridge native module is missing");
+  return mod.pairToDesktop(host, port, token, jsonBody);
 }
 
 export function resolveBridgeJson(id: string, status: number, body: unknown): void {

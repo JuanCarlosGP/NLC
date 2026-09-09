@@ -40,6 +40,10 @@ class NlcLanBridgeModule : Module() {
       LanBridgeServer.lanAddress()
     }
 
+    AsyncFunction("pairToDesktop") { host: String, port: Int, token: String, jsonBody: String ->
+      LanBridgeServer.postPair(host, port, token, jsonBody)
+    }
+
     AsyncFunction("start") { port: Int, token: String ->
       val ctx = appContext.reactContext ?: throw IllegalStateException("React context lost")
       val bound = LanBridgeServer.start(port, token) { reqId, method, path, query, range ->

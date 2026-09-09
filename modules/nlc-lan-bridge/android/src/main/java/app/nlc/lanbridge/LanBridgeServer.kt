@@ -105,6 +105,35 @@ object LanBridgeServer {
     return "0.0.0.0"
   }
 
+  fun postPair(host: String, port: Int, token: String, jsonBody: String): String {
+    val name = if (host.contains(":") && !host.startsWith("[")) "[$host]" else host
+    val url = URL("http://$name:$port/pair")
+    val conn = (url.openConnection() as HttpURLConnection).apply {
+      connectTimeout = 8_000
+      readTimeout = 8_000
+      requestMethod = "POST"
+      doOutput = true
+      setRequestProperty("Authorization", "Bearer $token")
+      setRequestProperty("Content-Type", "application/json")
+      setRequestProperty("Accept", "application/json")
+    }
+    try {
+      conn.outputStream.use { it.write(jsonBody.toByteArray(Charsets.UTF_8)) }
+      val code = conn.responseCode
+      val stream = if (code >= 400) conn.errorStream else conn.inputStream
+      val text = stream?.bufferedReader(Charsets.UTF_8)?.readText().orEmpty()
+      if (code !in 200..299) {
+        throw IllegalStateException("pair $code ${text.ifBlank { url.toString() }}")
+      }
+      return text
+    } catch (error: Exception) {
+      if (error is IllegalStateException) throw error
+      throw IllegalStateException("pair ${url}: ${error.message ?: error.javaClass.simpleName}")
+    } finally {
+      conn.disconnect()
+    }
+  }
+
   private fun handleClient(socket: Socket, onRequest: (String, String, String, String, String?) -> Unit) {
     socket.soTimeout = 30_000
     try {

@@ -1,4 +1,4 @@
-import { getLanAddress } from "nlc-lan-bridge";
+import { getLanAddress, pairToDesktop } from "nlc-lan-bridge";
 import { t } from "@/lib/i18n/runtime";
 import { BRIDGE_PORT, loadOrCreateDeviceId } from "@/lib/bridge/session";
 
@@ -11,30 +11,15 @@ export async function pairWithDesktop(host: string, port: number, token: string)
   const deviceId = await loadOrCreateDeviceId();
   const lanAddress = getLanAddress();
   const url = pairHttpUrl(host, port);
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 12_000);
-  let response: Response;
+  const jsonBody = JSON.stringify({
+    phoneLanIp: lanAddress,
+    bridgePort: BRIDGE_PORT,
+    deviceId,
+  });
   try {
-    response = await fetch(url, {
-      method: "POST",
-      signal: ctrl.signal,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        phoneLanIp: lanAddress,
-        bridgePort: BRIDGE_PORT,
-        deviceId,
-      }),
-    });
-  } catch {
-    throw new Error(t("desktop.pairNetwork", { url }));
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(text || `pair ${response.status}`);
+    await pairToDesktop(host, port, token, jsonBody);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : "";
+    throw new Error(t("desktop.pairNetwork", { url: detail ? `${url} (${detail})` : url }));
   }
 }
