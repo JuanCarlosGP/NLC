@@ -14,6 +14,11 @@ export function OtaBootstrap() {
       if (cancelled) return;
       unsub = mod.subscribeOtaNotifications();
     });
+    // APK JS checks updates only from Settings or a notification tap.
+    // Settings currently crashes on the shipped APK, so apply here on launch.
+    void import("@/lib/ota/apply-update").then((mod) => {
+      if (!cancelled) void mod.applyOtaUpdate();
+    });
     return () => {
       cancelled = true;
       unsub();

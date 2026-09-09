@@ -20,7 +20,8 @@ export default {
     updates: {
       url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
       fallbackToCacheTimeout: 0,
-      checkAutomatically: "ON_ERROR_RECOVERY",
+      // Native: only a new APK picks this up. JS also calls applyOtaUpdate on launch.
+      checkAutomatically: "ON_LOAD",
     },
     scheme: "nlc",
     orientation: "portrait",

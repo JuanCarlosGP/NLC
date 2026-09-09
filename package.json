@@ -34,6 +34,7 @@
     "android": "expo run:android",
     "postinstall": "node scripts/fix-expo-platform-header.mjs",
     "typecheck": "tsc --noEmit",
+    "assert:settings": "node scripts/assert-no-camera-in-settings.mjs",
     "tui": "cargo run --manifest-path tui/Cargo.toml",
     "tui:test": "cargo test --manifest-path tui/Cargo.toml",
     "update:preview": "eas update --channel preview && node scripts/notify-ota.mjs preview",
