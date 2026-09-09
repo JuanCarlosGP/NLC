@@ -50,9 +50,18 @@ export async function stopLanBridge(): Promise<void> {
   await loadNative()?.stop();
 }
 
+export function getLanAddress(): string {
+  const mod = loadNative();
+  if (!mod?.getLanAddress) throw new Error("Lan bridge native module is missing");
+  return mod.getLanAddress();
+}
+
 export async function pairToDesktop(host: string, port: number, token: string, jsonBody: string): Promise<string> {
   const mod = loadNative();
   if (!mod) throw new Error("Lan bridge native module is missing");
+  if (typeof mod.pairToDesktop !== "function") {
+    throw new Error("This APK cannot pair yet. Install 0.1.9+ from GitHub.");
+  }
   return mod.pairToDesktop(host, port, token, jsonBody);
 }
 

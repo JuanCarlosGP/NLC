@@ -20,6 +20,7 @@ export async function pairWithDesktop(host: string, port: number, token: string)
     await pairToDesktop(host, port, token, jsonBody);
   } catch (err) {
     const detail = err instanceof Error ? err.message : "";
+    if (detail.includes("0.1.9")) throw err;
     throw new Error(t("desktop.pairNetwork", { url: detail ? `${url} (${detail})` : url }));
   }
 }
