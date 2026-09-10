@@ -53,6 +53,10 @@ export async function handleBridgeRequest(
   const q = queryMap(query);
   const route = path.replace(/\/+$/, "") || "/";
 
+  if (route === "/v1/hello") {
+    return { kind: "json", status: 200, body: { ok: true } };
+  }
+
   if (route === "/v1/ping") {
     const ping = await source.ping().catch((error: unknown) => ({
       ok: false,

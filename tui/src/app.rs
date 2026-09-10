@@ -388,7 +388,7 @@ fn draw(frame: &mut Frame, app: &mut App) {
 
     if app.screen == Screen::Pair {
         let help = format!(
-            "{}\n\n{}\n\nq quit\nSame Wi-Fi as the phone. Then Settings → Desktop in NLC.",
+            "{}\n\n{}\n\nq quit\nSame Wi-Fi as the phone. Then Settings → Desktop in NLC.\nIf the phone cannot reach :7420, this TUI searches the LAN for the phone.",
             app.qr, app.pair_url
         );
         frame.render_widget(

@@ -51,7 +51,12 @@ export default function DesktopBridgeScreen() {
       }
       const { startLanBridge } = await import("nlc-lan-bridge");
       const started = await startLanBridge(BRIDGE_PORT, parsed.token);
-      await pairWithDesktop(parsed.host, parsed.port, parsed.token, started.lanAddress);
+      try {
+        await pairWithDesktop(parsed.host, parsed.port, parsed.token, started.lanAddress);
+      } catch {
+        // Phone → PC :7420 is often blocked (AP isolation / firewall). The TUI
+        // hunts this phone on :7421 instead, so keep the bridge up.
+      }
       await saveBridgeToken(parsed.token);
       await saveDesktopHost(parsed.host);
       setLinkedHost(parsed.host);
