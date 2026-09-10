@@ -6,6 +6,7 @@ import {
   addBridgeRequestListener,
   addBridgeUnlinkedListener,
   failBridgeRequest,
+  getBridgeLink,
   isBridgeUnlinked,
   isLanBridgeAvailable,
   resolveBridgeJson,
@@ -29,6 +30,13 @@ async function dropLink() {
   } catch {
     // discoverable listener is best-effort
   }
+}
+
+async function syncNativeLink() {
+  const link = getBridgeLink();
+  if (!link?.token) return;
+  await saveBridgeToken(link.token);
+  if (link.desktopHost) await saveDesktopHost(link.desktopHost);
 }
 
 export function BridgeHost({ children }: { children: ReactNode }) {
@@ -74,7 +82,12 @@ export function BridgeHost({ children }: { children: ReactNode }) {
       void dropLink();
     });
     const appState = AppState.addEventListener("change", (state) => {
-      if (state === "active" && isBridgeUnlinked()) void dropLink();
+      if (state !== "active") return;
+      void (async () => {
+        await syncNativeLink();
+        const link = getBridgeLink();
+        if (isBridgeUnlinked() && !link?.tuiSeen) await dropLink();
+      })();
     });
     const claimed = addBridgeClaimedListener((event) => {
       void (async () => {
@@ -99,11 +112,13 @@ export function BridgeHost({ children }: { children: ReactNode }) {
       try {
         if (!token) {
           await startLanBridge(BRIDGE_PORT, "", false);
+          if (!cancelled) await syncNativeLink();
           return;
         }
         const started = await startLanBridge(BRIDGE_PORT, token, true);
         if (cancelled) return;
         if (started.running === false) await clearBridgeSession();
+        await syncNativeLink();
       } catch (error) {
         console.warn("Lan bridge failed to start", error);
       }

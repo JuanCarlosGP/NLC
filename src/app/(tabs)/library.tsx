@@ -61,7 +61,7 @@ function albumDisplayName(album: Album): string {
 function albumDisplaySubtitle(album: Album, t: (path: string, vars?: I18nVars) => string): string {
   if (isPodcastAlbum(album)) return t("library.podcast");
   if (isSongsFolderName(album.name)) return t("library.songs");
-  return t("library.albumBy", { artist: album.artistName });
+  return t("library.playlistBy", { owner: album.artistName });
 }
 
 function itemTitle(item: MixItem): string {
@@ -115,7 +115,6 @@ export default function LibraryScreen() {
             { id: "playlists" as LibraryTab, label: t("library.tabPlaylists") },
             { id: "tracks" as LibraryTab, label: t("library.tabTracks") },
             { id: "artists" as LibraryTab, label: t("library.tabArtists") },
-            { id: "albums" as LibraryTab, label: t("library.tabAlbums") },
           ] satisfies { id: LibraryTab; label: string }[]),
     [t, zone],
   );
@@ -137,6 +136,10 @@ export default function LibraryScreen() {
 
   useEffect(() => {
     if (zone === "video" || zone === "focus" || zone === "wealth") return;
+    if (tab === "albums") {
+      setTab("playlists");
+      return;
+    }
     if (!tabs.some((item) => item.id === tab)) {
       setTab(tabs[0]?.id ?? "recents");
     }
@@ -183,14 +186,6 @@ export default function LibraryScreen() {
       ),
     [artists, musicArtistIds],
   );
-
-  const sortedAlbums = useMemo(() => {
-    const next = [...musicAlbums];
-    if (sort === "alpha") next.sort((a, b) => compareText(albumDisplayName(a), albumDisplayName(b)));
-    else if (sort === "creator") next.sort((a, b) => compareText(a.artistName, b.artistName));
-    else if (sort === "added") next.sort((a, b) => (b.year ?? 0) - (a.year ?? 0));
-    return next;
-  }, [musicAlbums, sort]);
 
   const podcastAlbums = useMemo(() => {
     const next = albums.filter(isPodcastAlbum);
@@ -423,7 +418,7 @@ export default function LibraryScreen() {
                   artistNode(
                     artist,
                     artist.albumCount
-                      ? t(artist.albumCount === 1 ? "library.albumOne" : "library.albumMany", {
+                      ? t(artist.albumCount === 1 ? "library.playlistOne" : "library.playlistMany", {
                           count: artist.albumCount,
                         })
                       : t("library.artist"),
@@ -433,16 +428,6 @@ export default function LibraryScreen() {
             </Collection>
           ) : (
             <Text style={type.body}>{t("library.emptyArtists")}</Text>
-          )
-        ) : null}
-
-        {tab === "albums" ? (
-          sortedAlbums.length ? (
-            <Collection>
-              {sortedAlbums.map((album) => wrap(album.id, albumNode(album)))}
-            </Collection>
-          ) : (
-            <Text style={type.body}>{t("library.emptyAlbums")}</Text>
           )
         ) : null}
 

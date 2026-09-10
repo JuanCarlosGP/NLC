@@ -27,6 +27,28 @@ pub struct Track {
     pub artist_name: String,
     #[serde(default)]
     pub duration_ms: u64,
+    /// Seconds, when the bridge sends `duration` instead of `durationMs`.
+    #[serde(default)]
+    duration: Option<f64>,
+}
+
+impl Track {
+    pub fn normalize(&mut self) {
+        if self.duration_ms > 0 {
+            return;
+        }
+        let Some(raw) = self.duration else {
+            return;
+        };
+        if raw <= 0.0 {
+            return;
+        }
+        self.duration_ms = if raw >= 10_000.0 {
+            raw.round() as u64
+        } else {
+            (raw * 1000.0).round() as u64
+        };
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -88,19 +110,37 @@ impl BridgeClient {
     }
 
     fn get_with_timeout(&self, path: &str, timeout: std::time::Duration) -> Result<ureq::Response, String> {
-        ureq::get(&format!("{}{path}", self.base))
+        let res = ureq::get(&format!("{}{path}", self.base))
             .set("Authorization", &format!("Bearer {}", self.token))
             .timeout(timeout)
             .call()
-            .map_err(|e| e.to_string())
+            .map_err(|e| explain_bridge_err(&e.to_string()))?;
+        if res.status() == 504 || res.status() >= 500 {
+            return Err(explain_bridge_err("timeout"));
+        }
+        if res.status() >= 400 {
+            return Err(format!("phone HTTP {}", res.status()));
+        }
+        Ok(res)
     }
 
     fn get(&self, path: &str) -> Result<ureq::Response, String> {
-        self.get_with_timeout(path, std::time::Duration::from_secs(25))
+        let timeout = if path.starts_with("/v1/album") {
+            std::time::Duration::from_secs(60)
+        } else {
+            std::time::Duration::from_secs(45)
+        };
+        match self.get_with_timeout(path, timeout) {
+            Ok(res) => Ok(res),
+            Err(err) if is_reset(&err) || err.to_ascii_lowercase().contains("time") => {
+                self.get_with_timeout(path, timeout)
+            }
+            Err(err) => Err(err),
+        }
     }
 
     pub fn hello(&self) -> Result<(), String> {
-        let res = self.get_with_timeout("/v1/hello", std::time::Duration::from_millis(400))?;
+        let res = self.get_with_timeout("/v1/hello", std::time::Duration::from_secs(2))?;
         if res.status() >= 300 {
             return Err(format!("hello {}", res.status()));
         }
@@ -111,29 +151,67 @@ impl BridgeClient {
         let _ = self.get_with_timeout("/v1/bye", std::time::Duration::from_secs(3));
     }
 
-    pub fn ping(&self) -> Result<(), String> {
-        let res = self.get("/v1/ping")?;
-        if res.status() >= 300 {
-            return Err(format!("ping {}", res.status()));
-        }
-        Ok(())
+    pub fn albums(&self) -> Result<Vec<Album>, String> {
+        let body: AlbumsBody = self.get("/v1/albums")?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        Ok(body.albums)
     }
 
-    pub fn albums(&self) -> Result<Vec<Album>, String> {
-        let body: AlbumsBody = self.get("/v1/albums")?.into_json().map_err(|e| e.to_string())?;
+    pub fn playlists(&self) -> Result<Vec<Album>, String> {
+        let body: AlbumsBody = self.get("/v1/playlists")?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
         Ok(body.albums)
+    }
+
+    pub fn tracks(&self) -> Result<Vec<Track>, String> {
+        let mut body: SearchBody = self.get("/v1/tracks")?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        for track in &mut body.tracks {
+            track.normalize();
+        }
+        Ok(body.tracks)
     }
 
     pub fn album(&self, id: &str) -> Result<AlbumDetail, String> {
         let path = format!("/v1/album?id={}", urlencoding::encode(id));
-        let body: AlbumBody = self.get(&path)?.into_json().map_err(|e| e.to_string())?;
+        let mut body: AlbumBody = self.get(&path)?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        for track in &mut body.album.tracks {
+            track.normalize();
+        }
         Ok(body.album)
     }
 
     pub fn search(&self, q: &str) -> Result<SearchBody, String> {
         let path = format!("/v1/search?q={}", urlencoding::encode(q));
-        self.get(&path)?.into_json().map_err(|e| e.to_string())
+        let mut body: SearchBody = self.get(&path)?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        for track in &mut body.tracks {
+            track.normalize();
+        }
+        Ok(body)
     }
+}
+
+fn is_reset(err: &str) -> bool {
+    let err = err.to_ascii_lowercase();
+    err.contains("os error 104")
+        || err.contains("connection reset")
+        || err.contains("broken pipe")
+        || err.contains("os error 32")
+        || err.contains("phone closed the link")
+}
+
+fn explain_bridge_err(err: &str) -> String {
+    let lower = err.to_ascii_lowercase();
+    if is_reset(err) {
+        return "Phone closed the link (unlinked or NLC went away). Open NLC and press r.".into();
+    }
+    if lower.contains("connection refused") || lower.contains("os error 111") {
+        return "No NLC bridge on the phone. Open NLC on this Wi-Fi.".into();
+    }
+    if lower.contains("js_timeout") || lower.contains("504") {
+        return "NLC is busy. Keep the app open on the phone and try again.".into();
+    }
+    if lower.contains("timed out") || lower.contains("timeout") {
+        return "The phone did not answer in time. Keep NLC open in the foreground.".into();
+    }
+    err.to_string()
 }
 
 #[cfg(test)]
@@ -149,7 +227,7 @@ mod tests {
         let port = server.server_addr().to_ip().unwrap().port();
         thread::spawn(move || {
             for request in server.incoming_requests() {
-                let body = if request.url().starts_with("/v1/ping") {
+                let body = if request.url().starts_with("/v1/hello") {
                     r#"{"ok":true}"#.to_string()
                 } else {
                     r#"{"albums":[{"id":"a1","name":"In Rainbows","artistName":"Radiohead"}]}"#.to_string()
@@ -170,10 +248,35 @@ mod tests {
             bridge_port: port,
             device_id: "d".into(),
         });
-        client.ping().unwrap();
+        client.hello().unwrap();
         let albums = client.albums().unwrap();
         assert_eq!(albums[0].name, "In Rainbows");
         assert!(client.stream_url("/Music/x.mp3").contains("id="));
+    }
+
+    #[test]
+    fn reset_errors_are_readable() {
+        let msg = explain_bridge_err(
+            "http://192.168.1.8:7421/v1/ping: Connection reset by peer (os error 104)",
+        );
+        assert!(!msg.contains("104"));
+        assert!(msg.to_ascii_lowercase().contains("phone"));
+    }
+
+    #[test]
+    fn track_reads_duration_ms_and_seconds() {
+        let ms: Track = serde_json::from_str(
+            r#"{"id":"1","title":"A","albumName":"B","artistName":"C","durationMs":185000}"#,
+        )
+        .unwrap();
+        assert_eq!(ms.duration_ms, 185_000);
+
+        let mut secs: Track = serde_json::from_str(
+            r#"{"id":"1","title":"A","albumName":"B","artistName":"C","duration":245}"#,
+        )
+        .unwrap();
+        secs.normalize();
+        assert_eq!(secs.duration_ms, 245_000);
     }
 }
 

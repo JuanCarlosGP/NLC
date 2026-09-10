@@ -80,6 +80,18 @@ class NlcLanBridgeModule : Module() {
       BridgePrefs.isUnlinked(ctx)
     }
 
+    Function("linkState") {
+      val ctx = appContext.reactContext
+      val nativeToken = LanBridgeServer.currentToken()
+      val prefsToken = if (ctx != null) BridgePrefs.token(ctx) else ""
+      val host = if (ctx != null) BridgePrefs.desktopHost(ctx) else LanBridgeServer.desktopHost()
+      mapOf(
+        "token" to nativeToken.ifBlank { prefsToken },
+        "desktopHost" to host,
+        "tuiSeen" to LanBridgeServer.tuiSeen(),
+      )
+    }
+
     Function("resolveJson") { id: String, status: Int, body: String ->
       jsonWaiters.remove(id)?.let {
         it.status = status

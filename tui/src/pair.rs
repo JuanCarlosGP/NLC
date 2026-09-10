@@ -21,6 +21,7 @@ pub struct PairOffer {
 pub struct PairWait {
     pub session: Receiver<Session>,
     pub status: Receiver<String>,
+    pub stop: Arc<AtomicBool>,
 }
 
 const PHONE_BRIDGE_PORT: u16 = 7421;
@@ -38,17 +39,12 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<PairWait, String> {
     let http_tx = tx.clone();
     let http_token = token.clone();
     let http_claimed = claimed.clone();
+    let http_status = status_tx.clone();
     thread::spawn(move || {
         for mut request in server.incoming_requests() {
             if http_claimed.load(Ordering::SeqCst) {
                 break;
             }
-            eprintln!(
-                "nlc-tui pair {} {} from {:?}",
-                request.method(),
-                request.url(),
-                request.remote_addr()
-            );
             let ok_method = *request.method() == Method::Post && request.url().starts_with("/pair");
             let auth = request
                 .headers()
@@ -93,6 +89,9 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<PairWait, String> {
                 );
                 continue;
             }
+            let _ = http_status.send(format!(
+                "QR/Settings pair from {phone_host}:{bridge_port} ({device_id}). Accepting…"
+            ));
             let session = Session {
                 token: http_token.clone(),
                 phone_host,
@@ -117,39 +116,44 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<PairWait, String> {
         }
     });
 
+    let scan_claimed = claimed.clone();
     thread::spawn(move || {
         let prefix = subnet_prefix(&lan_ip).unwrap_or_else(|| lan_ip.clone());
-        let _ = status_tx.send(format!("Looking for NLC on {prefix}.0/24…"));
+        let _ = status_tx.send(format!("Listening for QR on 0.0.0.0:7420. Scanning {prefix}.0/24…"));
         let mut last_note = String::new();
         loop {
-            if claimed.load(Ordering::SeqCst) {
+            if scan_claimed.load(Ordering::SeqCst) {
                 break;
             }
-            match try_link(&lan_ip, &token, last_host.as_deref()) {
+            match try_link(&lan_ip, &token, last_host.as_deref(), &status_tx) {
                 ScanHit::Linked(session) => {
-                    let _ = status_tx.send(format!("Found NLC at {}", session.phone_host));
-                    eprintln!("nlc-tui pair found phone at {}:{}", session.phone_host, session.bridge_port);
-                    if claimed.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+                    let _ = status_tx.send(format!("Linked to {}:{}. Stopping the scan.", session.phone_host, session.bridge_port));
+                    if scan_claimed.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
                         let _ = tx.send(session);
                     }
                     break;
                 }
                 ScanHit::Seen(host) => {
-                    let note = format!("Found a phone at {host}. Keep NLC open, or scan the QR.");
+                    let note = format!(
+                        "Phone at {host}:7421 is open, but claim failed. Keep NLC in the foreground or scan the QR."
+                    );
                     if note != last_note {
                         let _ = status_tx.send(note.clone());
                         last_note = note;
                     }
                 }
-                ScanHit::None => {}
+                ScanHit::None => {
+                    let _ = status_tx.send(format!("No NLC on {prefix}.0/24 this pass. Waiting, then scanning again…"));
+                }
             }
-            thread::sleep(Duration::from_millis(800));
+            thread::sleep(Duration::from_millis(1_400));
         }
     });
 
     Ok(PairWait {
         session: rx,
         status: status_rx,
+        stop: claimed,
     })
 }
 
@@ -199,7 +203,7 @@ fn claim_phone(host: &str, port: u16, token: &str, desktop: &str) -> bool {
     let body = serde_json::json!({ "token": token, "desktopHost": desktop }).to_string();
     match ureq::post(&url)
         .set("Content-Type", "application/json")
-        .timeout(Duration::from_secs(2))
+        .timeout(Duration::from_secs(8))
         .send_string(&body)
     {
         Ok(res) if (200..300).contains(&res.status()) => true,
@@ -215,7 +219,7 @@ fn probe_phone(host: &str, port: u16, token: &str) -> bool {
         let url = format!("http://{host}:{port}{path}");
         match ureq::get(&url)
             .set("Authorization", &format!("Bearer {token}"))
-            .timeout(Duration::from_millis(1_200))
+            .timeout(Duration::from_secs(3))
             .call()
         {
             Ok(res) if (200..300).contains(&res.status()) => return true,
@@ -231,20 +235,34 @@ enum ScanHit {
     None,
 }
 
-fn try_link(lan_ip: &str, token: &str, last_host: Option<&str>) -> ScanHit {
+fn try_link(lan_ip: &str, token: &str, last_host: Option<&str>, status: &mpsc::Sender<String>) -> ScanHit {
     if let Some(host) = last_host {
-        if let Some(session) = link_host(host, token, lan_ip) {
-            return ScanHit::Linked(session);
-        }
-        if tcp_open(host, PHONE_BRIDGE_PORT, 80) {
+        let _ = status.send(format!("Trying last phone {host}:7421…"));
+        if tcp_open(host, PHONE_BRIDGE_PORT, 200) {
+            let _ = status.send(format!("{host}:7421 is open. Claiming with this PC’s token…"));
+            if let Some(session) = link_host(host, token, lan_ip) {
+                return ScanHit::Linked(session);
+            }
+            let _ = status.send(format!(
+                "{host} answered TCP but did not accept the token. Scanning the rest of the LAN…"
+            ));
             return ScanHit::Seen(host.to_string());
         }
+        let _ = status.send(format!("Last phone {host} is not reachable. Scanning the subnet…"));
     }
-    scan_subnet(lan_ip, token)
+    scan_subnet(lan_ip, token, status)
 }
 
 fn link_host(host: &str, token: &str, desktop: &str) -> Option<Session> {
-    if claim_phone(host, PHONE_BRIDGE_PORT, token, desktop) || probe_phone(host, PHONE_BRIDGE_PORT, token) {
+    if claim_phone(host, PHONE_BRIDGE_PORT, token, desktop) {
+        return Some(Session {
+            token: token.to_string(),
+            phone_host: host.to_string(),
+            bridge_port: PHONE_BRIDGE_PORT,
+            device_id: "phone".into(),
+        });
+    }
+    if probe_phone(host, PHONE_BRIDGE_PORT, token) {
         return Some(Session {
             token: token.to_string(),
             phone_host: host.to_string(),
@@ -255,10 +273,15 @@ fn link_host(host: &str, token: &str, desktop: &str) -> Option<Session> {
     None
 }
 
-fn scan_subnet(lan_ip: &str, token: &str) -> ScanHit {
+fn scan_subnet(lan_ip: &str, token: &str, status: &mpsc::Sender<String>) -> ScanHit {
     let hosts = subnet_hosts(lan_ip);
+    let prefix = subnet_prefix(lan_ip).unwrap_or_else(|| lan_ip.to_string());
+    let total = hosts.len();
     let mut seen = None;
-    for chunk in hosts.chunks(48) {
+    for (i, chunk) in hosts.chunks(48).enumerate() {
+        let start = i * 48 + 1;
+        let end = (start + chunk.len() - 1).min(total);
+        let _ = status.send(format!("Scanning {prefix}.x  {start}–{end} of {total}…"));
         let hit = std::sync::Mutex::new(None::<String>);
         let open = std::sync::Mutex::new(None::<String>);
         thread::scope(|scope| {
@@ -273,9 +296,13 @@ fn scan_subnet(lan_ip: &str, token: &str) -> ScanHit {
             }
         });
         if let Some(phone_host) = hit.into_inner().ok().flatten() {
+            let _ = status.send(format!("Discover hit at {phone_host}:7421. Claiming…"));
             if let Some(session) = link_host(&phone_host, token, lan_ip) {
                 return ScanHit::Linked(session);
             }
+            let _ = status.send(format!(
+                "Found NLC at {phone_host} but claim was refused. Token mismatch or app in background."
+            ));
             seen = Some(phone_host);
         } else if seen.is_none() {
             seen = open.into_inner().ok().flatten();

@@ -17,6 +17,7 @@ const TABS: LibraryTab[] = ["recents", "playlists", "podcasts", "artists", "albu
 let tabMemory: LibraryTab | null = null;
 
 export function parseLibraryTab(raw: string | null): LibraryTab {
+  if (raw === "albums") return "playlists";
   return raw && TABS.includes(raw as LibraryTab) ? (raw as LibraryTab) : "recents";
 }
 

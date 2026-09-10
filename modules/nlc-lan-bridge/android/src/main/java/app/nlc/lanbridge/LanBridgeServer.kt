@@ -41,6 +41,7 @@ object LanBridgeServer {
   private val tuiSeen = AtomicBoolean(false)
   private val lastTuiMs = AtomicLong(0)
   private val unlinking = AtomicBoolean(false)
+  @Volatile private var lastEmittedHost: String = ""
   private var serverSocket: ServerSocket? = null
   private val pool = Executors.newCachedThreadPool()
 
@@ -55,6 +56,7 @@ object LanBridgeServer {
     tuiSeen.set(false)
     lastTuiMs.set(0)
     unlinking.set(false)
+    lastEmittedHost = ""
     Thread({
       while (running.get()) {
         try {
@@ -102,9 +104,35 @@ object LanBridgeServer {
     stop()
   }
 
-  private fun markTui() {
+  fun requestUnlink() {
+    if (!unlinking.compareAndSet(false, true)) return
+    val ctx = appContext
+    if (ctx != null) BridgePrefs.clearLink(ctx)
+    NlcLanBridgeModule.emitUnlinked()
+    if (ctx != null) stopForeground(ctx)
+    stop()
+  }
+
+  private fun markTui(remote: InetAddress) {
     tuiSeen.set(true)
     lastTuiMs.set(System.currentTimeMillis())
+    val host = remote.hostAddress?.substringBefore("%").orEmpty()
+    if (token.isEmpty() || host.isBlank()) return
+    val ctx = appContext
+    if (ctx != null) BridgePrefs.saveLink(ctx, token, host)
+    if (host != lastEmittedHost) {
+      lastEmittedHost = host
+      NlcLanBridgeModule.emitClaimed(token, host)
+    }
+  }
+
+  fun currentToken(): String = token
+
+  fun tuiSeen(): Boolean = tuiSeen.get()
+
+  fun desktopHost(): String {
+    val ctx = appContext ?: return ""
+    return BridgePrefs.desktopHost(ctx)
   }
 
   fun attach(context: Context) {
@@ -114,7 +142,7 @@ object LanBridgeServer {
   fun acceptToken(bearer: String) {
     token = bearer
     val ctx = appContext ?: return
-    BridgePrefs.setUnlinked(ctx, false)
+    BridgePrefs.saveLink(ctx, bearer, BridgePrefs.desktopHost(ctx))
     startForeground(ctx)
   }
 
@@ -210,12 +238,18 @@ object LanBridgeServer {
           JSONObject()
         }
         val bearer = json.optString("token").trim()
-        val desktop = json.optString("desktopHost")
+        val desktop = json.optString("desktopHost").trim().ifBlank {
+          remote.hostAddress?.substringBefore("%").orEmpty()
+        }
         if (bearer.isBlank()) {
           writeStatus(socket.getOutputStream(), 400, "application/json", """{"error":"token"}""")
           return
         }
         acceptToken(bearer)
+        if (desktop.isNotBlank()) {
+          appContext?.let { BridgePrefs.saveLink(it, bearer, desktop) }
+          lastEmittedHost = desktop
+        }
         NlcLanBridgeModule.emitClaimed(bearer, desktop)
         writeStatus(socket.getOutputStream(), 200, "application/json", """{"ok":true}""")
         return
@@ -224,7 +258,7 @@ object LanBridgeServer {
         writeStatus(socket.getOutputStream(), 401, "application/json", """{"error":"unauthorized"}""")
         return
       }
-      markTui()
+      markTui(remote)
       if (method != "GET" && method != "HEAD") {
         writeStatus(socket.getOutputStream(), 405, "application/json", """{"error":"method"}""")
         return
@@ -500,18 +534,39 @@ object LanBridgeServer {
 object BridgePrefs {
   private const val PREFS = "nlc_lan_bridge"
   private const val UNLINKED = "unlinked"
+  private const val TOKEN = "token"
+  private const val DESKTOP = "desktop_host"
 
-  fun setUnlinked(context: Context, value: Boolean) {
-    context.applicationContext
-      .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+  private fun prefs(context: Context) =
+    context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+  fun saveLink(context: Context, token: String, host: String) {
+    prefs(context)
       .edit()
-      .putBoolean(UNLINKED, value)
+      .putBoolean(UNLINKED, false)
+      .putString(TOKEN, token)
+      .putString(DESKTOP, host)
       .apply()
   }
 
-  fun isUnlinked(context: Context): Boolean {
-    return context.applicationContext
-      .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-      .getBoolean(UNLINKED, false)
+  fun clearLink(context: Context) {
+    prefs(context)
+      .edit()
+      .putBoolean(UNLINKED, true)
+      .remove(TOKEN)
+      .remove(DESKTOP)
+      .apply()
   }
+
+  fun setUnlinked(context: Context, value: Boolean) {
+    prefs(context).edit().putBoolean(UNLINKED, value).apply()
+  }
+
+  fun isUnlinked(context: Context): Boolean {
+    return prefs(context).getBoolean(UNLINKED, false)
+  }
+
+  fun token(context: Context): String = prefs(context).getString(TOKEN, "").orEmpty()
+
+  fun desktopHost(context: Context): String = prefs(context).getString(DESKTOP, "").orEmpty()
 }

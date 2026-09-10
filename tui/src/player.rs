@@ -56,7 +56,17 @@ impl MpvSession {
     }
 
     pub fn percent(&self) -> Option<f64> {
-        let reply = self.cmd(json!(["get_property", "percent-pos"]))?;
+        self.prop_f64("percent-pos")
+    }
+
+    pub fn playback_times(&self) -> Option<(f64, f64)> {
+        let pos = self.prop_f64("time-pos").or_else(|| self.prop_f64("playback-time"))?;
+        let dur = self.prop_f64("duration").unwrap_or(0.0);
+        Some((pos, dur))
+    }
+
+    fn prop_f64(&self, name: &str) -> Option<f64> {
+        let reply = self.cmd(json!(["get_property", name]))?;
         reply.get("data").and_then(|v| v.as_f64())
     }
 
@@ -99,6 +109,83 @@ pub fn format_ms(ms: u64) -> String {
     format!("{}:{:02}", total / 60, total % 60)
 }
 
+pub fn format_track_time(ms: u64) -> String {
+    if ms == 0 {
+        "—".into()
+    } else {
+        format_ms(ms)
+    }
+}
+
+pub fn probe_stream_duration(url: &str, auth_header: &str) -> Option<u64> {
+    probe_ffprobe(url, auth_header)
+        .and_then(|raw| parse_seconds(&raw))
+        .or_else(|| probe_mpv(url, auth_header).and_then(|raw| parse_seconds(&raw)))
+}
+
+fn parse_seconds(raw: &str) -> Option<u64> {
+    let line = raw.lines().find_map(|line| {
+        let line = line.trim();
+        if line.is_empty() {
+            return None;
+        }
+        line.split(|c: char| c.is_whitespace() || c == ',')
+            .find_map(|part| part.parse::<f64>().ok().filter(|n| *n > 0.0 && *n < 86_400.0))
+    })?;
+    Some((line * 1000.0).round() as u64)
+}
+
+fn run_limited(mut cmd: Command, wait_ms: u64) -> Option<String> {
+    cmd.stdout(Stdio::piped()).stderr(Stdio::null());
+    let mut child = cmd.spawn().ok()?;
+    let slices = (wait_ms / 50).max(1);
+    for _ in 0..slices {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) => thread::sleep(Duration::from_millis(50)),
+            Err(_) => {
+                let _ = child.kill();
+                return None;
+            }
+        }
+    }
+    let _ = child.kill();
+    let out = child.wait_with_output().ok()?;
+    String::from_utf8(out.stdout).ok()
+}
+
+fn probe_ffprobe(url: &str, auth_header: &str) -> Option<String> {
+    let mut cmd = Command::new("ffprobe");
+    cmd.args([
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "csv=p=0",
+        "-headers",
+        &format!("{auth_header}\r\n"),
+        url,
+    ]);
+    run_limited(cmd, 8_000)
+}
+
+fn probe_mpv(url: &str, auth_header: &str) -> Option<String> {
+    let mut cmd = Command::new("mpv");
+    cmd.args([
+        "--no-config",
+        "--vo=null",
+        "--ao=null",
+        "--quiet",
+        "--no-audio-display",
+        "--frames=1",
+        "--term-playing-msg=${=duration}",
+        &format!("--http-header-fields={auth_header}"),
+        url,
+    ]);
+    run_limited(cmd, 8_000)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{clamp_volume, format_ms};
@@ -114,5 +201,9 @@ mod tests {
     fn duration_is_mm_ss() {
         assert_eq!(format_ms(0), "0:00");
         assert_eq!(format_ms(125_000), "2:05");
+        assert_eq!(super::format_track_time(0), "—");
+        assert_eq!(super::format_track_time(125_000), "2:05");
+        assert_eq!(super::parse_seconds("245.0\n"), Some(245_000));
+        assert_eq!(super::parse_seconds("0\n"), None);
     }
 }

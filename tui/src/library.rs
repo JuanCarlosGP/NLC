@@ -1,15 +1,11 @@
-use crate::client::Album;
+use crate::client::{Album, Track};
 
-pub fn is_songs_folder(name: &str) -> bool {
-    name.trim().eq_ignore_ascii_case("canciones")
+pub fn is_imported_playlist(album: &Album) -> bool {
+    album.id.starts_with("playlist:")
 }
 
-pub fn is_podcast_folder(name: &str) -> bool {
+fn is_podcast_folder(name: &str) -> bool {
     name.trim().eq_ignore_ascii_case("podcasts")
-}
-
-pub fn is_loose_album(album: &Album) -> bool {
-    album.id == "album:canciones" || is_songs_folder(&album.artist_name) || is_songs_folder(&album.name)
 }
 
 pub fn is_podcast_album(album: &Album) -> bool {
@@ -19,20 +15,10 @@ pub fn is_podcast_album(album: &Album) -> bool {
         || album.id.to_lowercase().contains("/podcasts/")
 }
 
-pub fn listed_albums(albums: &[Album]) -> Vec<Album> {
-    albums
-        .iter()
-        .filter(|album| !is_podcast_album(album))
-        .cloned()
-        .collect()
-}
-
-pub fn loose_albums(albums: &[Album]) -> Vec<Album> {
-    albums
-        .iter()
-        .filter(|album| !is_podcast_album(album) && is_loose_album(album))
-        .cloned()
-        .collect()
+pub fn is_podcast_track(track: &Track) -> bool {
+    is_podcast_folder(&track.artist_name)
+        || is_podcast_folder(&track.album_name)
+        || track.id.to_lowercase().contains("/podcasts/")
 }
 
 #[cfg(test)]
@@ -48,15 +34,16 @@ mod tests {
     }
 
     #[test]
-    fn lists_albums_including_canciones_folders() {
-        let albums = vec![
-            album("a1", "In Rainbows", "Radiohead"),
-            album("album:canciones", "Canciones", "Canciones"),
-            album("a2", "Canciones", "Ada"),
-            album("p1", "Show", "Podcasts"),
-        ];
-        let listed = listed_albums(&albums);
-        assert_eq!(listed.len(), 3);
-        assert_eq!(loose_albums(&albums).len(), 2);
+    fn imported_playlists_are_prefixed() {
+        let playlist = album("playlist:abc", "★", "me");
+        assert!(is_imported_playlist(&playlist));
+        assert!(!is_podcast_album(&playlist));
+        assert!(!is_imported_playlist(&album("a1", "In Rainbows", "Radiohead")));
+    }
+
+    #[test]
+    fn podcasts_are_filtered_from_music() {
+        assert!(is_podcast_album(&album("p1", "Show", "Podcasts")));
+        assert!(!is_podcast_album(&album("a1", "In Rainbows", "Radiohead")));
     }
 }

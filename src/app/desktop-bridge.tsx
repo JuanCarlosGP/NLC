@@ -30,13 +30,13 @@ export default function DesktopBridgeScreen() {
   useEffect(() => {
     async function refresh() {
       const [token, host] = await Promise.all([loadBridgeToken(), loadDesktopHost()]);
-      setLinkedHost(token && host ? host : null);
+      setLinkedHost(token ? host || t("settings.desktopListening") : null);
     }
     void refresh();
     return subscribeBridgeSession(() => {
       void refresh();
     });
-  }, []);
+  }, [t]);
 
   async function connect(raw: string) {
     const parsed = parsePairQr(raw);

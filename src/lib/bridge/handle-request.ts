@@ -1,7 +1,9 @@
-import { getAlbum, getAlbums, getArtists, getLocalUri, searchCatalog } from "@/lib/db/catalog";
-import type { MusicSource, PlayableSource } from "@/lib/nas/types";
+import { getAlbum, getAlbums, getArtists, getLocalUri, getTracks, loadPlaylists, searchCatalog } from "@/lib/db/catalog";
+import type { Album, AlbumDetail, MusicSource, PlayableSource, Track } from "@/lib/nas/types";
+import { isPodcastTrack } from "@/lib/nas/webdav";
 import { dumpProductivity } from "@/lib/productivity/store";
 import { listReminders } from "@/lib/reminders/store";
+import type { ImportedPlaylist } from "@/lib/spotify/types";
 import { dumpWealth } from "@/lib/wealth/store";
 
 export type BridgeJson = { status: number; body: unknown };
@@ -45,6 +47,66 @@ async function first<T>(live: () => Promise<T>, cached: () => Promise<T>): Promi
   }
 }
 
+async function preferCache<T>(
+  cached: () => Promise<T>,
+  live: () => Promise<T>,
+  isEmpty: (value: T) => boolean,
+): Promise<T> {
+  try {
+    const value = await cached();
+    if (!isEmpty(value)) return value;
+  } catch {
+    // fall through to live
+  }
+  try {
+    return await live();
+  } catch {
+    return cached();
+  }
+}
+
+function playlistId(id: string): string {
+  return id.startsWith("playlist:") ? id : `playlist:${id}`;
+}
+
+function importedAsAlbum(playlist: ImportedPlaylist): Album {
+  return {
+    id: playlistId(playlist.id),
+    name: playlist.name,
+    artistId: `playlist-owner:${playlist.ownerName || "me"}`,
+    artistName: playlist.ownerName || "Playlist",
+    year: playlist.importedAt ? new Date(playlist.importedAt).getFullYear() : null,
+    coverId: null,
+    trackCount: playlist.tracks.length,
+  };
+}
+
+function importedAsAlbumDetail(playlist: ImportedPlaylist): AlbumDetail {
+  const album = importedAsAlbum(playlist);
+  const tracks: Track[] = playlist.tracks.map((track, index) => {
+    const matched = track.matched;
+    return {
+      id: matched?.id ?? `unmatched:${track.spotifyId || index}`,
+      title: track.title || matched?.title || "Track",
+      albumId: album.id,
+      albumName: playlist.name,
+      artistId: matched?.artistId || track.artistName,
+      artistName: track.artistName || matched?.artistName || "",
+      durationMs: track.durationMs || matched?.durationMs || 0,
+      track: index + 1,
+      coverId: matched?.coverId ?? null,
+      artworkUrl: track.coverUrl || matched?.artworkUrl || null,
+    };
+  });
+  return { ...album, tracks };
+}
+
+async function importedPlaylistById(id: string): Promise<ImportedPlaylist | undefined> {
+  const raw = id.startsWith("playlist:") ? id.slice("playlist:".length) : id;
+  const playlists = await loadPlaylists();
+  return playlists.find((item) => item.id === raw || playlistId(item.id) === id);
+}
+
 export async function handleBridgeRequest(
   source: MusicSource,
   path: string,
@@ -74,29 +136,64 @@ export async function handleBridgeRequest(
   }
 
   if (route === "/v1/artists") {
-    const artists = await first(() => source.getArtists(), () => getArtists());
+    const artists = await preferCache(() => getArtists(), () => source.getArtists(), (rows) => rows.length === 0);
     return { kind: "json", status: 200, body: { artists } };
   }
 
   if (route === "/v1/albums") {
-    const albums = await first(() => source.getAlbums(), () => getAlbums());
+    const albums = await preferCache(() => getAlbums(), () => source.getAlbums(), (rows) => rows.length === 0);
     return { kind: "json", status: 200, body: { albums } };
   }
 
-  if (route === "/v1/album" || route.startsWith("/v1/albums/")) {
-    const id = q.id || pathId(route, "/v1/albums/") || pathId(route, "/v1/album/");
+  if (route === "/v1/playlists") {
+    const playlists = await loadPlaylists().catch(() => []);
+    return { kind: "json", status: 200, body: { albums: playlists.map(importedAsAlbum) } };
+  }
+
+  if (route === "/v1/tracks") {
+    const tracks = await preferCache(
+      () => getTracks({ kind: "music" }),
+      async () => {
+        const results = await source.search("*");
+        return results.tracks.filter((track) => !isPodcastTrack(track));
+      },
+      (rows) => rows.length === 0,
+    );
+    return { kind: "json", status: 200, body: { tracks } };
+  }
+
+  if (route === "/v1/album" || route.startsWith("/v1/albums/") || route === "/v1/playlist" || route.startsWith("/v1/playlists/")) {
+    const id =
+      q.id ||
+      pathId(route, "/v1/albums/") ||
+      pathId(route, "/v1/album/") ||
+      pathId(route, "/v1/playlists/") ||
+      pathId(route, "/v1/playlist/");
     if (!id) return { kind: "json", status: 400, body: { error: "missing_id" } };
-    const album = await first(() => source.getAlbum(id), async () => {
-      const cached = await getAlbum(id);
-      if (!cached) throw new Error("missing");
-      return cached;
-    });
+    if (id.startsWith("playlist:") || route.includes("playlist")) {
+      const playlist = await importedPlaylistById(id);
+      if (!playlist) return { kind: "json", status: 404, body: { error: "missing" } };
+      return { kind: "json", status: 200, body: { album: importedAsAlbumDetail(playlist) } };
+    }
+    const album = await preferCache(
+      async () => {
+        const cached = await getAlbum(id);
+        if (!cached) throw new Error("missing");
+        return cached;
+      },
+      () => source.getAlbum(id),
+      (item) => !item.tracks?.length,
+    );
     return { kind: "json", status: 200, body: { album } };
   }
 
   if (route === "/v1/search") {
     const needle = (q.q ?? q.query ?? "").trim();
-    const results = await first(() => source.search(needle), () => searchCatalog(needle));
+    const results = await preferCache(
+      () => searchCatalog(needle),
+      () => source.search(needle),
+      (item) => item.tracks.length === 0 && item.albums.length === 0 && item.artists.length === 0,
+    );
     return { kind: "json", status: 200, body: results };
   }
 

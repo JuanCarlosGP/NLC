@@ -87,6 +87,9 @@ export default function SettingsScreen() {
       if (token && host) {
         setDesktopLinked(true);
         setDesktopSummary(t("settings.desktopLinked", { host }));
+      } else if (token) {
+        setDesktopLinked(true);
+        setDesktopSummary(t("settings.desktopListening"));
       } else {
         setDesktopLinked(false);
         setDesktopSummary(t("settings.desktopIdle"));

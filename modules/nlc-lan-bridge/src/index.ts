@@ -1,6 +1,12 @@
 import { requireNativeModule } from "expo-modules-core";
 import { Platform } from "react-native";
 
+export type BridgeLinkState = {
+  token?: string;
+  desktopHost?: string;
+  tuiSeen?: boolean;
+};
+
 export type BridgeStartResult = {
   port: number;
   lanAddress: string;
@@ -25,6 +31,7 @@ type NativeBridge = {
   stop(): Promise<void>;
   getLanAddress(): string;
   isUnlinked(): boolean;
+  linkState(): BridgeLinkState;
   pairToDesktop(host: string, port: number, token: string, jsonBody: string): Promise<string>;
   resolveJson(id: string, status: number, body: string): void;
   resolveStream(id: string, uri: string, headersJson: string): void;
@@ -64,6 +71,12 @@ export function isBridgeUnlinked(): boolean {
   const mod = loadNative();
   if (!mod || typeof mod.isUnlinked !== "function") return false;
   return mod.isUnlinked();
+}
+
+export function getBridgeLink(): BridgeLinkState | null {
+  const mod = loadNative();
+  if (!mod || typeof mod.linkState !== "function") return null;
+  return mod.linkState();
 }
 
 export function getLanAddress(): string {
