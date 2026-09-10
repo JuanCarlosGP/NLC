@@ -98,15 +98,6 @@ object LanBridgeServer {
   fun requestUnlink() {
     if (!unlinking.compareAndSet(false, true)) return
     val ctx = appContext
-    if (ctx != null) BridgePrefs.setUnlinked(ctx, true)
-    NlcLanBridgeModule.emitUnlinked()
-    if (ctx != null) stopForeground(ctx)
-    stop()
-  }
-
-  fun requestUnlink() {
-    if (!unlinking.compareAndSet(false, true)) return
-    val ctx = appContext
     if (ctx != null) BridgePrefs.clearLink(ctx)
     NlcLanBridgeModule.emitUnlinked()
     if (ctx != null) stopForeground(ctx)
