@@ -13,6 +13,7 @@ export async function loadBridgeToken(): Promise<string | null> {
 
 export async function saveBridgeToken(token: string): Promise<void> {
   await setSecret(TOKEN_KEY, token);
+  notifyBridgeSession();
 }
 
 export async function loadDesktopHost(): Promise<string | null> {
@@ -21,6 +22,7 @@ export async function loadDesktopHost(): Promise<string | null> {
 
 export async function saveDesktopHost(host: string): Promise<void> {
   await setSecret(DESKTOP_KEY, host);
+  notifyBridgeSession();
 }
 
 export async function loadOrCreateDeviceId(): Promise<string> {
@@ -31,8 +33,22 @@ export async function loadOrCreateDeviceId(): Promise<string> {
   return id;
 }
 
+const sessionListeners = new Set<() => void>();
+
+export function subscribeBridgeSession(listener: () => void): () => void {
+  sessionListeners.add(listener);
+  return () => {
+    sessionListeners.delete(listener);
+  };
+}
+
+function notifyBridgeSession() {
+  for (const listener of sessionListeners) listener();
+}
+
 export async function clearBridgeSession(): Promise<void> {
   await Promise.all([deleteSecret(TOKEN_KEY), deleteSecret(DESKTOP_KEY)]);
+  notifyBridgeSession();
 }
 
 export function parsePairQr(raw: string): { host: string; port: number; token: string } | null {

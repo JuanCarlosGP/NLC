@@ -1,16 +1,35 @@
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
+import { AppState } from "react-native";
 import {
+  addBridgeClaimedListener,
   addBridgeRequestListener,
+  addBridgeUnlinkedListener,
   failBridgeRequest,
+  isBridgeUnlinked,
   isLanBridgeAvailable,
   resolveBridgeJson,
   resolveBridgeStream,
   startLanBridge,
+  stopLanBridge,
 } from "nlc-lan-bridge";
 import { handleBridgeRequest } from "@/lib/bridge/handle-request";
-import { BRIDGE_PORT, loadBridgeToken } from "@/lib/bridge/session";
+import { BRIDGE_PORT, clearBridgeSession, loadBridgeToken, saveBridgeToken, saveDesktopHost } from "@/lib/bridge/session";
 import { useSettings } from "@/lib/settings/settings-context";
+
+async function dropLink() {
+  try {
+    await stopLanBridge();
+  } catch {
+    // already stopped
+  }
+  await clearBridgeSession();
+  try {
+    await startLanBridge(BRIDGE_PORT, "", false);
+  } catch {
+    // discoverable listener is best-effort
+  }
+}
 
 export function BridgeHost({ children }: { children: ReactNode }) {
   const { source, ready } = useSettings();
@@ -22,6 +41,7 @@ export function BridgeHost({ children }: { children: ReactNode }) {
     const sub = addBridgeRequestListener((event) => {
       void (async () => {
         try {
+          const route = event.path.replace(/\/+$/, "") || "/";
           const result = await handleBridgeRequest(sourceRef.current, event.path, event.query);
           const isStream = event.path === "/v1/stream" || event.path.startsWith("/v1/stream/");
           if (isStream) {
@@ -41,12 +61,33 @@ export function BridgeHost({ children }: { children: ReactNode }) {
           } else {
             failBridgeRequest(event.id, 500, "expected_json");
           }
+          if (route === "/v1/bye") {
+            await stopLanBridge();
+            await clearBridgeSession();
+          }
         } catch (error) {
           failBridgeRequest(event.id, 500, error instanceof Error ? error.message : "bridge");
         }
       })();
     });
-    return () => sub.remove();
+    const unlinked = addBridgeUnlinkedListener(() => {
+      void dropLink();
+    });
+    const appState = AppState.addEventListener("change", (state) => {
+      if (state === "active" && isBridgeUnlinked()) void dropLink();
+    });
+    const claimed = addBridgeClaimedListener((event) => {
+      void (async () => {
+        if (event.token) await saveBridgeToken(event.token);
+        if (event.desktopHost) await saveDesktopHost(event.desktopHost);
+      })();
+    });
+    return () => {
+      sub.remove();
+      unlinked.remove();
+      claimed.remove();
+      appState.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -54,9 +95,15 @@ export function BridgeHost({ children }: { children: ReactNode }) {
     let cancelled = false;
     void (async () => {
       const token = await loadBridgeToken();
-      if (!token || cancelled) return;
+      if (cancelled) return;
       try {
-        await startLanBridge(BRIDGE_PORT, token);
+        if (!token) {
+          await startLanBridge(BRIDGE_PORT, "", false);
+          return;
+        }
+        const started = await startLanBridge(BRIDGE_PORT, token, true);
+        if (cancelled) return;
+        if (started.running === false) await clearBridgeSession();
       } catch (error) {
         console.warn("Lan bridge failed to start", error);
       }

@@ -24,6 +24,7 @@ import java.util.Collections
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.min
 
 object LanBridgeServer {
@@ -31,9 +32,15 @@ object LanBridgeServer {
   private const val JSON_TIMEOUT_MS = 25_000L
   private const val STREAM_SETUP_MS = 20_000L
 
+  private const val IDLE_UNLINK_MS = 15_000L
+
   @Volatile private var token: String = ""
   @Volatile private var boundPort: Int = 0
+  @Volatile private var appContext: Context? = null
   private val running = AtomicBoolean(false)
+  private val tuiSeen = AtomicBoolean(false)
+  private val lastTuiMs = AtomicLong(0)
+  private val unlinking = AtomicBoolean(false)
   private var serverSocket: ServerSocket? = null
   private val pool = Executors.newCachedThreadPool()
 
@@ -45,6 +52,9 @@ object LanBridgeServer {
     serverSocket = socket
     boundPort = socket.localPort
     running.set(true)
+    tuiSeen.set(false)
+    lastTuiMs.set(0)
+    unlinking.set(false)
     Thread({
       while (running.get()) {
         try {
@@ -55,6 +65,20 @@ object LanBridgeServer {
         }
       }
     }, "nlc-lan-accept").start()
+    Thread({
+      while (running.get()) {
+        try {
+          Thread.sleep(2_000)
+        } catch (_: Exception) {
+          break
+        }
+        if (!running.get()) break
+        if (token.isNotEmpty() && tuiSeen.get() && System.currentTimeMillis() - lastTuiMs.get() > IDLE_UNLINK_MS) {
+          requestUnlink()
+          break
+        }
+      }
+    }, "nlc-lan-idle").start()
     return boundPort
   }
 
@@ -66,9 +90,36 @@ object LanBridgeServer {
     }
     serverSocket = null
     boundPort = 0
+    tuiSeen.set(false)
+  }
+
+  fun requestUnlink() {
+    if (!unlinking.compareAndSet(false, true)) return
+    val ctx = appContext
+    if (ctx != null) BridgePrefs.setUnlinked(ctx, true)
+    NlcLanBridgeModule.emitUnlinked()
+    if (ctx != null) stopForeground(ctx)
+    stop()
+  }
+
+  private fun markTui() {
+    tuiSeen.set(true)
+    lastTuiMs.set(System.currentTimeMillis())
+  }
+
+  fun attach(context: Context) {
+    appContext = context.applicationContext
+  }
+
+  fun acceptToken(bearer: String) {
+    token = bearer
+    val ctx = appContext ?: return
+    BridgePrefs.setUnlinked(ctx, false)
+    startForeground(ctx)
   }
 
   fun startForeground(context: Context) {
+    appContext = context.applicationContext
     val intent = Intent(context, LanBridgeService::class.java)
     if (Build.VERSION.SDK_INT >= 26) {
       context.startForegroundService(intent)
@@ -142,19 +193,53 @@ object LanBridgeServer {
         writeStatus(socket.getOutputStream(), 403, "application/json", """{"error":"lan_only"}""")
         return
       }
-      val parsed = readHeaders(socket.getInputStream()) ?: return
+      val input = socket.getInputStream()
+      val parsed = readHeaders(input) ?: return
+      val method = parsed.method.uppercase()
+      val path = parsed.path
+      if (path == "/v1/discover" && (method == "GET" || method == "HEAD")) {
+        writeStatus(socket.getOutputStream(), 200, "application/json", """{"ok":true,"app":"nlc"}""", method == "HEAD")
+        return
+      }
+      if (path == "/v1/claim" && method == "POST") {
+        val length = parsed.headers["content-length"]?.toIntOrNull() ?: 0
+        val body = readBody(input, length)
+        val json = try {
+          JSONObject(if (body.isBlank()) "{}" else body)
+        } catch (_: Exception) {
+          JSONObject()
+        }
+        val bearer = json.optString("token").trim()
+        val desktop = json.optString("desktopHost")
+        if (bearer.isBlank()) {
+          writeStatus(socket.getOutputStream(), 400, "application/json", """{"error":"token"}""")
+          return
+        }
+        acceptToken(bearer)
+        NlcLanBridgeModule.emitClaimed(bearer, desktop)
+        writeStatus(socket.getOutputStream(), 200, "application/json", """{"ok":true}""")
+        return
+      }
       if (!bearerOk(parsed.headers["authorization"])) {
         writeStatus(socket.getOutputStream(), 401, "application/json", """{"error":"unauthorized"}""")
         return
       }
-      val method = parsed.method.uppercase()
+      markTui()
       if (method != "GET" && method != "HEAD") {
         writeStatus(socket.getOutputStream(), 405, "application/json", """{"error":"method"}""")
         return
       }
-      val path = parsed.path
       val query = parsed.query
       val range = parsed.headers["range"]
+      if (path == "/v1/hello") {
+        writeStatus(socket.getOutputStream(), 200, "application/json", """{"ok":true}""", method == "HEAD")
+        return
+      }
+      if (path == "/v1/bye") {
+        writeStatus(socket.getOutputStream(), 200, "application/json", """{"ok":true}""", method == "HEAD")
+        requestUnlink()
+        return
+      }
       val id = UUID.randomUUID().toString()
       if (path == "/v1/stream" || path.startsWith("/v1/stream/")) {
         onRequest(id, method, path, query, range)
@@ -179,6 +264,19 @@ object LanBridgeServer {
       } catch (_: Exception) {
       }
     }
+  }
+
+  private fun readBody(input: InputStream, length: Int): String {
+    if (length <= 0) return ""
+    val want = min(length, 4_096)
+    val buf = ByteArray(want)
+    var n = 0
+    while (n < want) {
+      val read = input.read(buf, n, want - n)
+      if (read < 0) break
+      n += read
+    }
+    return String(buf, 0, n, Charsets.UTF_8)
   }
 
   private fun proxyStream(socket: Socket, method: String, uri: String, headersJson: String, range: String?) {
@@ -379,6 +477,7 @@ object LanBridgeServer {
     val bytes = body.toByteArray(Charsets.UTF_8)
     val reason = when (status) {
       200 -> "OK"
+      400 -> "Bad Request"
       401 -> "Unauthorized"
       403 -> "Forbidden"
       404 -> "Not Found"
@@ -395,5 +494,24 @@ object LanBridgeServer {
     out.write(headers.toByteArray(Charsets.US_ASCII))
     if (!headOnly) out.write(bytes)
     out.flush()
+  }
+}
+
+object BridgePrefs {
+  private const val PREFS = "nlc_lan_bridge"
+  private const val UNLINKED = "unlinked"
+
+  fun setUnlinked(context: Context, value: Boolean) {
+    context.applicationContext
+      .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+      .edit()
+      .putBoolean(UNLINKED, value)
+      .apply()
+  }
+
+  fun isUnlinked(context: Context): Boolean {
+    return context.applicationContext
+      .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+      .getBoolean(UNLINKED, false)
   }
 }

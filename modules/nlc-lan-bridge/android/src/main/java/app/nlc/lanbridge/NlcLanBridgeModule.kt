@@ -25,7 +25,7 @@ class PendingStream(
 class NlcLanBridgeModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("NlcLanBridge")
-    Events("onBridgeRequest")
+    Events("onBridgeRequest", "onBridgeUnlinked", "onBridgeClaimed")
 
     OnCreate {
       instance = this@NlcLanBridgeModule
@@ -44,19 +44,40 @@ class NlcLanBridgeModule : Module() {
       LanBridgeServer.postPair(host, port, token, jsonBody)
     }
 
-    AsyncFunction("start") { port: Int, token: String ->
+    AsyncFunction("start") { port: Int, token: String, resume: Boolean ->
       val ctx = appContext.reactContext ?: throw IllegalStateException("React context lost")
+      LanBridgeServer.attach(ctx)
+      if (resume && BridgePrefs.isUnlinked(ctx) && token.isNotBlank()) {
+        val bound = LanBridgeServer.start(port, "") { reqId, method, path, query, range ->
+          emitRequest(reqId, method, path, query, range)
+        }
+        return@AsyncFunction mapOf(
+          "port" to bound,
+          "lanAddress" to LanBridgeServer.lanAddress(),
+          "running" to false,
+        )
+      }
+      if (token.isNotBlank()) {
+        BridgePrefs.setUnlinked(ctx, false)
+      }
       val bound = LanBridgeServer.start(port, token) { reqId, method, path, query, range ->
         emitRequest(reqId, method, path, query, range)
       }
-      LanBridgeServer.startForeground(ctx)
-      mapOf("port" to bound, "lanAddress" to LanBridgeServer.lanAddress())
+      if (token.isNotBlank()) {
+        LanBridgeServer.startForeground(ctx)
+      }
+      mapOf("port" to bound, "lanAddress" to LanBridgeServer.lanAddress(), "running" to token.isNotBlank())
     }
 
     AsyncFunction("stop") {
       val ctx = appContext.reactContext
       if (ctx != null) LanBridgeServer.stopForeground(ctx)
       LanBridgeServer.stop()
+    }
+
+    Function("isUnlinked") {
+      val ctx = appContext.reactContext ?: return@Function false
+      BridgePrefs.isUnlinked(ctx)
     }
 
     Function("resolveJson") { id: String, status: Int, body: String ->
@@ -135,6 +156,17 @@ class NlcLanBridgeModule : Module() {
     fun jsonString(value: String): String {
       val escaped = value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
       return "\"$escaped\""
+    }
+
+    fun emitUnlinked() {
+      instance?.sendEvent("onBridgeUnlinked", emptyMap<String, Any>())
+    }
+
+    fun emitClaimed(token: String, desktopHost: String) {
+      instance?.sendEvent(
+        "onBridgeClaimed",
+        mapOf("token" to token, "desktopHost" to desktopHost),
+      )
     }
   }
 }

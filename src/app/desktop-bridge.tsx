@@ -13,6 +13,7 @@ import {
   parsePairQr,
   saveBridgeToken,
   saveDesktopHost,
+  subscribeBridgeSession,
 } from "@/lib/bridge/session";
 import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -27,10 +28,14 @@ export default function DesktopBridgeScreen() {
   const [linkedHost, setLinkedHost] = useState<string | null>(null);
 
   useEffect(() => {
-    void (async () => {
+    async function refresh() {
       const [token, host] = await Promise.all([loadBridgeToken(), loadDesktopHost()]);
       setLinkedHost(token && host ? host : null);
-    })();
+    }
+    void refresh();
+    return subscribeBridgeSession(() => {
+      void refresh();
+    });
   }, []);
 
   async function connect(raw: string) {

@@ -33,6 +33,13 @@ pub fn save_session(session: &Session) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+#[allow(dead_code)]
+pub fn clear_session() {
+    if let Some(path) = session_path() {
+        let _ = fs::remove_file(path);
+    }
+}
+
 pub fn random_token() -> String {
     let mut bytes = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut bytes);

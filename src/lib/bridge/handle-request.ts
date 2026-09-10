@@ -57,6 +57,14 @@ export async function handleBridgeRequest(
     return { kind: "json", status: 200, body: { ok: true } };
   }
 
+  if (route === "/v1/discover") {
+    return { kind: "json", status: 200, body: { ok: true, app: "nlc" } };
+  }
+
+  if (route === "/v1/bye") {
+    return { kind: "json", status: 200, body: { ok: true } };
+  }
+
   if (route === "/v1/ping") {
     const ping = await source.ping().catch((error: unknown) => ({
       ok: false,

@@ -15,7 +15,7 @@ import { Screen } from "@/components/ui/screen";
 import { useAppUpdate } from "@/hooks/use-app-update";
 import { useDownloadSettings } from "@/hooks/use-download-settings";
 import { useNasSettings } from "@/hooks/use-nas-settings";
-import { loadBridgeToken, loadDesktopHost } from "@/lib/bridge/session";
+import { loadBridgeToken, loadDesktopHost, subscribeBridgeSession } from "@/lib/bridge/session";
 import { sendTestPush } from "@/lib/ota/test-push";
 import { formatOfflineBytes } from "@/lib/offline/downloader";
 import { useOffline } from "@/lib/offline/offline-context";
@@ -81,7 +81,7 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    async function refreshDesktop() {
       const [token, host] = await Promise.all([loadBridgeToken(), loadDesktopHost()]);
       if (cancelled) return;
       if (token && host) {
@@ -91,9 +91,14 @@ export default function SettingsScreen() {
         setDesktopLinked(false);
         setDesktopSummary(t("settings.desktopIdle"));
       }
-    })();
+    }
+    void refreshDesktop();
+    const unsub = subscribeBridgeSession(() => {
+      void refreshDesktop();
+    });
     return () => {
       cancelled = true;
+      unsub();
     };
   }, [t]);
 

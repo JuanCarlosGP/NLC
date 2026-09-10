@@ -30,11 +30,6 @@ pub struct Track {
 }
 
 #[derive(Debug, Deserialize)]
-struct ArtistsBody {
-    artists: Vec<Artist>,
-}
-
-#[derive(Debug, Deserialize)]
 struct AlbumsBody {
     albums: Vec<Album>,
 }
@@ -56,6 +51,7 @@ pub struct AlbumDetail {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct SearchBody {
     #[serde(default)]
     pub artists: Vec<Artist>,
@@ -91,12 +87,28 @@ impl BridgeClient {
         format!("Authorization: Bearer {}", self.token)
     }
 
-    fn get(&self, path: &str) -> Result<ureq::Response, String> {
+    fn get_with_timeout(&self, path: &str, timeout: std::time::Duration) -> Result<ureq::Response, String> {
         ureq::get(&format!("{}{path}", self.base))
             .set("Authorization", &format!("Bearer {}", self.token))
-            .timeout(std::time::Duration::from_secs(25))
+            .timeout(timeout)
             .call()
             .map_err(|e| e.to_string())
+    }
+
+    fn get(&self, path: &str) -> Result<ureq::Response, String> {
+        self.get_with_timeout(path, std::time::Duration::from_secs(25))
+    }
+
+    pub fn hello(&self) -> Result<(), String> {
+        let res = self.get_with_timeout("/v1/hello", std::time::Duration::from_millis(400))?;
+        if res.status() >= 300 {
+            return Err(format!("hello {}", res.status()));
+        }
+        Ok(())
+    }
+
+    pub fn bye(&self) {
+        let _ = self.get_with_timeout("/v1/bye", std::time::Duration::from_secs(3));
     }
 
     pub fn ping(&self) -> Result<(), String> {
@@ -105,11 +117,6 @@ impl BridgeClient {
             return Err(format!("ping {}", res.status()));
         }
         Ok(())
-    }
-
-    pub fn artists(&self) -> Result<Vec<Artist>, String> {
-        let body: ArtistsBody = self.get("/v1/artists")?.into_json().map_err(|e| e.to_string())?;
-        Ok(body.artists)
     }
 
     pub fn albums(&self) -> Result<Vec<Album>, String> {
@@ -129,25 +136,6 @@ impl BridgeClient {
     }
 }
 
-pub fn play_url(url: &str, auth_header: &str) -> Result<std::process::Child, String> {
-    std::process::Command::new("mpv")
-        .args([
-            "--no-video",
-            "--really-quiet",
-            "--force-window=no",
-            &format!("--http-header-fields={auth_header}"),
-            url,
-        ])
-        .spawn()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "mpv is not installed".into()
-            } else {
-                e.to_string()
-            }
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,7 +144,7 @@ mod tests {
     use tiny_http::{Header, Response, Server, StatusCode};
 
     #[test]
-    fn client_lists_artists_from_bridge() {
+    fn client_lists_albums_from_bridge() {
         let server = Server::http("127.0.0.1:0").unwrap();
         let port = server.server_addr().to_ip().unwrap().port();
         thread::spawn(move || {
@@ -164,7 +152,7 @@ mod tests {
                 let body = if request.url().starts_with("/v1/ping") {
                     r#"{"ok":true}"#.to_string()
                 } else {
-                    r#"{"artists":[{"id":"a1","name":"Ada"}]}"#.to_string()
+                    r#"{"albums":[{"id":"a1","name":"In Rainbows","artistName":"Radiohead"}]}"#.to_string()
                 };
                 let len = body.len();
                 let _ = request.respond(Response::new(
@@ -183,8 +171,8 @@ mod tests {
             device_id: "d".into(),
         });
         client.ping().unwrap();
-        let artists = client.artists().unwrap();
-        assert_eq!(artists[0].name, "Ada");
+        let albums = client.albums().unwrap();
+        assert_eq!(albums[0].name, "In Rainbows");
         assert!(client.stream_url("/Music/x.mp3").contains("id="));
     }
 }

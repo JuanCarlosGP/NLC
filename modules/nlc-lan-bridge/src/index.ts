@@ -4,6 +4,12 @@ import { Platform } from "react-native";
 export type BridgeStartResult = {
   port: number;
   lanAddress: string;
+  running?: boolean;
+};
+
+export type BridgeClaimedEvent = {
+  token: string;
+  desktopHost?: string;
 };
 
 export type BridgeRequestEvent = {
@@ -15,14 +21,18 @@ export type BridgeRequestEvent = {
 };
 
 type NativeBridge = {
-  start(port: number, token: string): Promise<BridgeStartResult>;
+  start(port: number, token: string, resume: boolean): Promise<BridgeStartResult>;
   stop(): Promise<void>;
   getLanAddress(): string;
+  isUnlinked(): boolean;
   pairToDesktop(host: string, port: number, token: string, jsonBody: string): Promise<string>;
   resolveJson(id: string, status: number, body: string): void;
   resolveStream(id: string, uri: string, headersJson: string): void;
   fail(id: string, status: number, message: string): void;
-  addListener(event: "onBridgeRequest", listener: (event: BridgeRequestEvent) => void): { remove(): void };
+  addListener(
+    event: "onBridgeRequest" | "onBridgeUnlinked" | "onBridgeClaimed",
+    listener: ((event: BridgeRequestEvent) => void) | ((event: BridgeClaimedEvent) => void) | (() => void),
+  ): { remove(): void };
 };
 
 let native: NativeBridge | null = null;
@@ -40,14 +50,20 @@ function loadNative(): NativeBridge | null {
 
 export const isLanBridgeAvailable = Platform.OS === "android" && loadNative() != null;
 
-export async function startLanBridge(port: number, token: string): Promise<BridgeStartResult> {
+export async function startLanBridge(port: number, token: string, resume = false): Promise<BridgeStartResult> {
   const mod = loadNative();
   if (!mod) throw new Error("Lan bridge native module is missing");
-  return mod.start(port, token);
+  return mod.start(port, token, resume);
 }
 
 export async function stopLanBridge(): Promise<void> {
   await loadNative()?.stop();
+}
+
+export function isBridgeUnlinked(): boolean {
+  const mod = loadNative();
+  if (!mod || typeof mod.isUnlinked !== "function") return false;
+  return mod.isUnlinked();
 }
 
 export function getLanAddress(): string {
@@ -81,4 +97,16 @@ export function addBridgeRequestListener(listener: (event: BridgeRequestEvent) =
   const mod = loadNative();
   if (!mod?.addListener) return { remove() {} };
   return mod.addListener("onBridgeRequest", listener);
+}
+
+export function addBridgeUnlinkedListener(listener: () => void): { remove(): void } {
+  const mod = loadNative();
+  if (!mod?.addListener) return { remove() {} };
+  return mod.addListener("onBridgeUnlinked", listener);
+}
+
+export function addBridgeClaimedListener(listener: (event: BridgeClaimedEvent) => void): { remove(): void } {
+  const mod = loadNative();
+  if (!mod?.addListener) return { remove() {} };
+  return mod.addListener("onBridgeClaimed", listener);
 }

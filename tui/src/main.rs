@@ -1,7 +1,10 @@
 mod app;
 mod client;
+mod library;
 mod pair;
+mod player;
 mod session;
+mod theme;
 
 fn main() {
     if let Err(err) = app::run() {

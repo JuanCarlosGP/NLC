@@ -15,15 +15,23 @@ pub struct PairOffer {
     pub port: u16,
     pub ip: String,
     pub url: String,
+    pub last_host: Option<String>,
+}
+
+pub struct PairWait {
+    pub session: Receiver<Session>,
+    pub status: Receiver<String>,
 }
 
 const PHONE_BRIDGE_PORT: u16 = 7421;
 
-pub fn listen_for_pair(offer: PairOffer) -> Result<Receiver<Session>, String> {
+pub fn listen_for_pair(offer: PairOffer) -> Result<PairWait, String> {
     let server = Server::http(("0.0.0.0", offer.port)).map_err(|e| e.to_string())?;
     let (tx, rx) = mpsc::channel();
+    let (status_tx, status_rx) = mpsc::channel();
     let token = offer.token.clone();
     let lan_ip = offer.ip.clone();
+    let last_host = offer.last_host.clone();
     let _ = offer.url;
     let claimed = Arc::new(AtomicBool::new(false));
 
@@ -110,43 +118,97 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<Receiver<Session>, String> {
     });
 
     thread::spawn(move || {
+        let prefix = subnet_prefix(&lan_ip).unwrap_or_else(|| lan_ip.clone());
+        let _ = status_tx.send(format!("Looking for NLC on {prefix}.0/24…"));
+        let mut last_note = String::new();
         loop {
             if claimed.load(Ordering::SeqCst) {
                 break;
             }
-            if let Some(session) = scan_subnet(&lan_ip, &token) {
-                eprintln!("nlc-tui pair found phone at {}:{}", session.phone_host, session.bridge_port);
-                if claimed.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
-                    let _ = tx.send(session);
+            match try_link(&lan_ip, &token, last_host.as_deref()) {
+                ScanHit::Linked(session) => {
+                    let _ = status_tx.send(format!("Found NLC at {}", session.phone_host));
+                    eprintln!("nlc-tui pair found phone at {}:{}", session.phone_host, session.bridge_port);
+                    if claimed.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+                        let _ = tx.send(session);
+                    }
+                    break;
                 }
-                break;
+                ScanHit::Seen(host) => {
+                    let note = format!("Found a phone at {host}. Keep NLC open, or scan the QR.");
+                    if note != last_note {
+                        let _ = status_tx.send(note.clone());
+                        last_note = note;
+                    }
+                }
+                ScanHit::None => {}
             }
-            thread::sleep(Duration::from_millis(400));
+            thread::sleep(Duration::from_millis(800));
         }
     });
 
-    Ok(rx)
+    Ok(PairWait {
+        session: rx,
+        status: status_rx,
+    })
+}
+
+fn subnet_prefix(lan_ip: &str) -> Option<String> {
+    let parts: Vec<&str> = lan_ip.split('.').collect();
+    if parts.len() != 4 {
+        return None;
+    }
+    Some(format!("{}.{}.{}", parts[0], parts[1], parts[2]))
 }
 
 fn subnet_hosts(lan_ip: &str) -> Vec<String> {
-    let parts: Vec<&str> = lan_ip.split('.').collect();
-    if parts.len() != 4 {
+    let Some(prefix) = subnet_prefix(lan_ip) else {
         return Vec::new();
-    }
-    let prefix = format!("{}.{}.{}", parts[0], parts[1], parts[2]);
-    let self_oct: u8 = parts[3].parse().unwrap_or(0);
+    };
+    let parts: Vec<&str> = lan_ip.split('.').collect();
+    let self_oct: u8 = parts.get(3).and_then(|p| p.parse().ok()).unwrap_or(0);
     (1u8..=254)
         .filter(|&octet| octet != self_oct)
         .map(|octet| format!("{prefix}.{octet}"))
         .collect()
 }
 
-fn probe_phone(host: &str, port: u16, token: &str) -> bool {
+fn tcp_open(host: &str, port: u16, wait_ms: u64) -> bool {
     let Ok(ip) = host.parse::<std::net::Ipv4Addr>() else {
         return false;
     };
     let addr = SocketAddr::from((ip, port));
-    if TcpStream::connect_timeout(&addr, Duration::from_millis(180)).is_err() {
+    TcpStream::connect_timeout(&addr, Duration::from_millis(wait_ms)).is_ok()
+}
+
+fn discover_nlc(host: &str, port: u16) -> bool {
+    if !tcp_open(host, port, 80) {
+        return false;
+    }
+    let url = format!("http://{host}:{port}/v1/discover");
+    match ureq::get(&url).timeout(Duration::from_millis(500)).call() {
+        Ok(res) if (200..300).contains(&res.status()) => {
+            res.into_string().ok().is_some_and(|body| body.contains("nlc"))
+        }
+        _ => false,
+    }
+}
+
+fn claim_phone(host: &str, port: u16, token: &str, desktop: &str) -> bool {
+    let url = format!("http://{host}:{port}/v1/claim");
+    let body = serde_json::json!({ "token": token, "desktopHost": desktop }).to_string();
+    match ureq::post(&url)
+        .set("Content-Type", "application/json")
+        .timeout(Duration::from_secs(2))
+        .send_string(&body)
+    {
+        Ok(res) if (200..300).contains(&res.status()) => true,
+        _ => false,
+    }
+}
+
+fn probe_phone(host: &str, port: u16, token: &str) -> bool {
+    if !tcp_open(host, port, 80) {
         return false;
     }
     for path in ["/v1/hello", "/v1/ping"] {
@@ -163,29 +225,66 @@ fn probe_phone(host: &str, port: u16, token: &str) -> bool {
     false
 }
 
-fn scan_subnet(lan_ip: &str, token: &str) -> Option<Session> {
+enum ScanHit {
+    Linked(Session),
+    Seen(String),
+    None,
+}
+
+fn try_link(lan_ip: &str, token: &str, last_host: Option<&str>) -> ScanHit {
+    if let Some(host) = last_host {
+        if let Some(session) = link_host(host, token, lan_ip) {
+            return ScanHit::Linked(session);
+        }
+        if tcp_open(host, PHONE_BRIDGE_PORT, 80) {
+            return ScanHit::Seen(host.to_string());
+        }
+    }
+    scan_subnet(lan_ip, token)
+}
+
+fn link_host(host: &str, token: &str, desktop: &str) -> Option<Session> {
+    if claim_phone(host, PHONE_BRIDGE_PORT, token, desktop) || probe_phone(host, PHONE_BRIDGE_PORT, token) {
+        return Some(Session {
+            token: token.to_string(),
+            phone_host: host.to_string(),
+            bridge_port: PHONE_BRIDGE_PORT,
+            device_id: "phone".into(),
+        });
+    }
+    None
+}
+
+fn scan_subnet(lan_ip: &str, token: &str) -> ScanHit {
     let hosts = subnet_hosts(lan_ip);
+    let mut seen = None;
     for chunk in hosts.chunks(48) {
         let hit = std::sync::Mutex::new(None::<String>);
+        let open = std::sync::Mutex::new(None::<String>);
         thread::scope(|scope| {
             for host in chunk {
                 scope.spawn(|| {
-                    if probe_phone(host, PHONE_BRIDGE_PORT, token) {
+                    if discover_nlc(host, PHONE_BRIDGE_PORT) {
                         *hit.lock().unwrap() = Some(host.clone());
+                    } else if tcp_open(host, PHONE_BRIDGE_PORT, 80) {
+                        *open.lock().unwrap() = Some(host.clone());
                     }
                 });
             }
         });
         if let Some(phone_host) = hit.into_inner().ok().flatten() {
-            return Some(Session {
-                token: token.to_string(),
-                phone_host,
-                bridge_port: PHONE_BRIDGE_PORT,
-                device_id: "phone".into(),
-            });
+            if let Some(session) = link_host(&phone_host, token, lan_ip) {
+                return ScanHit::Linked(session);
+            }
+            seen = Some(phone_host);
+        } else if seen.is_none() {
+            seen = open.into_inner().ok().flatten();
         }
     }
-    None
+    match seen {
+        Some(host) => ScanHit::Seen(host),
+        None => ScanHit::None,
+    }
 }
 
 #[cfg(test)]
