@@ -99,6 +99,27 @@ function withMediaSkipButtons(config) {
       copyPatchedKotlin(root, "AudioMediaSessionCallback.kt");
       copyPatchedKotlin(root, "LockScreenPlayer.kt");
 
+      // Ensure expo-audio compiles from patched source instead of stock prebuilt AAR
+      const moduleConfigPath = path.join(root, "expo-module.config.json");
+      const moduleConfig = read(moduleConfigPath);
+      if (moduleConfig && moduleConfig.includes('"publication"')) {
+        try {
+          const parsed = JSON.parse(moduleConfig);
+          if (parsed.android && parsed.android.publication) {
+            delete parsed.android.publication;
+            write(moduleConfigPath, JSON.stringify(parsed, null, 2));
+          }
+        } catch (e) {
+          console.warn("[with-media-skip-buttons] failed to strip publication from expo-module.config.json", e);
+        }
+      }
+      const localMaven = path.join(root, "local-maven-repo");
+      if (fs.existsSync(localMaven)) {
+        try {
+          fs.rmSync(localMaven, { recursive: true, force: true });
+        } catch (_) {}
+      }
+
       const iosRecords = path.join(root, "ios/AudioRecords.swift");
       source = read(iosRecords);
       if (source && !source.includes("showNextTrack")) {

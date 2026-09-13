@@ -2,6 +2,7 @@ package expo.modules.audio.service
 
 import androidx.annotation.OptIn
 import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 
@@ -16,6 +17,17 @@ class LockScreenPlayer(
   player: Player,
   private val onSkip: (String) -> Unit,
 ) : ForwardingPlayer(player) {
+  @Volatile
+  var customMetadata: MediaMetadata = MediaMetadata.EMPTY
+
+  override fun getMediaMetadata(): MediaMetadata {
+    return if (customMetadata != MediaMetadata.EMPTY) customMetadata else super.getMediaMetadata()
+  }
+
+  override fun getPlaylistMetadata(): MediaMetadata {
+    return if (customMetadata != MediaMetadata.EMPTY) customMetadata else super.getPlaylistMetadata()
+  }
+
   override fun getAvailableCommands(): Player.Commands {
     return super.getAvailableCommands().buildUpon()
       .add(Player.COMMAND_SEEK_TO_NEXT)

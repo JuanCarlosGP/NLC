@@ -4,11 +4,17 @@ import {
 } from "@/lib/library/artwork-cache";
 import type { Track } from "@/lib/nas/types";
 
-/** Remote art only — data: URIs crash expo-audio's Android URL parser and kill the session. */
+/** Valid URL only — data: URIs crash expo-audio's Android URL parser and kill the session. */
 export function lockScreenArtworkUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
   const trimmed = url.trim();
-  if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) return trimmed;
+  if (
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("file://")
+  ) {
+    return trimmed;
+  }
   return undefined;
 }
 
