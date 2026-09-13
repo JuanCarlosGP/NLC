@@ -1,6 +1,6 @@
 {
   "name": "nlc",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "description": "Reproductor Android personal para la biblioteca de un NAS (música, podcasts, vídeo, foco y patrimonio).",
   "license": "SEE LICENSE IN LICENSE",
