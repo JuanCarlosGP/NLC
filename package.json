@@ -39,8 +39,8 @@
     "apk:check": "bash scripts/check-android-native.sh",
     "tui": "cargo run --manifest-path tui/Cargo.toml",
     "tui:test": "cargo test --manifest-path tui/Cargo.toml",
-    "update:preview": "eas update --channel preview && node scripts/notify-ota.mjs preview",
-    "update:production": "eas update --channel production && node scripts/notify-ota.mjs production",
+    "update:preview": "npx eas-cli update --channel preview && node scripts/notify-ota.mjs preview",
+    "update:production": "npx eas-cli update --channel production && node scripts/notify-ota.mjs production",
     "apk:release": "node scripts/release-apk.mjs",
     "ios": "expo run:ios"
   },
