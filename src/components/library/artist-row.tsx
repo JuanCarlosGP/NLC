@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Cover } from "@/components/ui/cover";
 import { useCoverUrl } from "@/hooks/use-cover-url";
@@ -5,7 +6,7 @@ import type { Artist } from "@/lib/nas/types";
 import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts } from "@/lib/theme";
 
-export function ArtistRow({
+export const ArtistRow = memo(function ArtistRow({
   artist,
   subtitle,
   onPress,
@@ -32,7 +33,7 @@ export function ArtistRow({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {

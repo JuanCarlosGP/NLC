@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import * as FileSystem from "expo-file-system/legacy";
 import { collateLocale, t } from "@/lib/i18n/runtime";
 import type { NasSettings } from "@/lib/settings/storage";
 import { nasBaseUrl } from "@/lib/settings/storage";
@@ -84,6 +85,59 @@ function webNasUri(nasUrl: string, extra?: Record<string, string>): string {
 }
 
 const nativeCoverCache = new Map<string, string>();
+const inFlightCovers = new Map<string, Promise<string | null>>();
+
+const COVER_CACHE_DIR = Platform.OS !== "web" ? `${FileSystem.cacheDirectory}covers/` : null;
+let coverDirEnsured = false;
+
+async function ensureCoverCacheDir(): Promise<string | null> {
+  if (!COVER_CACHE_DIR) return null;
+  if (coverDirEnsured) return COVER_CACHE_DIR;
+  try {
+    const info = await FileSystem.getInfoAsync(COVER_CACHE_DIR);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(COVER_CACHE_DIR, { intermediates: true });
+    }
+    coverDirEnsured = true;
+    return COVER_CACHE_DIR;
+  } catch {
+    return null;
+  }
+}
+
+function coverCacheKey(id: string): string {
+  let hash = 5381;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) + hash) + id.charCodeAt(i);
+    hash |= 0;
+  }
+  const clean = id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(-24);
+  return `cov_${Math.abs(hash)}_${clean}.jpg`;
+}
+
+class CoverLimiter {
+  private active = 0;
+  private queue: (() => void)[] = [];
+
+  constructor(private readonly maxConcurrent: number = 4) {}
+
+  async acquire(): Promise<void> {
+    if (this.active < this.maxConcurrent) {
+      this.active++;
+      return;
+    }
+    await new Promise<void>((resolve) => this.queue.push(resolve));
+    this.active++;
+  }
+
+  release(): void {
+    this.active--;
+    const next = this.queue.shift();
+    if (next) next();
+  }
+}
+
+const coverLimiter = new CoverLimiter(4);
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -688,18 +742,64 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
       const nasUrl = absolute(id);
       const cached = nativeCoverCache.get(nasUrl);
       if (cached) return cached;
+
+      const inFlight = inFlightCovers.get(nasUrl);
+      if (inFlight) return inFlight;
+
+      const fetchPromise = (async () => {
+        // Native disk cache path (Android / iOS): avoids Base64 entirely
+        if (Platform.OS !== "web" && COVER_CACHE_DIR) {
+          try {
+            await coverLimiter.acquire();
+            const dir = await ensureCoverCacheDir();
+            if (dir) {
+              const fileKey = coverCacheKey(id);
+              const dest = `${dir}${fileKey}`;
+              const info = await FileSystem.getInfoAsync(dest);
+              if (info.exists && !info.isDirectory && (info.size ?? 0) > 0) {
+                nativeCoverCache.set(nasUrl, dest);
+                return dest;
+              }
+              const auth = session.authorization("GET", nasUrl);
+              const headers: Record<string, string> = auth ? { Authorization: auth } : {};
+              const res = await FileSystem.downloadAsync(nasUrl, dest, { headers });
+              if (res.status >= 200 && res.status < 300) {
+                nativeCoverCache.set(nasUrl, dest);
+                return dest;
+              }
+              await FileSystem.deleteAsync(dest, { idempotent: true }).catch(() => undefined);
+            }
+          } catch {
+            // fall through to in-memory fallback
+          } finally {
+            coverLimiter.release();
+          }
+        }
+
+        // Web / in-memory fallback path:
+        try {
+          await coverLimiter.acquire();
+          const response = await davFetch(nasUrl);
+          if (!response.ok) return null;
+          const bytes = await response.arrayBuffer();
+          if (!bytes.byteLength) return null;
+          const type = (response.headers.get("content-type") ?? "image/jpeg").split(";")[0]!.trim();
+          if (!type.startsWith("image/")) return null;
+          const uri = `data:${type};base64,${arrayBufferToBase64(bytes)}`;
+          nativeCoverCache.set(nasUrl, uri);
+          return uri;
+        } catch {
+          return null;
+        } finally {
+          coverLimiter.release();
+        }
+      })();
+
+      inFlightCovers.set(nasUrl, fetchPromise);
       try {
-        const response = await davFetch(nasUrl);
-        if (!response.ok) return null;
-        const bytes = await response.arrayBuffer();
-        if (!bytes.byteLength) return null;
-        const type = (response.headers.get("content-type") ?? "image/jpeg").split(";")[0]!.trim();
-        if (!type.startsWith("image/")) return null;
-        const uri = `data:${type};base64,${arrayBufferToBase64(bytes)}`;
-        nativeCoverCache.set(nasUrl, uri);
-        return uri;
-      } catch {
-        return null;
+        return await fetchPromise;
+      } finally {
+        inFlightCovers.delete(nasUrl);
       }
     },
 

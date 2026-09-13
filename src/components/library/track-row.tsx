@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { memo, useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { MoreVertical } from "lucide-react-native";
@@ -20,7 +20,7 @@ function formatDuration(ms: number): string {
   return `${min}:${sec.toString().padStart(2, "0")}`;
 }
 
-export function TrackRow({
+export const TrackRow = memo(function TrackRow({
   track,
   index,
   active,
@@ -85,7 +85,7 @@ export function TrackRow({
       </Pressable>
     </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {

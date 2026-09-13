@@ -1,8 +1,9 @@
+import { memo } from "react";
 import { LibraryTile } from "@/components/library/library-tile";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import type { Album } from "@/lib/nas/types";
 
-export function AlbumTile({
+export const AlbumTile = memo(function AlbumTile({
   album,
   coverUri,
   subtitle,
@@ -26,9 +27,9 @@ export function AlbumTile({
       onLongPress={onLongPress}
     />
   );
-}
+});
 
-export function ArtistTile({
+export const ArtistTile = memo(function ArtistTile({
   id,
   name,
   subtitle,
@@ -45,4 +46,4 @@ export function ArtistTile({
   return (
     <LibraryTile id={id} title={name} subtitle={subtitle} uri={cover} round onPress={onPress} />
   );
-}
+});

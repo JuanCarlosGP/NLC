@@ -1,9 +1,10 @@
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Cover } from "@/components/ui/cover";
 import { triggerLongPressUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
-export function LibraryTile({
+export const LibraryTile = memo(function LibraryTile({
   id,
   title,
   subtitle,
@@ -45,7 +46,7 @@ export function LibraryTile({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   tile: { gap: 8, width: "100%" },

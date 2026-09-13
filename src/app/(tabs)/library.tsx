@@ -42,6 +42,7 @@ import type { ImportedPlaylist } from "@/lib/spotify/types";
 import type { I18nVars } from "@/lib/i18n/t";
 
 const GENERAL_RECENT_LIMIT = 8;
+const PAGE_SIZE = 24;
 
 function compareText(a: string, b: string): number {
   return a.localeCompare(b, collateLocale(), { sensitivity: "base" });
@@ -124,8 +125,13 @@ export default function LibraryScreen() {
   const { openPlaylistActions } = usePlaylistActions();
   const [importOpen, setImportOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { sort, viewMode, setSort, setViewMode, ready: browseReady } = useBrowsePrefs("nlc.library.browse.v1");
   const grid = viewMode === "grid";
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [tab, sort]);
 
   useFocusEffect(
     useCallback(() => {
@@ -226,6 +232,31 @@ export default function LibraryScreen() {
       sort,
     );
   }, [allMix, recentMix, sort]);
+
+  const renderedRestMix = useMemo(
+    () => restMix.slice(0, visibleCount),
+    [restMix, visibleCount],
+  );
+
+  const renderedPlaylists = useMemo(
+    () => sortedPlaylists.slice(0, visibleCount),
+    [sortedPlaylists, visibleCount],
+  );
+
+  const renderedPodcasts = useMemo(
+    () => podcastAlbums.slice(0, visibleCount),
+    [podcastAlbums, visibleCount],
+  );
+
+  const renderedArtists = useMemo(
+    () => sortedArtists.slice(0, visibleCount),
+    [sortedArtists, visibleCount],
+  );
+
+  const renderedTracks = useMemo(
+    () => visibleTracks.slice(0, visibleCount),
+    [visibleTracks, visibleCount],
+  );
 
   function renderMixItem(item: MixItem) {
     if (item.kind === "playlist") {
@@ -378,7 +409,17 @@ export default function LibraryScreen() {
             {restMix.length ? (
               <View style={styles.section}>
                 <Text style={styles.sectionLabel}>{t("library.all")}</Text>
-                <Collection>{restMix.map((item) => renderMixItem(item))}</Collection>
+                <Collection>{renderedRestMix.map((item) => renderMixItem(item))}</Collection>
+                {restMix.length > renderedRestMix.length ? (
+                  <Pressable
+                    onPress={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                    style={({ pressed }) => [styles.more, { opacity: pressed ? 0.8 : 1 }]}
+                  >
+                    <Text style={styles.moreText}>
+                      {t("library.showMore", { count: restMix.length - renderedRestMix.length })}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
             {!recentMix.length && !restMix.length ? (
@@ -389,11 +430,23 @@ export default function LibraryScreen() {
 
         {tab === "playlists" ? (
           sortedPlaylists.length ? (
-            <Collection>
-              {sortedPlaylists.map(({ playlist, album }) =>
-                wrap(playlist.id, playlistNode(playlist, album)),
-              )}
-            </Collection>
+            <>
+              <Collection>
+                {renderedPlaylists.map(({ playlist, album }) =>
+                  wrap(playlist.id, playlistNode(playlist, album)),
+                )}
+              </Collection>
+              {sortedPlaylists.length > renderedPlaylists.length ? (
+                <Pressable
+                  onPress={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  style={({ pressed }) => [styles.more, { opacity: pressed ? 0.8 : 1 }]}
+                >
+                  <Text style={styles.moreText}>
+                    {t("library.showMore", { count: sortedPlaylists.length - renderedPlaylists.length })}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </>
           ) : (
             <Text style={type.body}>{t("library.emptyPlaylistsImport")}</Text>
           )
@@ -401,9 +454,21 @@ export default function LibraryScreen() {
 
         {tab === "podcasts" ? (
           podcastAlbums.length ? (
-            <Collection>
-              {podcastAlbums.map((album) => wrap(album.id, albumNode(album, t("library.podcast"))))}
-            </Collection>
+            <>
+              <Collection>
+                {renderedPodcasts.map((album) => wrap(album.id, albumNode(album, t("library.podcast"))))}
+              </Collection>
+              {podcastAlbums.length > renderedPodcasts.length ? (
+                <Pressable
+                  onPress={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  style={({ pressed }) => [styles.more, { opacity: pressed ? 0.8 : 1 }]}
+                >
+                  <Text style={styles.moreText}>
+                    {t("library.showMore", { count: podcastAlbums.length - renderedPodcasts.length })}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </>
           ) : (
             <Text style={type.body}>{t("library.emptyPodcastsSettings")}</Text>
           )
@@ -411,21 +476,33 @@ export default function LibraryScreen() {
 
         {tab === "artists" ? (
           sortedArtists.length ? (
-            <Collection>
-              {sortedArtists.map((artist) =>
-                wrap(
-                  artist.id,
-                  artistNode(
-                    artist,
-                    artist.albumCount
-                      ? t(artist.albumCount === 1 ? "library.playlistOne" : "library.playlistMany", {
-                          count: artist.albumCount,
-                        })
-                      : t("library.artist"),
+            <>
+              <Collection>
+                {renderedArtists.map((artist) =>
+                  wrap(
+                    artist.id,
+                    artistNode(
+                      artist,
+                      artist.albumCount
+                        ? t(artist.albumCount === 1 ? "library.playlistOne" : "library.playlistMany", {
+                            count: artist.albumCount,
+                          })
+                        : t("library.artist"),
+                    ),
                   ),
-                ),
-              )}
-            </Collection>
+                )}
+              </Collection>
+              {sortedArtists.length > renderedArtists.length ? (
+                <Pressable
+                  onPress={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  style={({ pressed }) => [styles.more, { opacity: pressed ? 0.8 : 1 }]}
+                >
+                  <Text style={styles.moreText}>
+                    {t("library.showMore", { count: sortedArtists.length - renderedArtists.length })}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </>
           ) : (
             <Text style={type.body}>{t("library.emptyArtists")}</Text>
           )
@@ -433,20 +510,34 @@ export default function LibraryScreen() {
 
         {tab === "tracks"
           ? visibleTracks.length
-            ? visibleTracks.map((track, index) => (
-                <TrackRow
-                  key={track.id}
-                  track={track}
-                  index={index + 1}
-                  exiting={isExiting(track.id)}
-                  onPress={() => {
-                    if (isExiting(track.id)) return;
-                    const playIndex = tracks.findIndex((item) => item.id === track.id);
-                    if (playIndex < 0) return;
-                    void playTracks(tracks, playIndex);
-                  }}
-                />
-              ))
+            ? (
+              <>
+                {renderedTracks.map((track, index) => (
+                  <TrackRow
+                    key={track.id}
+                    track={track}
+                    index={index + 1}
+                    exiting={isExiting(track.id)}
+                    onPress={() => {
+                      if (isExiting(track.id)) return;
+                      const playIndex = tracks.findIndex((item) => item.id === track.id);
+                      if (playIndex < 0) return;
+                      void playTracks(tracks, playIndex);
+                    }}
+                  />
+                ))}
+                {visibleTracks.length > renderedTracks.length ? (
+                  <Pressable
+                    onPress={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                    style={({ pressed }) => [styles.more, { opacity: pressed ? 0.8 : 1 }]}
+                  >
+                    <Text style={styles.moreText}>
+                      {t("library.showMore", { count: visibleTracks.length - renderedTracks.length })}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </>
+            )
             : <Text style={type.body}>{zone === "podcast" ? t("library.emptyEpisodes") : t("library.emptyTracks")}</Text>
           : null}
           </>
@@ -737,4 +828,15 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   error: { ...type.body, color: colors.danger },
+  more: {
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.rule,
+    backgroundColor: colors.sheet,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  moreText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.ink },
 });

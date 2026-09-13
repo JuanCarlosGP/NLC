@@ -1,10 +1,11 @@
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Cover } from "@/components/ui/cover";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import type { Album } from "@/lib/nas/types";
 import { colors, fonts } from "@/lib/theme";
 
-export function AlbumRow({
+export const AlbumRow = memo(function AlbumRow({
   album,
   coverUri,
   subtitle,
@@ -38,7 +39,7 @@ export function AlbumRow({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {

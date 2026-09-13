@@ -79,6 +79,7 @@ export const mediaEn = {
     albumMany: "{count} playlists",
     playlistOne: "{count} playlist",
     playlistMany: "{count} playlists",
+    showMore: "Show more ({count} left)",
   },
   music: {
     title: "Music",
@@ -502,6 +503,7 @@ export const mediaEs = {
     albumMany: "{count} playlists",
     playlistOne: "{count} playlist",
     playlistMany: "{count} playlists",
+    showMore: "Mostrar más ({count} restantes)",
   },
   music: {
     title: "Música",
