@@ -15,7 +15,7 @@ function read(file) {
 
 function write(file, next) {
   const prev = read(file);
-  if (prev == null || prev === next) return;
+  if (prev === next) return;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, next);
 }
@@ -39,48 +39,46 @@ function copyPatchedKotlin(root, filename) {
   write(dest, next);
 }
 
-function withMediaSkipButtons(config) {
-  return withDangerousMod(config, [
-    "android",
-    async (modConfig) => {
-      const root = path.join(modConfig.modRequest.projectRoot, "node_modules/expo-audio");
+function patchExpoAudio(projectRoot) {
+  const root = path.join(projectRoot, "node_modules/expo-audio");
+  if (!fs.existsSync(root)) return;
 
-      const records = path.join(root, "android/src/main/java/expo/modules/audio/AudioRecords.kt");
-      let source = read(records);
-      if (source && !source.includes("showNextTrack")) {
-        write(
-          records,
-          source.replace(
-            `class AudioLockScreenOptions(
+  const records = path.join(root, "android/src/main/java/expo/modules/audio/AudioRecords.kt");
+  let source = read(records);
+  if (source && !source.includes("showNextTrack")) {
+    write(
+      records,
+      source.replace(
+        `class AudioLockScreenOptions(
   @Field val showSeekForward: Boolean,
   @Field val showSeekBackward: Boolean
 ) : Record`,
-            `class AudioLockScreenOptions(
+        `class AudioLockScreenOptions(
   @Field val showSeekForward: Boolean = false,
   @Field val showSeekBackward: Boolean = false,
   // ${MARKER}
   @Field val showNextTrack: Boolean = false,
   @Field val showPreviousTrack: Boolean = false
 ) : Record`,
-          ),
-        );
-      }
+      ),
+    );
+  }
 
-      const player = path.join(root, "android/src/main/java/expo/modules/audio/AudioPlayer.kt");
-      source = read(player);
-      if (source && !patched(source)) {
-        source = source.replace(
-          `private const val AUDIO_SAMPLE_UPDATE = "audioSampleUpdate"`,
-          `private const val AUDIO_SAMPLE_UPDATE = "audioSampleUpdate"\nprivate const val LOCK_SCREEN_SKIP = "lockScreenSkip"`,
-        );
-        if (!source.includes("emitLockScreenSkip")) {
-          source = source.replace(
-            `fun clearLockScreenControls() {
+  const player = path.join(root, "android/src/main/java/expo/modules/audio/AudioPlayer.kt");
+  source = read(player);
+  if (source && !patched(source)) {
+    source = source.replace(
+      `private const val AUDIO_SAMPLE_UPDATE = "audioSampleUpdate"`,
+      `private const val AUDIO_SAMPLE_UPDATE = "audioSampleUpdate"\nprivate const val LOCK_SCREEN_SKIP = "lockScreenSkip"`,
+    );
+    if (!source.includes("emitLockScreenSkip")) {
+      source = source.replace(
+        `fun clearLockScreenControls() {
     if (isActiveForLockScreen) {
       AudioControlsService.setActivePlayer(context, null)
     }
   }`,
-            `fun clearLockScreenControls() {
+        `fun clearLockScreenControls() {
     if (isActiveForLockScreen) {
       AudioControlsService.setActivePlayer(context, null)
     }
@@ -90,59 +88,67 @@ function withMediaSkipButtons(config) {
   fun emitLockScreenSkip(direction: String) {
     emit(LOCK_SCREEN_SKIP, mapOf("direction" to direction))
   }`,
-          );
-        }
-        write(player, source);
-      }
+      );
+    }
+    write(player, source);
+  }
 
-      copyPatchedKotlin(root, "AudioControlsService.kt");
-      copyPatchedKotlin(root, "AudioMediaSessionCallback.kt");
-      copyPatchedKotlin(root, "LockScreenPlayer.kt");
+  copyPatchedKotlin(root, "AudioControlsService.kt");
+  copyPatchedKotlin(root, "AudioMediaSessionCallback.kt");
+  copyPatchedKotlin(root, "LockScreenPlayer.kt");
 
-      // Ensure expo-audio compiles from patched source instead of stock prebuilt AAR
-      const moduleConfigPath = path.join(root, "expo-module.config.json");
-      const moduleConfig = read(moduleConfigPath);
-      if (moduleConfig && moduleConfig.includes('"publication"')) {
-        try {
-          const parsed = JSON.parse(moduleConfig);
-          if (parsed.android && parsed.android.publication) {
-            delete parsed.android.publication;
-            write(moduleConfigPath, JSON.stringify(parsed, null, 2));
-          }
-        } catch (e) {
-          console.warn("[with-media-skip-buttons] failed to strip publication from expo-module.config.json", e);
-        }
+  // Ensure expo-audio compiles from patched source instead of stock prebuilt AAR
+  const moduleConfigPath = path.join(root, "expo-module.config.json");
+  const moduleConfig = read(moduleConfigPath);
+  if (moduleConfig && moduleConfig.includes('"publication"')) {
+    try {
+      const parsed = JSON.parse(moduleConfig);
+      if (parsed.android && parsed.android.publication) {
+        delete parsed.android.publication;
+        write(moduleConfigPath, JSON.stringify(parsed, null, 2));
       }
-      const localMaven = path.join(root, "local-maven-repo");
-      if (fs.existsSync(localMaven)) {
-        try {
-          fs.rmSync(localMaven, { recursive: true, force: true });
-        } catch (_) {}
-      }
+    } catch (e) {
+      console.warn("[with-media-skip-buttons] failed to strip publication from expo-module.config.json", e);
+    }
+  }
+  const localMaven = path.join(root, "local-maven-repo");
+  if (fs.existsSync(localMaven)) {
+    try {
+      fs.rmSync(localMaven, { recursive: true, force: true });
+    } catch (_) {}
+  }
 
-      const iosRecords = path.join(root, "ios/AudioRecords.swift");
-      source = read(iosRecords);
-      if (source && !source.includes("showNextTrack")) {
-        write(
-          iosRecords,
-          source.replace(
-            `struct LockScreenOptions: Record {
+  const iosRecords = path.join(root, "ios/AudioRecords.swift");
+  source = read(iosRecords);
+  if (source && !source.includes("showNextTrack")) {
+    write(
+      iosRecords,
+      source.replace(
+        `struct LockScreenOptions: Record {
   @Field var showSeekForward: Bool = false
   @Field var showSeekBackward: Bool = false
 }`,
-            `struct LockScreenOptions: Record {
+        `struct LockScreenOptions: Record {
   @Field var showSeekForward: Bool = false
   @Field var showSeekBackward: Bool = false
   // ${MARKER}
   @Field var showNextTrack: Bool = false
   @Field var showPreviousTrack: Bool = false
 }`,
-          ),
-        );
-      }
+      ),
+    );
+  }
+}
+
+function withMediaSkipButtons(config) {
+  return withDangerousMod(config, [
+    "android",
+    async (modConfig) => {
+      patchExpoAudio(modConfig.modRequest.projectRoot);
       return modConfig;
     },
   ]);
 }
 
+withMediaSkipButtons.patchExpoAudio = patchExpoAudio;
 module.exports = withMediaSkipButtons;
