@@ -31,7 +31,7 @@ async function withNasTimeout(work: Promise<PingResult>): Promise<PingResult> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(t("nas.timeout"))), 10_000);
+      timer = setTimeout(() => reject(new Error(t("nas.timeout"))), 15_000);
     });
     return await Promise.race([work, timeout]);
   } catch (error) {

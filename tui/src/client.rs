@@ -11,10 +11,13 @@ pub struct Artist {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct Album {
     pub id: String,
     pub name: String,
     pub artist_name: String,
+    #[serde(default)]
+    pub cover_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -23,6 +26,8 @@ pub struct Album {
 pub struct Track {
     pub id: String,
     pub title: String,
+    #[serde(default)]
+    pub album_id: String,
     pub album_name: String,
     pub artist_name: String,
     #[serde(default)]
@@ -30,6 +35,10 @@ pub struct Track {
     /// Seconds, when the bridge sends `duration` instead of `durationMs`.
     #[serde(default)]
     duration: Option<f64>,
+    #[serde(default)]
+    pub cover_id: Option<String>,
+    #[serde(default)]
+    pub artwork_url: Option<String>,
 }
 
 impl Track {
@@ -48,6 +57,22 @@ impl Track {
         } else {
             (raw * 1000.0).round() as u64
         };
+    }
+
+    pub fn cover_key(&self) -> Option<String> {
+        if let Some(art) = &self.artwork_url {
+            let trimmed = art.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+        if let Some(cov) = &self.cover_id {
+            let trimmed = cov.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+        None
     }
 }
 
@@ -87,6 +112,31 @@ pub struct SearchBody {
 pub struct BridgeClient {
     base: String,
     token: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct CoverResponse {
+    #[serde(default)]
+    url: Option<String>,
+}
+
+fn decode_data_uri(uri: &str) -> Option<Vec<u8>> {
+    let (_, data_part) = uri.split_once(',')?;
+    use base64::prelude::*;
+    BASE64_STANDARD.decode(data_part.trim().as_bytes()).ok()
+}
+
+fn fetch_http_bytes(url: &str) -> Result<Vec<u8>, String> {
+    let res = ureq::get(url)
+        .timeout(std::time::Duration::from_secs(8))
+        .call()
+        .map_err(|e| e.to_string())?;
+    let mut buf = Vec::new();
+    use std::io::Read;
+    res.into_reader()
+        .read_to_end(&mut buf)
+        .map_err(|e| e.to_string())?;
+    Ok(buf)
 }
 
 impl BridgeClient {
@@ -169,6 +219,97 @@ impl BridgeClient {
         Ok(body.tracks)
     }
 
+    pub fn videos(&self) -> Result<Vec<Album>, String> {
+        let res = self.get_with_timeout("/v1/video", std::time::Duration::from_secs(20))?;
+        let body: AlbumsBody = res.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        Ok(body.albums)
+    }
+
+    pub fn cover_bytes(&self, key: &str) -> Result<Vec<u8>, String> {
+        let trimmed = key.trim();
+        if trimmed.is_empty() {
+            return Err("empty key".into());
+        }
+
+        let clean_key = trimmed.strip_prefix("cover:").unwrap_or(trimmed);
+
+        if clean_key.starts_with("data:") {
+            return decode_data_uri(clean_key).ok_or_else(|| "invalid data uri".into());
+        }
+
+        if clean_key.starts_with("http://") || clean_key.starts_with("https://") {
+            if clean_key.starts_with(&self.base) {
+                let rel = &clean_key[self.base.len()..];
+                if let Ok(bytes) = self.fetch_bridge_stream_bytes(rel) {
+                    if !bytes.is_empty() {
+                        return Ok(bytes);
+                    }
+                }
+            } else if let Ok(bytes) = fetch_http_bytes(clean_key) {
+                if !bytes.is_empty() {
+                    return Ok(bytes);
+                }
+            }
+        }
+
+        // Fast path for WebDAV/NAS paths (e.g. /Music/Canciones/Kit Kat.jpg):
+        // /v1/stream?id=... on the phone proxies the binary image directly through native Kotlin
+        // socket code in ~30ms, avoiding Hermes JS base64 encoding which can stall or timeout.
+        if clean_key.starts_with('/') {
+            let path = format!("/v1/stream?id={}", urlencoding::encode(clean_key));
+            if let Ok(bytes) = self.fetch_bridge_stream_bytes(&path) {
+                if !bytes.is_empty() {
+                    return Ok(bytes);
+                }
+            }
+        }
+
+        let path = format!("/v1/cover?id={}", urlencoding::encode(clean_key));
+        let body: CoverResponse = self
+            .get_with_timeout(&path, std::time::Duration::from_secs(10))?
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))?;
+
+        let Some(url) = body.url else {
+            return Err("no cover url returned from bridge".into());
+        };
+
+        let trimmed_url = url.trim();
+        if trimmed_url.starts_with("data:") {
+            return decode_data_uri(trimmed_url).ok_or_else(|| "invalid data uri from bridge".into());
+        }
+
+        if trimmed_url.starts_with(&self.base) {
+            let rel = &trimmed_url[self.base.len()..];
+            return self.fetch_bridge_stream_bytes(rel);
+        }
+
+        if trimmed_url.starts_with("http://") || trimmed_url.starts_with("https://") {
+            return fetch_http_bytes(trimmed_url);
+        }
+
+        if trimmed_url.starts_with('/') {
+            let path = if trimmed_url.starts_with("/v1/") {
+                trimmed_url.to_string()
+            } else {
+                format!("/v1/stream?id={}", urlencoding::encode(trimmed_url))
+            };
+            return self.fetch_bridge_stream_bytes(&path);
+        }
+
+        Err(format!("unsupported cover url format: {trimmed_url}"))
+    }
+
+    fn fetch_bridge_stream_bytes(&self, path: &str) -> Result<Vec<u8>, String> {
+        let res = self.get_with_timeout(path, std::time::Duration::from_secs(10))?;
+        let mut bytes = Vec::new();
+        use std::io::Read;
+        res.into_reader()
+            .read_to_end(&mut bytes)
+            .map_err(|e| e.to_string())?;
+        Ok(bytes)
+    }
+
     pub fn album(&self, id: &str) -> Result<AlbumDetail, String> {
         let path = format!("/v1/album?id={}", urlencoding::encode(id));
         let mut body: AlbumBody = self.get(&path)?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
@@ -185,6 +326,128 @@ impl BridgeClient {
             track.normalize();
         }
         Ok(body)
+    }
+
+    pub fn focus(&self) -> Result<FocusDump, String> {
+        self.get("/v1/focus")?
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))
+    }
+
+    pub fn wealth(&self) -> Result<WealthDump, String> {
+        self.get("/v1/wealth")?
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FocusDump {
+    #[serde(default)]
+    pub projects: Vec<FocusProject>,
+    #[serde(default)]
+    pub tasks: Vec<FocusTask>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusProject {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub archived: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusTask {
+    pub id: String,
+    #[serde(default)]
+    pub project_id: String,
+    pub title: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub notes: String,
+    #[serde(default)]
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WealthDump {
+    #[serde(default)]
+    pub accounts: Vec<WealthAccount>,
+    #[serde(default)]
+    pub assets: Vec<WealthAsset>,
+    #[serde(default)]
+    pub txs: Vec<WealthTx>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WealthAccount {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub archived: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WealthAsset {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub ticker: String,
+    #[serde(default)]
+    pub account_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WealthTx {
+    pub id: String,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub amount: f64,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub account_id: Option<String>,
+}
+
+impl Album {
+    pub fn row(id: impl Into<String>, name: impl Into<String>, artist: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            artist_name: artist.into(),
+            cover_id: None,
+        }
+    }
+}
+
+impl Track {
+    pub fn row(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        album_id: impl Into<String>,
+        album: impl Into<String>,
+        artist: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            album_id: album_id.into(),
+            album_name: album.into(),
+            artist_name: artist.into(),
+            duration_ms: 0,
+            duration: None,
+            cover_id: None,
+            artwork_url: None,
+        }
     }
 }
 
@@ -277,6 +540,34 @@ mod tests {
         .unwrap();
         secs.normalize();
         assert_eq!(secs.duration_ms, 245_000);
+    }
+
+    #[test]
+    fn decode_data_uri_works() {
+        let fake = "data:image/jpeg;base64,aGVsbG8gd29ybGQ=";
+        let bytes = decode_data_uri(fake).unwrap();
+        assert_eq!(bytes, b"hello world");
+    }
+
+    #[test]
+    fn live_phone_cover_bytes() {
+        if let Some(session) = crate::session::load_session() {
+            let client = BridgeClient::new(&session);
+            let bytes = client
+                .cover_bytes("/Music/Canciones/Kit Kat.jpg")
+                .expect("Failed to fetch Kit Kat cover bytes");
+            assert!(!bytes.is_empty());
+            let img = image::load_from_memory(&bytes).unwrap();
+            assert_eq!(img.width(), 300);
+            assert_eq!(img.height(), 300);
+
+            let spotify_url = "https://image-cdn-ak.spotifycdn.com/image/ab67616d00001e0209e53d80cd1d69e00104cff5";
+            if let Ok(bytes) = client.cover_bytes(spotify_url) {
+                assert!(!bytes.is_empty());
+                let img = image::load_from_memory(&bytes).unwrap();
+                assert_eq!(img.width(), 300);
+            }
+        }
     }
 }
 

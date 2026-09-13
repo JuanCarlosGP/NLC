@@ -1,5 +1,6 @@
 mod app;
 mod client;
+mod cover;
 mod library;
 mod pair;
 mod player;

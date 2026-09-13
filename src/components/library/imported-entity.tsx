@@ -22,6 +22,7 @@ import { TintWash } from "@/components/ui/tint-wash";
 import { mergeDockOnScroll, useDock } from "@/lib/dock-context";
 import { useDownloadSettings } from "@/hooks/use-download-settings";
 import { usePlayer } from "@/lib/player/player-context";
+import { usePlayerUi } from "@/lib/player/player-ui-context";
 import {
   downloadSearchQuery,
   enqueueSearchDownload,
@@ -51,11 +52,18 @@ export function ImportedEntityView({
 }) {
   const { t } = useI18n();
   const { playTracks, current, playing, togglePlay, shuffle, toggleShuffle } = usePlayer();
+  const { miniPlayerDismissed } = usePlayerUi();
   const { settings, token, ready: downloadReady } = useDownloadSettings();
   const { rematchPlaylist, reorderPlaylistTracks } = useSpotify();
   const { openPlaylistActions } = usePlaylistActions();
   const dock = useDock();
   const insets = useSafeAreaInsets();
+  const mini =
+    current && !miniPlayerDismissed
+      ? layout.miniPlayerHeight + layout.miniPlayerGap
+      : 0;
+  const reserved = dock?.reservedBottom ?? insets.bottom + layout.dockHeight + layout.dockMargin;
+  const bottomInset = reserved + mini + 24;
   const scrollRef = useRef<Animated.ScrollView>(null);
   const scrollY = useSharedValue(0);
   const viewportTop = useSharedValue(0);
@@ -69,9 +77,16 @@ export function ImportedEntityView({
   const focusSearch = () => searchRef.current?.focus();
   const searchTap = useMemo(
     () =>
-      Gesture.Tap().onEnd(() => {
-        runOnJS(focusSearch)();
-      }),
+      Gesture.Tap()
+        .maxDistance(12)
+        .maxDeltaX(12)
+        .maxDeltaY(12)
+        .maxDuration(300)
+        .onEnd((_event, success) => {
+          if (success) {
+            runOnJS(focusSearch)();
+          }
+        }),
     [],
   );
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -256,7 +271,10 @@ export function ImportedEntityView({
     <Animated.ScrollView
       ref={scrollRef}
       style={styles.page}
-      contentContainerStyle={[styles.pageContent, { paddingTop: insets.top + 8 }]}
+      contentContainerStyle={[
+        styles.pageContent,
+        { paddingTop: insets.top + 8, paddingBottom: bottomInset },
+      ]}
       scrollEnabled={!dragging}
       keyboardShouldPersistTaps="always"
       scrollEventThrottle={16}
@@ -529,7 +547,7 @@ function IconButton({
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: "transparent" },
-  pageContent: { flexGrow: 1, paddingBottom: 8, paddingHorizontal: layout.screenPad },
+  pageContent: { flexGrow: 1, paddingHorizontal: layout.screenPad },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",

@@ -13,20 +13,42 @@ pub struct MpvSession {
 }
 
 impl MpvSession {
-    pub fn spawn(url: &str, auth_header: &str, volume: u8) -> Result<Self, String> {
+    pub fn spawn(
+        url: &str,
+        auth_header: &str,
+        volume: u8,
+        video: bool,
+        title: Option<&str>,
+    ) -> Result<Self, String> {
         let sock = std::env::temp_dir().join(format!("nlc-tui-mpv-{}.sock", std::process::id()));
         let _ = std::fs::remove_file(&sock);
-        let child = Command::new("mpv")
-            .args([
-                "--no-video",
-                "--really-quiet",
-                "--force-window=no",
-                "--idle=no",
-                &format!("--volume={volume}"),
-                &format!("--input-ipc-server={}", sock.display()),
-                &format!("--http-header-fields={auth_header}"),
-                url,
-            ])
+        let mut cmd = Command::new("mpv");
+        cmd.args([
+            "--really-quiet",
+            "--idle=no",
+            &format!("--volume={volume}"),
+            &format!("--input-ipc-server={}", sock.display()),
+            &format!("--http-header-fields={auth_header}"),
+        ]);
+
+        let has_display =
+            std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some();
+        if video && has_display {
+            let win_title = title
+                .map(|t| format!("NLC: {t}"))
+                .unwrap_or_else(|| "NLC Video".into());
+            cmd.args([
+                "--force-window=immediate",
+                "--autofit=60%x60%",
+                &format!("--title={win_title}"),
+            ]);
+        } else {
+            cmd.args(["--no-video", "--force-window=no"]);
+        }
+
+        cmd.arg(url);
+
+        let child = cmd
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -98,6 +120,17 @@ impl Drop for MpvSession {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+pub fn is_video_file(path_or_id_or_title: &str) -> bool {
+    let lower = path_or_id_or_title.to_lowercase();
+    if lower.starts_with("video:") {
+        return true;
+    }
+    const VIDEO_EXTS: &[&str] = &[
+        ".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v", ".flv", ".wmv", ".ts", ".m2ts",
+    ];
+    VIDEO_EXTS.iter().any(|ext| lower.ends_with(ext))
 }
 
 pub fn clamp_volume(volume: i32) -> u8 {
@@ -205,5 +238,16 @@ mod tests {
         assert_eq!(super::format_track_time(125_000), "2:05");
         assert_eq!(super::parse_seconds("245.0\n"), Some(245_000));
         assert_eq!(super::parse_seconds("0\n"), None);
+    }
+
+    #[test]
+    fn detects_video_files() {
+        assert!(super::is_video_file("video:/volume1/video/movie.mkv"));
+        assert!(super::is_video_file("episode_01.mp4"));
+        assert!(super::is_video_file("video:custom-identifier"));
+        assert!(super::is_video_file("show.S01E02.WEBRip.mkv"));
+        assert!(!super::is_video_file("song.mp3"));
+        assert!(!super::is_video_file("track.flac"));
+        assert!(!super::is_video_file("podcast.m4a"));
     }
 }

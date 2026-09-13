@@ -1,4 +1,5 @@
 import type { MusicSource, Track } from "@/lib/nas/types";
+import { isPodcastTrack } from "@/lib/nas/webdav";
 import { rememberTrackArtwork } from "@/lib/library/artwork-cache";
 import { persistTrackCovers } from "@/lib/library/persist-covers";
 import type { ImportedTrack } from "@/lib/spotify/types";
@@ -20,7 +21,28 @@ function titleClose(a: string, b: string): boolean {
   const left = normalize(a);
   const right = normalize(b);
   if (!left || !right) return false;
-  return left === right || left.includes(right) || right.includes(left);
+  if (left === right) return true;
+
+  const leftWords = left.split(/\s+/).filter(Boolean);
+  const rightWords = right.split(/\s+/).filter(Boolean);
+  const rightSet = new Set(rightWords);
+  const leftSet = new Set(leftWords);
+
+  // If either title is short (<= 4 chars or single word), require exact word presence.
+  // This prevents short titles like "nana" from matching inside "mañana", "banana", etc.
+  if (left.length <= 4 || right.length <= 4 || leftWords.length === 1 || rightWords.length === 1) {
+    return leftWords.some((w) => rightSet.has(w));
+  }
+
+  // If all words of one title are present in the other (e.g. "where have you been" in "where have you been rihanna")
+  if (leftWords.every((w) => rightSet.has(w)) || rightWords.every((w) => leftSet.has(w))) {
+    return true;
+  }
+
+  // Word-boundary phrase matching
+  const leftPattern = new RegExp(`\\b${left}\\b`, "i");
+  const rightPattern = new RegExp(`\\b${right}\\b`, "i");
+  return leftPattern.test(right) || rightPattern.test(left);
 }
 
 function artistClose(a: string, b: string): boolean {
@@ -62,10 +84,9 @@ export async function matchImportedTracks(
   source: MusicSource,
   tracks: ImportedTrack[],
 ): Promise<ImportedTrack[]> {
-  // Match against the full library. Searching "title artist" as one substring
-  // fails because neither field contains the combined query.
+  // Match against the full library, excluding podcasts so music tracks never match podcast episodes.
   const library = await source.search("*");
-  const pool = library.tracks;
+  const pool = library.tracks.filter((track) => !isPodcastTrack(track));
   if (!pool.length) {
     return tracks.map((track) => ({ ...track, matched: null }));
   }

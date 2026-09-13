@@ -16,6 +16,8 @@ import {
   removeTrackFromImportedPlaylist,
   reorderImportedPlaylistTracks,
   toggleImportedPlaylistLiked,
+  updateImportedPlaylist,
+  updateImportedTrackCover,
   upsertImportedPlaylist,
 } from "@/lib/spotify/playlist-store";
 import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
@@ -38,6 +40,8 @@ type SpotifyContextValue = {
   togglePlaylistLiked: (id: string) => Promise<void>;
   rematchPlaylist: (id: string) => Promise<void>;
   reloadPlaylists: () => Promise<void>;
+  updatePlaylistDetails: (id: string, updates: { name?: string; coverUrl?: string | null }) => Promise<void>;
+  updateTrackCover: (trackId: string, coverUrl: string) => Promise<void>;
 };
 
 const SpotifyContext = createContext<SpotifyContextValue | null>(null);
@@ -196,6 +200,23 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
     [source],
   );
 
+  const updatePlaylistDetails = useCallback(
+    async (id: string, updates: { name?: string; coverUrl?: string | null }) => {
+      const next = await updateImportedPlaylist(id, updates);
+      setPlaylists(next.map(withKind));
+      void syncArtworkFromPlaylists(next).then(() => persistPlaylistCovers(source, next));
+    },
+    [source],
+  );
+
+  const updateTrackCover = useCallback(
+    async (trackId: string, coverUrl: string) => {
+      const next = await updateImportedTrackCover(trackId, coverUrl);
+      setPlaylists(next.map(withKind));
+    },
+    [],
+  );
+
   const value = useMemo(
     () => ({
       playlists,
@@ -209,8 +230,10 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
       togglePlaylistLiked,
       rematchPlaylist,
       reloadPlaylists,
+      updatePlaylistDetails,
+      updateTrackCover,
     }),
-    [addTracksToPlaylist, createLocalPlaylist, deletePlaylist, hydratePlaylistCovers, importPlaylistUrl, playlists, reloadPlaylists, rematchPlaylist, removeTrackFromPlaylist, reorderPlaylistTracks, togglePlaylistLiked],
+    [addTracksToPlaylist, createLocalPlaylist, deletePlaylist, hydratePlaylistCovers, importPlaylistUrl, playlists, reloadPlaylists, rematchPlaylist, removeTrackFromPlaylist, reorderPlaylistTracks, togglePlaylistLiked, updatePlaylistDetails, updateTrackCover],
   );
 
   return <SpotifyContext.Provider value={value}>{children}</SpotifyContext.Provider>;

@@ -26,11 +26,7 @@ mod tests {
     use super::*;
 
     fn album(id: &str, name: &str, artist: &str) -> Album {
-        Album {
-            id: id.into(),
-            name: name.into(),
-            artist_name: artist.into(),
-        }
+        Album::row(id, name, artist)
     }
 
     #[test]

@@ -130,7 +130,7 @@ function encodeDavPath(path: string): string {
     .join("/");
 }
 
-function createDavTransport(settings: NasSettings, password: string) {
+export function createDavTransport(settings: NasSettings, password: string) {
   const rootPath = toWebDavPath(settings.sharePath);
   const session = createDavAuthSession(settings.username.trim(), password);
 
@@ -489,6 +489,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
           },
           body: PROPFIND_BODY,
         });
+        if (propfind.status === 401) throw new Error(t("nas.badAuth"));
         if (propfind.ok) {
           const entries = parsePropfind(await propfind.text()).filter((entry) => {
             const normalized = entry.path.replace(/\/+$/, "") || "/";
@@ -497,7 +498,8 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
           });
           if (entries.length) return entries;
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof Error && error.message === t("nas.badAuth")) throw error;
         // HTML listing fallback.
       }
     }

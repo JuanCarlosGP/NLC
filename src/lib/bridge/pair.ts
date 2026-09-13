@@ -28,3 +28,23 @@ export async function pairWithDesktop(
     throw new Error(t("desktop.pairNetwork", { url: detail ? `${url} (${detail})` : url }));
   }
 }
+
+export async function notifyDesktopUnlink(host: string, port = 7420, token?: string | null): Promise<void> {
+  if (!host) return;
+  const name = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1200);
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    await fetch(`http://${name}:${port}/unlink`, {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+    });
+  } catch {
+    // Best-effort in case desktop is unreachable
+  } finally {
+    clearTimeout(timer);
+  }
+}

@@ -33,7 +33,7 @@ export function Screen({
           styles.fill,
           {
             paddingTop: flush ? 0 : insets.top + 8,
-            paddingBottom: bottom,
+            paddingBottom: flush ? 0 : bottom,
             paddingHorizontal: flush ? 0 : layout.screenPad,
           },
         ]}
@@ -48,7 +48,11 @@ export function Screen({
       style={styles.fill}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + 12, paddingBottom: bottom },
+        {
+          paddingTop: flush ? 0 : insets.top + 12,
+          paddingBottom: bottom,
+          paddingHorizontal: flush ? 0 : layout.screenPad,
+        },
       ]}
       scrollEventThrottle={16}
       onScroll={mergeDockOnScroll(dock)}

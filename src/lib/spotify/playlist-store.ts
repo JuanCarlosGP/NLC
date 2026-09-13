@@ -33,6 +33,28 @@ export async function renameImportedPlaylist(id: string, name: string): Promise<
   return next;
 }
 
+export async function updateImportedPlaylist(
+  id: string,
+  updates: { name?: string; coverUrl?: string | null },
+): Promise<ImportedPlaylist[]> {
+  const current = await loadPlaylists();
+  const next = current.map((item) => {
+    if (item.id !== id) return item;
+    const name = updates.name !== undefined ? updates.name.trim() : item.name;
+    const coverUrl =
+      updates.coverUrl !== undefined
+        ? updates.coverUrl?.trim() || null
+        : item.coverUrl;
+    return {
+      ...item,
+      name: name || item.name,
+      coverUrl,
+    };
+  });
+  await savePlaylists(next);
+  return next;
+}
+
 export async function createEmptyImportedPlaylist(name: string): Promise<ImportedPlaylist[]> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error(t("nasExtra.playlistNeedName"));
@@ -119,3 +141,39 @@ export async function reorderImportedPlaylistTracks(
   await savePlaylists(next);
   return next;
 }
+
+export async function updateImportedTrackCover(
+  trackId: string,
+  coverUrl: string,
+): Promise<ImportedPlaylist[]> {
+  const current = await loadPlaylists();
+  let changed = false;
+  const next = current.map((playlist) => {
+    let listChanged = false;
+    const tracks = playlist.tracks.map((track) => {
+      if (track.matched?.id === trackId || track.spotifyId === trackId) {
+        if (track.coverUrl !== coverUrl) {
+          listChanged = true;
+          changed = true;
+          return {
+            ...track,
+            coverUrl,
+            matched: track.matched ? { ...track.matched, artworkUrl: coverUrl } : track.matched,
+          };
+        }
+      }
+      return track;
+    });
+    if (!listChanged) return playlist;
+    return {
+      ...playlist,
+      tracks,
+      coverUrl: playlist.coverUrl ?? coverUrl,
+    };
+  });
+  if (changed) {
+    await savePlaylists(next);
+  }
+  return next;
+}
+

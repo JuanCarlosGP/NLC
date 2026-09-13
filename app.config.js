@@ -8,6 +8,8 @@ const googleServices = fs.existsSync(path.join(__dirname, "google-services.json"
   ? "./google-services.json"
   : undefined;
 
+const isExpoGo = process.env.EXPO_GO === "1";
+
 export default {
   expo: {
     name: "NLC",
@@ -16,13 +18,15 @@ export default {
     // Same value locally and on EAS. Gating this on EAS_BUILD made the CLI
     // fingerprint exposdk:54.0.0 while the worker used appVersion, and
     // Configure expo-updates aborted.
-    runtimeVersion: { policy: "appVersion" },
-    updates: {
-      url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
-      fallbackToCacheTimeout: 0,
-      // Native: only a new APK picks this up. JS also calls applyOtaUpdate on launch.
-      checkAutomatically: "ON_LOAD",
-    },
+    ...(isExpoGo ? {} : { runtimeVersion: { policy: "appVersion" } }),
+    updates: isExpoGo
+      ? { enabled: false }
+      : {
+          url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+          fallbackToCacheTimeout: 0,
+          // Native: only a new APK picks this up. JS also calls applyOtaUpdate on launch.
+          checkAutomatically: "ON_LOAD",
+        },
     scheme: "nlc",
     orientation: "portrait",
     icon: "./assets/icon.png",

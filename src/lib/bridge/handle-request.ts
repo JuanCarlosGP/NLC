@@ -3,7 +3,12 @@ import type { Album, AlbumDetail, MusicSource, PlayableSource, Track } from "@/l
 import { isPodcastTrack } from "@/lib/nas/webdav";
 import { dumpProductivity } from "@/lib/productivity/store";
 import { listReminders } from "@/lib/reminders/store";
+import { loadNasPassword, loadNasSettings } from "@/lib/settings/storage";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
+import { inspectFolder } from "@/lib/video/browse";
+import { listVideoShows } from "@/lib/video/catalog";
+import { createVideoClient } from "@/lib/video/source";
+import { createDavTransport } from "@/lib/nas/webdav-source";
 import { dumpWealth } from "@/lib/wealth/store";
 
 export type BridgeJson = { status: number; body: unknown };
@@ -39,6 +44,19 @@ function playableParts(source: PlayableSource): BridgeStream {
   return { uri: source.uri, headers: source.headers ?? {} };
 }
 
+async function withTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return await new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    work.then((value) => {
+      clearTimeout(timer);
+      resolve(value);
+    }).catch(() => {
+      clearTimeout(timer);
+      resolve(fallback);
+    });
+  });
+}
+
 async function first<T>(live: () => Promise<T>, cached: () => Promise<T>): Promise<T> {
   try {
     return await live();
@@ -69,12 +87,40 @@ function playlistId(id: string): string {
   return id.startsWith("playlist:") ? id : `playlist:${id}`;
 }
 
+function videoId(path: string): string {
+  return path.startsWith("video:") ? path : `video:${path}`;
+}
+
+function videoPath(id: string): string {
+  const raw = id.startsWith("video:") ? id.slice("video:".length) : id;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function videoTrack(id: string, title: string, albumId: string, albumName: string, artistName: string, track = 0): Track {
+  return {
+    id,
+    title,
+    albumId,
+    albumName,
+    artistId: albumId,
+    artistName,
+    durationMs: 0,
+    track,
+    coverId: null,
+    artworkUrl: null,
+  };
+}
+
 function importedAsAlbum(playlist: ImportedPlaylist): Album {
   return {
     id: playlistId(playlist.id),
     name: playlist.name,
     artistId: `playlist-owner:${playlist.ownerName || "me"}`,
-    artistName: playlist.ownerName || "Playlist",
+    artistName: "",
     year: playlist.importedAt ? new Date(playlist.importedAt).getFullYear() : null,
     coverId: null,
     trackCount: playlist.tracks.length,
@@ -105,6 +151,36 @@ async function importedPlaylistById(id: string): Promise<ImportedPlaylist | unde
   const raw = id.startsWith("playlist:") ? id.slice("playlist:".length) : id;
   const playlists = await loadPlaylists();
   return playlists.find((item) => item.id === raw || playlistId(item.id) === id);
+}
+
+async function videoListing(id: string): Promise<AlbumDetail | null> {
+  const dir = videoPath(id);
+  const [settings, password] = await Promise.all([loadNasSettings(), loadNasPassword()]);
+  const listing = await inspectFolder(settings, password, dir).catch(() => null);
+  const name = listing?.title || dir.split("/").filter(Boolean).at(-1) || "Video";
+  const albumId = videoId(listing?.path || dir);
+  const folderTracks =
+    listing?.folders.map((folder, index) =>
+      videoTrack(videoId(folder.path), folder.title, albumId, name, "Folder", index + 1),
+    ) ?? [];
+  const episodeTracks =
+    listing?.episodes.map((episode) =>
+      videoTrack(videoId(episode.path), episode.title, albumId, name, listing?.eyebrow || "Video", episode.number),
+    ) ?? [];
+  const tracks = [...folderTracks, ...episodeTracks];
+  if (!tracks.length) {
+    tracks.push(videoTrack(albumId, name, albumId, name, listing?.eyebrow || "Video", 1));
+  }
+  return {
+    id: albumId,
+    name,
+    artistId: listing?.path || dir,
+    artistName: listing?.eyebrow || "Video",
+    year: null,
+    coverId: null,
+    trackCount: tracks.length,
+    tracks,
+  };
 }
 
 export async function handleBridgeRequest(
@@ -170,6 +246,11 @@ export async function handleBridgeRequest(
       pathId(route, "/v1/playlists/") ||
       pathId(route, "/v1/playlist/");
     if (!id) return { kind: "json", status: 400, body: { error: "missing_id" } };
+    if (id.startsWith("video:")) {
+      const listing = await videoListing(id);
+      if (!listing) return { kind: "json", status: 404, body: { error: "missing" } };
+      return { kind: "json", status: 200, body: { album: listing } };
+    }
     if (id.startsWith("playlist:") || route.includes("playlist")) {
       const playlist = await importedPlaylistById(id);
       if (!playlist) return { kind: "json", status: 404, body: { error: "missing" } };
@@ -200,6 +281,26 @@ export async function handleBridgeRequest(
   if (route === "/v1/stream" || route.startsWith("/v1/stream/")) {
     const id = q.id || pathId(route, "/v1/stream/");
     if (!id) return { kind: "json", status: 400, body: { error: "missing_id" } };
+    if (id.startsWith("video:")) {
+      const [settings, password] = await Promise.all([loadNasSettings(), loadNasPassword()]);
+      const playable = createVideoClient(settings, password).playable(videoPath(id));
+      return { kind: "stream", ...playableParts(await Promise.resolve(playable)) };
+    }
+    if (id.startsWith("cover:")) {
+      const raw = id.slice("cover:".length);
+      if (raw.startsWith("http://") || raw.startsWith("https://")) {
+        return { kind: "stream", uri: raw, headers: {} };
+      }
+      const [settings, password] = await Promise.all([loadNasSettings(), loadNasPassword()]);
+      if (settings.sourceKind === "webdav") {
+        const { absolute, session } = createDavTransport(settings, password);
+        const nasUrl = absolute(raw);
+        const auth = session.authorization("GET", nasUrl);
+        return { kind: "stream", uri: nasUrl, headers: auth ? { Authorization: auth } : {} };
+      }
+      const playable = await source.coverUrl(raw);
+      return { kind: "stream", uri: playable || "", headers: {} };
+    }
     const local = await getLocalUri(id);
     if (local) return { kind: "stream", uri: local, headers: {} };
     const playable = await source.streamUrl(id);
@@ -212,6 +313,27 @@ export async function handleBridgeRequest(
     const url = await source.coverUrl(id);
     if (!url) return { kind: "json", status: 404, body: { error: "no_cover" } };
     return { kind: "json", status: 200, body: { url } };
+  }
+
+  if (route === "/v1/video") {
+    const id = q.id;
+    if (id) {
+      const listing = await videoListing(id);
+      if (!listing) return { kind: "json", status: 404, body: { error: "missing" } };
+      return { kind: "json", status: 200, body: { album: listing } };
+    }
+    const [settings, password] = await Promise.all([loadNasSettings(), loadNasPassword()]);
+    const shows = await withTimeout(listVideoShows(settings, password), 8_000, []);
+    const albums: Album[] = shows.map((show) => ({
+      id: videoId(show.path),
+      name: show.title,
+      artistId: show.kind,
+      artistName: show.kind === "movie" ? "Movie" : "Series",
+      year: null,
+      coverId: null,
+      trackCount: show.file ? 1 : 0,
+    }));
+    return { kind: "json", status: 200, body: { albums } };
   }
 
   if (route === "/v1/focus") {

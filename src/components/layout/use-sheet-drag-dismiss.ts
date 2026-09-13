@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Platform, type View } from "react-native";
 import { Gesture, type GestureType } from "react-native-gesture-handler";
 import {
@@ -136,7 +136,7 @@ export function useSheetDragDismiss({
   const dismissVelocitySV = useSharedValue(dismissVelocity);
   const dismissTravelSV = useSharedValue(dismissTravel);
   const closeMsSV = useSharedValue(closeMs);
-  const expandEnabledSV = useSharedValue(expandEnabled ? 1 : 0);
+  const expandEnabledSV = useSharedValue(expandEnabled && onExpand ? 1 : 0);
   const expandDistanceSV = useSharedValue(expandDistance);
   const expandVelocitySV = useSharedValue(expandVelocity);
 
@@ -151,13 +151,32 @@ export function useSheetDragDismiss({
   onDismissRef.current = onDismiss;
   onDismissSettledRef.current = onDismissSettled;
   onExpandRef.current = onExpand;
-  dismissDistanceSV.value = dismissDistance;
-  dismissVelocitySV.value = dismissVelocity;
-  dismissTravelSV.value = dismissTravel;
-  closeMsSV.value = closeMs;
-  expandEnabledSV.value = expandEnabled && onExpand ? 1 : 0;
-  expandDistanceSV.value = expandDistance;
-  expandVelocitySV.value = expandVelocity;
+
+  useEffect(() => {
+    dismissDistanceSV.value = dismissDistance;
+    dismissVelocitySV.value = dismissVelocity;
+    dismissTravelSV.value = dismissTravel;
+    closeMsSV.value = closeMs;
+    expandEnabledSV.value = expandEnabled && onExpand ? 1 : 0;
+    expandDistanceSV.value = expandDistance;
+    expandVelocitySV.value = expandVelocity;
+  }, [
+    dismissDistance,
+    dismissVelocity,
+    dismissTravel,
+    closeMs,
+    expandEnabled,
+    onExpand,
+    expandDistance,
+    expandVelocity,
+    dismissDistanceSV,
+    dismissVelocitySV,
+    dismissTravelSV,
+    closeMsSV,
+    expandEnabledSV,
+    expandDistanceSV,
+    expandVelocitySV,
+  ]);
 
   const notifyDismiss = useCallback(() => onDismissRef.current(), []);
   const notifySettled = useCallback(() => onDismissSettledRef.current?.(), []);

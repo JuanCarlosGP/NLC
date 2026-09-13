@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Heart, ListEnd, ListMusic, ListPlus, Play, RefreshCw, Trash2 } from "lucide-react-native";
+import { Heart, ListEnd, ListMusic, ListPlus, Pencil, Play, RefreshCw, Trash2 } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { EditPlaylistDialog } from "@/components/library/edit-playlist-dialog";
 import { Cover } from "@/components/ui/cover";
 import { usePlayer } from "@/lib/player/player-context";
 import { matchedNasTracks } from "@/lib/spotify/match";
@@ -42,8 +43,9 @@ function PlaylistActionsBody({
   const router = useRouter();
   const { t } = useI18n();
   const { playTracks, enqueueTracks } = usePlayer();
-  const { deletePlaylist, rematchPlaylist, togglePlaylistLiked } = useSpotify();
+  const { deletePlaylist, rematchPlaylist, togglePlaylistLiked, updatePlaylistDetails } = useSpotify();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const playable = matchedNasTracks(playlist.tracks);
   const liked = Boolean(playlist.liked);
@@ -96,6 +98,14 @@ function PlaylistActionsBody({
           }
         />
         <ActionRow
+          icon={<Pencil color={colors.ink} size={22} strokeWidth={1.8} />}
+          label={t("playlistActions.edit")}
+          onPress={() => {
+            triggerUiHaptic();
+            setEditOpen(true);
+          }}
+        />
+        <ActionRow
           icon={<Play color={colors.ink} size={22} fill={colors.ink} strokeWidth={1.8} />}
           label={t("playlistActions.play")}
           disabled={!playable.length}
@@ -142,6 +152,15 @@ function PlaylistActionsBody({
           }}
         />
       </SheetScrollView>
+
+      <EditPlaylistDialog
+        open={editOpen}
+        playlist={playlist}
+        onClose={() => setEditOpen(false)}
+        onSave={async (updates) => {
+          await updatePlaylistDetails(playlist.id, updates);
+        }}
+      />
 
       <ConfirmDialog
         open={confirmDelete}

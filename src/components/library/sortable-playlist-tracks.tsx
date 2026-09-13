@@ -217,8 +217,14 @@ function SortableRow({
 
   const tap = Gesture.Tap()
     .enabled(Boolean(local))
-    .onEnd(() => {
-      runOnJS(onPlay)();
+    .maxDistance(12)
+    .maxDeltaX(12)
+    .maxDeltaY(12)
+    .maxDuration(300)
+    .onEnd((_event, success) => {
+      if (success) {
+        runOnJS(onPlay)();
+      }
     });
 
   const panBase = Gesture.Pan()

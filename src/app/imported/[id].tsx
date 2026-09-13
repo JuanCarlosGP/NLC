@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Text } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ImportedEntityView } from "@/components/library/imported-entity";
 import { Screen } from "@/components/ui/screen";
 import { useSpotify } from "@/lib/spotify/spotify-context";
@@ -10,6 +11,7 @@ import { layout, type } from "@/lib/theme";
 export default function ImportedPlaylistScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { t } = useI18n();
   const { playlists, deletePlaylist, hydratePlaylistCovers, togglePlaylistLiked } = useSpotify();
   const playlist = playlists.find((item) => item.id === id) ?? null;
@@ -28,7 +30,7 @@ export default function ImportedPlaylistScreen() {
   if (!playlist) {
     return (
       <Screen scroll={false} flush>
-        <Text style={[type.meta, { paddingHorizontal: layout.screenPad, paddingTop: 12 }]}>
+        <Text style={[type.meta, { paddingHorizontal: layout.screenPad, paddingTop: insets.top + 12 }]}>
           {t("imported.loading")}
         </Text>
       </Screen>

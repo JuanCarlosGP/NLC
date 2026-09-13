@@ -15,10 +15,19 @@ import {
   stopLanBridge,
 } from "nlc-lan-bridge";
 import { handleBridgeRequest } from "@/lib/bridge/handle-request";
-import { BRIDGE_PORT, clearBridgeSession, loadBridgeToken, saveBridgeToken, saveDesktopHost } from "@/lib/bridge/session";
+import { notifyDesktopUnlink } from "@/lib/bridge/pair";
+import { BRIDGE_PORT, clearBridgeSession, loadBridgeToken, loadDesktopHost, saveBridgeToken, saveDesktopHost } from "@/lib/bridge/session";
 import { useSettings } from "@/lib/settings/settings-context";
 
 async function dropLink() {
+  try {
+    const [host, token] = await Promise.all([loadDesktopHost(), loadBridgeToken()]);
+    if (host) {
+      await notifyDesktopUnlink(host, 7420, token);
+    }
+  } catch {
+    // best-effort
+  }
   try {
     await stopLanBridge();
   } catch {

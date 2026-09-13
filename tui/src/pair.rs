@@ -1,8 +1,8 @@
 use std::io::Cursor;
 use std::net::{SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver};
-use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 
@@ -11,17 +11,21 @@ use tiny_http::{Header, Method, Response, Server, StatusCode};
 use crate::session::Session;
 
 pub struct PairOffer {
-    pub token: String,
+    pub token: Arc<RwLock<String>>,
     pub port: u16,
     pub ip: String,
     pub url: String,
-    pub last_host: Option<String>,
+    pub last_host: Arc<RwLock<Option<String>>>,
 }
 
 pub struct PairWait {
     pub session: Receiver<Session>,
+    pub session_tx: Sender<Session>,
     pub status: Receiver<String>,
+    pub unlink: Receiver<()>,
     pub stop: Arc<AtomicBool>,
+    #[allow(dead_code)]
+    pub last_host: Arc<RwLock<Option<String>>>,
 }
 
 const PHONE_BRIDGE_PORT: u16 = 7421;
@@ -30,6 +34,7 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<PairWait, String> {
     let server = Server::http(("0.0.0.0", offer.port)).map_err(|e| e.to_string())?;
     let (tx, rx) = mpsc::channel();
     let (status_tx, status_rx) = mpsc::channel();
+    let (unlink_tx, unlink_rx) = mpsc::channel();
     let token = offer.token.clone();
     let lan_ip = offer.ip.clone();
     let last_host = offer.last_host.clone();
@@ -40,19 +45,41 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<PairWait, String> {
     let http_token = token.clone();
     let http_claimed = claimed.clone();
     let http_status = status_tx.clone();
+    let http_unlink = unlink_tx.clone();
+    let http_last_host = last_host.clone();
     thread::spawn(move || {
         for mut request in server.incoming_requests() {
-            if http_claimed.load(Ordering::SeqCst) {
-                break;
-            }
-            let ok_method = *request.method() == Method::Post && request.url().starts_with("/pair");
+            let current_token = http_token.read().map(|t| t.clone()).unwrap_or_default();
             let auth = request
                 .headers()
                 .iter()
                 .find(|h| h.field.equiv("Authorization"))
                 .map(|h| h.value.as_str().to_string())
                 .unwrap_or_default();
-            let expected = format!("Bearer {http_token}");
+            let expected = format!("Bearer {current_token}");
+
+            if *request.method() == Method::Post && request.url().starts_with("/unlink") {
+                if !auth.trim().is_empty() && auth.trim() != expected {
+                    let _ = request.respond(Response::from_string("unauthorized").with_status_code(StatusCode(401)));
+                    continue;
+                }
+                let payload = serde_json::json!({ "ok": true }).to_string();
+                let cursor = Cursor::new(payload.clone().into_bytes());
+                let response = Response::new(
+                    StatusCode(200),
+                    vec![Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()],
+                    cursor,
+                    Some(payload.len()),
+                    None,
+                );
+                let _ = request.respond(response);
+                http_claimed.store(true, Ordering::SeqCst);
+                let _ = http_unlink.send(());
+                let _ = http_status.send("Unlink requested by phone. Ready to pair again.".to_string());
+                continue;
+            }
+
+            let ok_method = *request.method() == Method::Post && request.url().starts_with("/pair");
             if !ok_method || auth.trim() != expected {
                 let _ = request.respond(Response::from_string("unauthorized").with_status_code(StatusCode(401)));
                 continue;
@@ -92,8 +119,11 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<PairWait, String> {
             let _ = http_status.send(format!(
                 "QR/Settings pair from {phone_host}:{bridge_port} ({device_id}). Accepting…"
             ));
+            if let Ok(mut lock) = http_last_host.write() {
+                *lock = Some(phone_host.clone());
+            }
             let session = Session {
-                token: http_token.clone(),
+                token: current_token,
                 phone_host,
                 bridge_port,
                 device_id,
@@ -108,43 +138,44 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<PairWait, String> {
                 None,
             );
             let _ = request.respond(response);
-            if http_claimed.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
-                let _ = http_tx.send(session);
-            }
-            thread::sleep(Duration::from_millis(50));
-            break;
+            http_claimed.store(true, Ordering::SeqCst);
+            let _ = http_tx.send(session);
         }
     });
 
     let scan_claimed = claimed.clone();
+    let scan_token = token.clone();
+    let scan_last_host = last_host.clone();
+    let scan_tx = tx.clone();
     thread::spawn(move || {
         let prefix = subnet_prefix(&lan_ip).unwrap_or_else(|| lan_ip.clone());
         let _ = status_tx.send(format!("Listening for QR on 0.0.0.0:7420. Scanning {prefix}.0/24…"));
-        let mut last_note = String::new();
+        let mut last_seen_host = String::new();
         loop {
             if scan_claimed.load(Ordering::SeqCst) {
-                break;
+                thread::sleep(Duration::from_millis(500));
+                continue;
             }
-            match try_link(&lan_ip, &token, last_host.as_deref(), &status_tx) {
+            let cur_token = scan_token.read().map(|t| t.clone()).unwrap_or_default();
+            let cur_host = scan_last_host.read().ok().and_then(|h| h.clone());
+            match try_link(&lan_ip, &cur_token, cur_host.as_deref()) {
                 ScanHit::Linked(session) => {
-                    let _ = status_tx.send(format!("Linked to {}:{}. Stopping the scan.", session.phone_host, session.bridge_port));
-                    if scan_claimed.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
-                        let _ = tx.send(session);
+                    let _ = status_tx.send(format!("Linked to {}:{}. Pausing LAN scan.", session.phone_host, session.bridge_port));
+                    scan_claimed.store(true, Ordering::SeqCst);
+                    if let Ok(mut lock) = scan_last_host.write() {
+                        *lock = Some(session.phone_host.clone());
                     }
-                    break;
+                    let _ = scan_tx.send(session);
                 }
                 ScanHit::Seen(host) => {
-                    let note = format!(
-                        "Phone at {host}:7421 is open, but claim failed. Keep NLC in the foreground or scan the QR."
-                    );
-                    if note != last_note {
-                        let _ = status_tx.send(note.clone());
-                        last_note = note;
+                    if host != last_seen_host {
+                        let _ = status_tx.send(format!(
+                            "Phone at {host}:7421 open. Scanning QR or tap 'Puente TUI' in app."
+                        ));
+                        last_seen_host = host;
                     }
                 }
-                ScanHit::None => {
-                    let _ = status_tx.send(format!("No NLC on {prefix}.0/24 this pass. Waiting, then scanning again…"));
-                }
+                ScanHit::None => {}
             }
             thread::sleep(Duration::from_millis(1_400));
         }
@@ -152,8 +183,11 @@ pub fn listen_for_pair(offer: PairOffer) -> Result<PairWait, String> {
 
     Ok(PairWait {
         session: rx,
+        session_tx: tx,
         status: status_rx,
+        unlink: unlink_rx,
         stop: claimed,
+        last_host,
     })
 }
 
@@ -235,25 +269,19 @@ enum ScanHit {
     None,
 }
 
-fn try_link(lan_ip: &str, token: &str, last_host: Option<&str>, status: &mpsc::Sender<String>) -> ScanHit {
+fn try_link(lan_ip: &str, token: &str, last_host: Option<&str>) -> ScanHit {
     if let Some(host) = last_host {
-        let _ = status.send(format!("Trying last phone {host}:7421…"));
         if tcp_open(host, PHONE_BRIDGE_PORT, 200) {
-            let _ = status.send(format!("{host}:7421 is open. Claiming with this PC’s token…"));
             if let Some(session) = link_host(host, token, lan_ip) {
                 return ScanHit::Linked(session);
             }
-            let _ = status.send(format!(
-                "{host} answered TCP but did not accept the token. Scanning the rest of the LAN…"
-            ));
             return ScanHit::Seen(host.to_string());
         }
-        let _ = status.send(format!("Last phone {host} is not reachable. Scanning the subnet…"));
     }
-    scan_subnet(lan_ip, token, status)
+    scan_subnet(lan_ip, token)
 }
 
-fn link_host(host: &str, token: &str, desktop: &str) -> Option<Session> {
+pub fn link_host(host: &str, token: &str, desktop: &str) -> Option<Session> {
     if claim_phone(host, PHONE_BRIDGE_PORT, token, desktop) {
         return Some(Session {
             token: token.to_string(),
@@ -273,15 +301,10 @@ fn link_host(host: &str, token: &str, desktop: &str) -> Option<Session> {
     None
 }
 
-fn scan_subnet(lan_ip: &str, token: &str, status: &mpsc::Sender<String>) -> ScanHit {
+fn scan_subnet(lan_ip: &str, token: &str) -> ScanHit {
     let hosts = subnet_hosts(lan_ip);
-    let prefix = subnet_prefix(lan_ip).unwrap_or_else(|| lan_ip.to_string());
-    let total = hosts.len();
     let mut seen = None;
-    for (i, chunk) in hosts.chunks(48).enumerate() {
-        let start = i * 48 + 1;
-        let end = (start + chunk.len() - 1).min(total);
-        let _ = status.send(format!("Scanning {prefix}.x  {start}–{end} of {total}…"));
+    for chunk in hosts.chunks(48) {
         let hit = std::sync::Mutex::new(None::<String>);
         let open = std::sync::Mutex::new(None::<String>);
         thread::scope(|scope| {
@@ -296,13 +319,9 @@ fn scan_subnet(lan_ip: &str, token: &str, status: &mpsc::Sender<String>) -> Scan
             }
         });
         if let Some(phone_host) = hit.into_inner().ok().flatten() {
-            let _ = status.send(format!("Discover hit at {phone_host}:7421. Claiming…"));
             if let Some(session) = link_host(&phone_host, token, lan_ip) {
                 return ScanHit::Linked(session);
             }
-            let _ = status.send(format!(
-                "Found NLC at {phone_host} but claim was refused. Token mismatch or app in background."
-            ));
             seen = Some(phone_host);
         } else if seen.is_none() {
             seen = open.into_inner().ok().flatten();
@@ -324,5 +343,31 @@ mod tests {
         assert_eq!(hosts.len(), 253);
         assert!(!hosts.iter().any(|h| h == "192.168.1.66"));
         assert!(hosts.contains(&"192.168.1.45".into()));
+    }
+
+    #[test]
+    fn unlink_post_triggers_unlink_channel() {
+        let token = std::sync::Arc::new(std::sync::RwLock::new("test_token_123".to_string()));
+        let wait = super::listen_for_pair(super::PairOffer {
+            token: token.clone(),
+            port: 17425,
+            ip: "127.0.0.1".into(),
+            url: "http://127.0.0.1:17425/pair?token=test_token_123".into(),
+            last_host: std::sync::Arc::new(std::sync::RwLock::new(None)),
+        }).expect("listen");
+
+        let bad_res = ureq::post("http://127.0.0.1:17425/unlink")
+            .set("Authorization", "Bearer wrong_token")
+            .call();
+        assert!(bad_res.is_err());
+
+        let ok_res = ureq::post("http://127.0.0.1:17425/unlink")
+            .set("Authorization", "Bearer test_token_123")
+            .call()
+            .expect("unlink call");
+        assert_eq!(ok_res.status(), 200);
+
+        assert!(wait.unlink.recv_timeout(std::time::Duration::from_millis(500)).is_ok());
+        assert!(wait.stop.load(std::sync::atomic::Ordering::SeqCst));
     }
 }

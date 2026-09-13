@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { Screen } from "@/components/ui/screen";
 import { Field } from "@/components/settings/source-fields";
 import { DesktopQrCamera } from "@/components/settings/desktop-qr-camera";
-import { pairWithDesktop } from "@/lib/bridge/pair";
+import { notifyDesktopUnlink, pairWithDesktop } from "@/lib/bridge/pair";
 import {
   BRIDGE_PORT,
   clearBridgeSession,
@@ -28,8 +28,10 @@ export default function DesktopBridgeScreen() {
   const [linkedHost, setLinkedHost] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
     async function refresh() {
       const [token, host] = await Promise.all([loadBridgeToken(), loadDesktopHost()]);
+      if (!active) return;
       setLinkedHost(token ? host || t("settings.desktopListening") : null);
     }
     void refresh();
@@ -87,10 +89,24 @@ export default function DesktopBridgeScreen() {
     triggerUiHaptic();
     setBusy(true);
     try {
-      const { stopLanBridge } = await import("nlc-lan-bridge");
-      await stopLanBridge();
+      const [host, token] = await Promise.all([loadDesktopHost(), loadBridgeToken()]);
+      if (host) {
+        await notifyDesktopUnlink(host, 7420, token);
+      }
+      const { stopLanBridge, startLanBridge } = await import("nlc-lan-bridge");
+      try {
+        await stopLanBridge();
+      } catch {
+        // already stopped
+      }
       await clearBridgeSession();
       setLinkedHost(null);
+      await new Promise((r) => setTimeout(r, 150));
+      try {
+        await startLanBridge(BRIDGE_PORT, "", false);
+      } catch {
+        // best-effort discoverable
+      }
     } finally {
       setBusy(false);
     }
@@ -133,17 +149,6 @@ export default function DesktopBridgeScreen() {
       )}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <Pressable
-        onPress={() => {
-          triggerUiHaptic();
-          if (router.canGoBack()) router.back();
-          else router.replace("/(tabs)/settings");
-        }}
-        style={styles.back}
-      >
-        <Text style={styles.backLabel}>{t("desktop.close")}</Text>
-      </Pressable>
     </Screen>
   );
 }

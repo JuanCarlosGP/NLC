@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
+  Check,
   ChevronLeft,
   CircleMinus,
   CirclePlus,
   Heart,
+  Image as ImageIcon,
   ListEnd,
   ListMusic,
   ListPlus,
@@ -20,13 +22,14 @@ import { useTrackArtwork } from "@/hooks/use-cover-url";
 import { useFavorites } from "@/lib/favorites/favorites-context";
 import { clearLibraryCache, removeRecent } from "@/lib/library/cache";
 import { artistHref } from "@/lib/library/href";
-import { withTrackArtwork } from "@/lib/library/artwork-cache";
+import { rememberTrackArtwork, withTrackArtwork } from "@/lib/library/artwork-cache";
+import { findCoverForTrack } from "@/lib/library/fetch-track-cover";
 import { usePlayer } from "@/lib/player/player-context";
 import { useTrackActions, type TrackActionsTarget } from "@/lib/player/track-actions-context";
 import { useSettings } from "@/lib/settings/settings-context";
 import { useSpotify } from "@/lib/spotify/spotify-context";
 import { useI18n } from "@/lib/i18n/context";
-import { triggerUiHaptic } from "@/lib/ui-haptics";
+import { triggerSelectionUiHaptic, triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
 type ViewMode = "menu" | "playlists";
@@ -60,19 +63,65 @@ function TrackActionsBody({
   const display = withTrackArtwork(track);
   const { enqueueTracks, removeTrackFromQueue } = usePlayer();
   const { isFavorite, toggleFavorite, removeFavorite } = useFavorites();
-  const { playlists, addTracksToPlaylist, createLocalPlaylist, removeTrackFromPlaylist } = useSpotify();
+  const { playlists, addTracksToPlaylist, createLocalPlaylist, removeTrackFromPlaylist, updateTrackCover } = useSpotify();
   const { source } = useSettings();
   const [view, setView] = useState<ViewMode>("menu");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [coverStatus, setCoverStatus] = useState<"idle" | "searching" | "found" | "not_found">("idle");
   const liked = isFavorite(track.id);
   const canDelete = Boolean(source.deleteTrack && track.id.startsWith("/"));
 
   useEffect(() => {
     setView("menu");
     setName("");
+    setCoverStatus("idle");
   }, [track.id, playlistId]);
+
+  async function handleFindCover() {
+    if (coverStatus === "searching") return;
+    triggerUiHaptic();
+    setCoverStatus("searching");
+    try {
+      const playlist = playlistId ? playlists.find((p) => p.id === playlistId) : null;
+      const playlistTrack = playlist?.tracks.find(
+        (t) => t.matched?.id === track.id || t.spotifyId === track.id,
+      );
+      const spotifyId = playlistTrack?.spotifyId;
+
+      const foundUrl = await findCoverForTrack({
+        title: track.title,
+        artistName: track.artistName,
+        albumName: track.albumName,
+        spotifyId,
+      });
+
+      if (foundUrl) {
+        await rememberTrackArtwork([{ trackId: track.id, url: foundUrl }]);
+        if (source.ensureCoverSidecar && track.id.startsWith("/")) {
+          void source.ensureCoverSidecar(track.id, foundUrl).catch(() => {});
+        }
+        void updateTrackCover(track.id, foundUrl);
+        triggerSelectionUiHaptic();
+        setCoverStatus("found");
+        setTimeout(() => {
+          setCoverStatus("idle");
+        }, 2500);
+      } else {
+        triggerUiHaptic();
+        setCoverStatus("not_found");
+        setTimeout(() => {
+          setCoverStatus("idle");
+        }, 2500);
+      }
+    } catch {
+      setCoverStatus("not_found");
+      setTimeout(() => {
+        setCoverStatus("idle");
+      }, 2500);
+    }
+  }
 
   const lists = useMemo(
     () => playlists.filter((item) => item.kind !== "album" && item.id !== playlistId),
@@ -238,6 +287,32 @@ function TrackActionsBody({
               }
               label={liked ? t("player.favoriteRemove") : t("player.favoriteAdd")}
               onPress={() => closeAfter(() => toggleFavorite(track))}
+            />
+            <ActionRow
+              icon={
+                coverStatus === "searching" ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : coverStatus === "found" ? (
+                  <Check color={colors.ok} size={22} strokeWidth={2.2} />
+                ) : (
+                  <ImageIcon
+                    color={coverStatus === "not_found" ? colors.muted : colors.ink}
+                    size={22}
+                    strokeWidth={1.8}
+                  />
+                )
+              }
+              label={
+                coverStatus === "searching"
+                  ? t("player.findingCover")
+                  : coverStatus === "found"
+                    ? t("player.coverFound")
+                    : coverStatus === "not_found"
+                      ? t("player.coverNotFound")
+                      : t("player.findCover")
+              }
+              disabled={coverStatus === "searching"}
+              onPress={() => void handleFindCover()}
             />
             {canDelete ? (
               <ActionRow
