@@ -119,12 +119,13 @@ export function ImportedEntityView({
     return { inMobile, onNas, exact, offLabel, offCount: offTime.length };
   }, [playlist.tracks, t]);
   const rematchTried = useRef<string | null>(null);
+  const rematchRef = useRef(rematchPlaylist);
+  rematchRef.current = rematchPlaylist;
 
   const local = playlist.kind === "local";
 
   // Re-link after NAS downloads / previous broken matches, including on return to the app.
   useEffect(() => {
-    if (local) return;
     const tryRematch = () => {
       if (!missing.length) {
         rematchTried.current = null;
@@ -141,7 +142,7 @@ export function ImportedEntityView({
       tryRematch();
     });
     return () => sub.remove();
-  }, [local, missing.length, playlist.id, rematchPlaylist]);
+  }, [missing.length, playlist.id, rematchPlaylist]);
   const liked = Boolean(playlist.liked);
   const totalMs = useMemo(
     () => playlist.tracks.reduce((sum, track) => sum + (track.durationMs || 0), 0),
@@ -214,6 +215,8 @@ export function ImportedEntityView({
           token,
           queue.map((track) => ({
             query: downloadSearchQuery(track.title, track.artistName),
+            title: track.title,
+            artist: track.artistName,
             kind: "song",
             durationMs: track.durationMs || null,
           })),
@@ -223,10 +226,34 @@ export function ImportedEntityView({
             ? t("importedEntity.fetchQueuedPartial", { done: jobs.length, total: queue.length })
             : t("importedEntity.fetchQueued", { count: jobs.length }),
         );
+        const playlistId = playlist.id;
         void watchNasDownloads(
           settings,
           token,
           jobs.map((job) => job.id),
+          (summary) => {
+            rematchTried.current = null;
+            setFetchNote(
+              summary.failed
+                ? t("importedEntity.fetchPartialRematch", {
+                    done: summary.done,
+                    failed: summary.failed,
+                  })
+                : t("importedEntity.fetchOkRematch", { done: summary.done }),
+            );
+            void (async () => {
+              await new Promise((resolve) => setTimeout(resolve, 1500));
+              await rematchRef.current(playlistId);
+              setFetchNote(
+                summary.failed
+                  ? t("importedEntity.fetchPartialDone", {
+                      done: summary.done,
+                      failed: summary.failed,
+                    })
+                  : t("importedEntity.fetchOkDone", { done: summary.done }),
+              );
+            })();
+          },
         );
       } catch (err) {
         setFetchNote(err instanceof Error ? err.message : t("importedEntity.downloadFail"));

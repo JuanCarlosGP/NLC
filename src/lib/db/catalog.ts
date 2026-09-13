@@ -1,5 +1,6 @@
-import { getDb } from "@/lib/db/client";
+import { getDb, runInTransaction } from "@/lib/db/client";
 import { migrateLegacyIfNeeded } from "@/lib/db/migrate-legacy";
+import type { CatalogDb } from "@/lib/db/types";
 import type { Album, AlbumDetail, Artist, SearchResults, Track } from "@/lib/nas/types";
 import { isPodcastAlbum, isPodcastTrack, isSongsAlbum, isSongsFolderName } from "@/lib/nas/webdav";
 import type { WebDavIndex } from "@/lib/nas/webdav";
@@ -47,10 +48,40 @@ export function notifyCatalog(): void {
   for (const listener of catalogListeners) listener();
 }
 
-async function ready() {
-  const db = await getDb();
-  await migrateLegacyIfNeeded(db);
-  return db;
+let cleanedGhostTracks = false;
+async function cleanGhostTracks(db: CatalogDb): Promise<void> {
+  if (cleanedGhostTracks) return;
+  cleanedGhostTracks = true;
+  try {
+    await runInTransaction(db, async () => {
+      await db.runAsync(
+        "DELETE FROM tracks WHERE on_nas = 0 AND (local_uri IS NULL OR offline_status != 'ready')",
+      );
+      await db.runAsync("DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)");
+      await db.runAsync("DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM tracks)");
+      await db.runAsync("DELETE FROM recents WHERE track_id NOT IN (SELECT id FROM tracks)");
+      await db.runAsync("DELETE FROM favorites WHERE track_id NOT IN (SELECT id FROM tracks)");
+    });
+  } catch (error) {
+    console.warn("cleanGhostTracks error:", error);
+  }
+}
+
+let readyPromise: Promise<CatalogDb> | null = null;
+
+async function ready(): Promise<CatalogDb> {
+  if (!readyPromise) {
+    readyPromise = (async () => {
+      const db = await getDb();
+      await migrateLegacyIfNeeded(db);
+      await cleanGhostTracks(db);
+      return db;
+    })().catch((err) => {
+      readyPromise = null;
+      throw err;
+    });
+  }
+  return readyPromise;
 }
 
 function asKind(value: string | null | undefined): OfflineKind {
@@ -106,7 +137,7 @@ export async function replaceLibrary(index: WebDavIndex, sizes?: Map<string, num
   const kept = new Map(existing.map((row) => [row.id, row]));
   const seen = new Set<string>();
 
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     await db.runAsync(
       "DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks WHERE id LIKE 'local%')",
     );
@@ -185,8 +216,17 @@ export async function replaceLibrary(index: WebDavIndex, sizes?: Map<string, num
     }
     for (const row of existing) {
       if (seen.has(row.id) || row.kind === "video" || row.id.startsWith("local")) continue;
-      await db.runAsync("UPDATE tracks SET on_nas = 0 WHERE id = ?", row.id);
+      const readyFile = row.offline_status === "ready" && row.local_uri;
+      if (readyFile) {
+        await db.runAsync("UPDATE tracks SET on_nas = 0 WHERE id = ?", row.id);
+      } else {
+        await db.runAsync("DELETE FROM tracks WHERE id = ?", row.id);
+      }
     }
+    await db.runAsync("DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)");
+    await db.runAsync("DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM tracks)");
+    await db.runAsync("DELETE FROM recents WHERE track_id NOT IN (SELECT id FROM tracks)");
+    await db.runAsync("DELETE FROM favorites WHERE track_id NOT IN (SELECT id FROM tracks)");
     await db.runAsync(
       "INSERT OR REPLACE INTO meta (key, value) VALUES ('last_scan_at', ?)",
       String(index.scannedAt || Date.now()),
@@ -202,7 +242,7 @@ export async function upsertLocalLibrary(
 ): Promise<void> {
   const db = await ready();
   const seen = new Set(index.tracks.map((track) => track.id));
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     for (const artist of index.artists) {
       await db.runAsync(
         `INSERT INTO artists (id, name, album_count, cover_id) VALUES (?, ?, ?, ?)
@@ -286,7 +326,11 @@ export async function getTracks(opts?: { kind?: "music" | "podcast"; offlineOnly
     where.push("kind = ?");
     params.push(opts.kind);
   }
-  if (opts?.offlineOnly) where.push("offline_status = 'ready'");
+  if (opts?.offlineOnly) {
+    where.push("offline_status = 'ready'");
+  } else {
+    where.push("(on_nas = 1 OR offline_status = 'ready' OR id LIKE 'local%')");
+  }
   const sql = `SELECT * FROM tracks ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY title COLLATE NOCASE`;
   const rows = await db.getAllAsync<TrackRow>(sql, ...params);
   return rows.map(rowToTrack);
@@ -316,6 +360,12 @@ export async function getAlbums(opts?: {
     );
     const allowed = new Set(readyAlbums.map((row) => row.album_id));
     rows = rows.filter((album) => allowed.has(album.id));
+  } else {
+    const activeAlbums = await db.getAllAsync<{ album_id: string }>(
+      "SELECT DISTINCT album_id FROM tracks WHERE on_nas = 1 OR offline_status = 'ready' OR id LIKE 'local%'",
+    );
+    const allowed = new Set(activeAlbums.map((row) => row.album_id));
+    rows = rows.filter((album) => allowed.has(album.id));
   }
   return rows.map(({ kind: _kind, ...album }) => album);
 }
@@ -332,7 +382,11 @@ export async function getArtists(opts?: { offlineOnly?: boolean }): Promise<Arti
     );
   }
   return db.getAllAsync<Artist>(
-    "SELECT id, name, album_count as albumCount, cover_id as coverId FROM artists ORDER BY name COLLATE NOCASE",
+    `SELECT DISTINCT a.id, a.name, a.album_count as albumCount, a.cover_id as coverId
+     FROM artists a
+     INNER JOIN tracks t ON t.artist_id = a.id
+     WHERE t.on_nas = 1 OR t.offline_status = 'ready' OR t.id LIKE 'local%'
+     ORDER BY a.name COLLATE NOCASE`,
   );
 }
 
@@ -346,7 +400,7 @@ export async function getAlbum(id: string, offlineOnly?: boolean): Promise<Album
   const tracks = await db.getAllAsync<TrackRow>(
     offlineOnly
       ? "SELECT * FROM tracks WHERE album_id = ? AND offline_status = 'ready' ORDER BY track_no, title"
-      : "SELECT * FROM tracks WHERE album_id = ? ORDER BY track_no, title",
+      : "SELECT * FROM tracks WHERE album_id = ? AND (on_nas = 1 OR offline_status = 'ready' OR id LIKE 'local%') ORDER BY track_no, title",
     id,
   );
   return { ...album, tracks: tracks.map(rowToTrack) };
@@ -363,14 +417,23 @@ export async function searchCatalog(query: string, offlineOnly?: boolean): Promi
     };
   }
   const like = `%${q.replace(/%/g, "\\%")}%`;
-  const trackFilter = offlineOnly ? "AND offline_status = 'ready'" : "";
+  const trackFilter = offlineOnly
+    ? "AND offline_status = 'ready'"
+    : "AND (on_nas = 1 OR offline_status = 'ready' OR id LIKE 'local%')";
+  const albumActiveFilter = offlineOnly
+    ? "AND id IN (SELECT DISTINCT album_id FROM tracks WHERE offline_status = 'ready')"
+    : "AND id IN (SELECT DISTINCT album_id FROM tracks WHERE on_nas = 1 OR offline_status = 'ready' OR id LIKE 'local%')";
+  const artistActiveFilter = offlineOnly
+    ? "AND id IN (SELECT DISTINCT artist_id FROM tracks WHERE offline_status = 'ready')"
+    : "AND id IN (SELECT DISTINCT artist_id FROM tracks WHERE on_nas = 1 OR offline_status = 'ready' OR id LIKE 'local%')";
+
   const [artists, albums, tracks] = await Promise.all([
     db.getAllAsync<Artist>(
-      "SELECT id, name, album_count as albumCount, cover_id as coverId FROM artists WHERE name LIKE ? ESCAPE '\\' ORDER BY name COLLATE NOCASE",
+      `SELECT id, name, album_count as albumCount, cover_id as coverId FROM artists WHERE name LIKE ? ESCAPE '\\' ${artistActiveFilter} ORDER BY name COLLATE NOCASE`,
       like,
     ),
     db.getAllAsync<Album & { kind: string }>(
-      "SELECT id, name, artist_id as artistId, artist_name as artistName, year, cover_id as coverId, track_count as trackCount, kind FROM albums WHERE (name LIKE ? ESCAPE '\\' OR artist_name LIKE ? ESCAPE '\\') AND kind != 'podcast_episode' ORDER BY name COLLATE NOCASE",
+      `SELECT id, name, artist_id as artistId, artist_name as artistName, year, cover_id as coverId, track_count as trackCount, kind FROM albums WHERE (name LIKE ? ESCAPE '\\' OR artist_name LIKE ? ESCAPE '\\') AND kind != 'podcast_episode' ${albumActiveFilter} ORDER BY name COLLATE NOCASE`,
       like,
       like,
     ),
@@ -422,7 +485,7 @@ export async function getRecents(offlineOnly?: boolean): Promise<Track[]> {
 
 export async function replaceRecents(tracks: Track[]): Promise<void> {
   const db = await ready();
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     await db.runAsync("DELETE FROM recents");
     for (const [index, track] of tracks.slice(0, 20).entries()) {
       await upsertTrackSnapshot(db, track);
@@ -453,7 +516,7 @@ export async function getFavorites(): Promise<Track[]> {
 
 export async function replaceFavorites(tracks: Track[]): Promise<void> {
   const db = await ready();
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     await db.runAsync("DELETE FROM favorites");
     for (const [index, track] of tracks.entries()) {
       await upsertTrackSnapshot(db, track);
@@ -556,11 +619,41 @@ export async function loadPlaylists(): Promise<ImportedPlaylist[]> {
   return result;
 }
 
-export async function savePlaylists(playlists: ImportedPlaylist[]): Promise<void> {
+const PLAYLISTS_UPDATED_AT_KEY = "playlists_updated_at";
+
+export async function getPlaylistsUpdatedAt(): Promise<number> {
   const db = await ready();
-  await db.withTransactionAsync(async () => {
+  const row = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM meta WHERE key = ?",
+    PLAYLISTS_UPDATED_AT_KEY,
+  );
+  const n = Number(row?.value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export async function setPlaylistsUpdatedAt(value: number): Promise<void> {
+  const db = await ready();
+  await db.runAsync(
+    "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+    PLAYLISTS_UPDATED_AT_KEY,
+    String(value),
+  );
+}
+
+export async function savePlaylists(
+  playlists: ImportedPlaylist[],
+  opts?: { updatedAt?: number },
+): Promise<void> {
+  const db = await ready();
+  const updatedAt = opts?.updatedAt ?? Date.now();
+  await runInTransaction(db, async () => {
     await db.runAsync("DELETE FROM playlist_tracks");
     await db.runAsync("DELETE FROM playlists");
+    await db.runAsync(
+      "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+      PLAYLISTS_UPDATED_AT_KEY,
+      String(updatedAt),
+    );
     for (const playlist of playlists) {
       await db.runAsync(
         "INSERT INTO playlists (id, kind, name, owner_name, cover_url, spotify_url, imported_at, liked) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -694,20 +787,35 @@ export async function clearLocalCopies(kind?: OfflineKind): Promise<string[]> {
       "UPDATE tracks SET local_uri = NULL, local_bytes = NULL, offline_status = 'skipped' WHERE local_uri IS NOT NULL AND kind != 'video'",
     );
   }
+  await db.runAsync(
+    "DELETE FROM tracks WHERE on_nas = 0 AND (local_uri IS NULL OR offline_status != 'ready')",
+  );
+  await db.runAsync("DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)");
+  await db.runAsync("DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM tracks)");
+  await db.runAsync("DELETE FROM recents WHERE track_id NOT IN (SELECT id FROM tracks)");
+  await db.runAsync("DELETE FROM favorites WHERE track_id NOT IN (SELECT id FROM tracks)");
   notifyCatalog();
   return rows.map((row) => row.local_uri);
 }
 
 export async function clearLocalCopy(trackId: string): Promise<string | null> {
   const db = await ready();
-  const row = await db.getFirstAsync<{ local_uri: string | null }>(
-    "SELECT local_uri FROM tracks WHERE id = ?",
+  const row = await db.getFirstAsync<{ local_uri: string | null; on_nas: number }>(
+    "SELECT local_uri, on_nas FROM tracks WHERE id = ?",
     trackId,
   );
-  await db.runAsync(
-    "UPDATE tracks SET local_uri = NULL, local_bytes = NULL, offline_status = 'skipped' WHERE id = ?",
-    trackId,
-  );
+  if (row && row.on_nas === 0) {
+    await db.runAsync("DELETE FROM tracks WHERE id = ?", trackId);
+    await db.runAsync("DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)");
+    await db.runAsync("DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM tracks)");
+    await db.runAsync("DELETE FROM recents WHERE track_id NOT IN (SELECT id FROM tracks)");
+    await db.runAsync("DELETE FROM favorites WHERE track_id NOT IN (SELECT id FROM tracks)");
+  } else {
+    await db.runAsync(
+      "UPDATE tracks SET local_uri = NULL, local_bytes = NULL, offline_status = 'skipped' WHERE id = ?",
+      trackId,
+    );
+  }
   notifyCatalog();
   return row?.local_uri ?? null;
 }
@@ -716,7 +824,7 @@ export async function upsertVideoTracks(
   items: { path: string; title: string; number: number; albumId: string; albumName: string }[],
 ): Promise<void> {
   const db = await ready();
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     for (const item of items) {
       await db.runAsync(
         `INSERT INTO tracks (

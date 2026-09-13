@@ -33,17 +33,17 @@ const YTDLP_COMPOSE = `services:
       - "8091:8091"
     environment:
       LIBRARY_DIR: /library
-      PODCAST_DIR: /podcasts
-      SONG_DIR: /library
+      PODCAST_DIR: /library/Podcasts
+      SONG_DIR: /library/Canciones
       VIDEO_DIR: /video
       BIND_HOST: 0.0.0.0
       BIND_PORT: "8091"
       AUTH_TOKEN: ""
       MAX_WORKERS: "2"
     volumes:
+      # Edit the left side to your share (File Manager path).
       - /volume1/Music/nlc-downloader-app:/app
       - /volume1/Music:/library
-      - /volume1/Podcasts:/podcasts
       - /volume1/Video:/video
     command:
       - bash

@@ -1,5 +1,5 @@
-import { type ReactNode } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { type ReactElement, type ReactNode } from "react";
+import { type RefreshControlProps, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { mergeDockOnScroll, useDock } from "@/lib/dock-context";
 import { usePlayer } from "@/lib/player/player-context";
@@ -10,10 +10,12 @@ export function Screen({
   children,
   scroll = true,
   flush = false,
+  refreshControl,
 }: {
   children: ReactNode;
   scroll?: boolean;
   flush?: boolean;
+  refreshControl?: ReactElement<RefreshControlProps>;
 }) {
   const insets = useSafeAreaInsets();
   const { current } = usePlayer();
@@ -56,6 +58,7 @@ export function Screen({
       ]}
       scrollEventThrottle={16}
       onScroll={mergeDockOnScroll(dock)}
+      refreshControl={refreshControl}
     >
       {children}
     </ScrollView>

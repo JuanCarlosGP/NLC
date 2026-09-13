@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { AlbumRow } from "@/components/library/album-row";
 import { ArtistRow } from "@/components/library/artist-row";
@@ -51,10 +51,27 @@ export default function SearchScreen() {
 function CatalogSearch({ zone }: { zone: "music" | "podcast" }) {
   const router = useRouter();
   const { t } = useI18n();
+  const { source } = useSettings();
   const [query, setQuery] = useState("");
   const { results, loading } = useSearch(query);
   const { playTracks } = usePlayer();
+  const [refreshing, setRefreshing] = useState(false);
   const podcast = zone === "podcast";
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (source.refresh) {
+        await source.refresh();
+      } else {
+        await source.ping();
+      }
+    } catch {
+      // Best-effort
+    } finally {
+      setRefreshing(false);
+    }
+  }, [source]);
 
   const artists = useMemo(
     () => results.artists.filter((artist) => (podcast ? isPodcastArtist(artist) : !isPodcastArtist(artist))),
@@ -74,7 +91,16 @@ function CatalogSearch({ zone }: { zone: "music" | "podcast" }) {
     !artists.length && !albums.length && !tracks.length && !loading && Boolean(query.trim());
 
   return (
-    <Screen>
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+          colors={[colors.accent]}
+        />
+      }
+    >
       <Text style={type.pageTitle}>{t("search.title")}</Text>
       <TextInput
         value={query}

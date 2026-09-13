@@ -17,6 +17,7 @@ services:
       MAX_WORKERS: "2"
       PODCAST_MIN_SECONDS: "600"
     volumes:
+      # Change the left side to your music share in File Manager.
       - /volume1/Music/nlc-downloader-app:/app
       - /volume1/Music:/library
     command:

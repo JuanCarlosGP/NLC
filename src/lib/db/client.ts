@@ -78,3 +78,28 @@ export async function getDb(): Promise<CatalogDb> {
   }
   return opened;
 }
+
+let txQueue: Promise<unknown> = Promise.resolve();
+
+export async function runInTransaction<T = void>(
+  db: CatalogDb,
+  task: () => Promise<T>,
+): Promise<T> {
+  const previous = txQueue;
+  let resolveCurrent!: () => void;
+  txQueue = new Promise<void>((resolve) => {
+    resolveCurrent = resolve;
+  });
+
+  await previous.catch(() => {});
+  let result!: T;
+  try {
+    await db.withTransactionAsync(async () => {
+      result = await task();
+    });
+    return result;
+  } finally {
+    resolveCurrent();
+  }
+}
+

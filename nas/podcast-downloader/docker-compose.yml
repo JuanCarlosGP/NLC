@@ -16,6 +16,5 @@ services:
       AUTH_TOKEN: ""
       MAX_WORKERS: "2"
     volumes:
-      # Ugreen example: map the shared Music/Podcasts folder (create Podcasts first).
       # Change the left side to your real path in File Manager / volume1.
       - /volume1/Music/Podcasts:/downloads

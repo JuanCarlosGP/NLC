@@ -86,7 +86,7 @@ Si el ping falla: el teléfono y el NAS deben estar en la misma LAN; Navidrome d
 
 El APK no embebe yt-dlp. Corre en Docker en el NAS: [`nas/podcast-downloader/README.md`](nas/podcast-downloader/README.md).
 
-En NLC → Ajustes → Descargas: host del NAS, puerto `8091` y el mismo token que `AUTH_TOKEN` del compose. Las descargas van a `Music/Podcasts` o `Music/Canciones`. No descarga audio de Spotify.
+En NLC → Ajustes → Descargas: host del NAS, puerto `8091` y el mismo token que `AUTH_TOKEN` del compose. Las descargas van a `Podcasts` o `Canciones` en el share que montes. No descarga audio de Spotify.
 
 ## APK y OTA (maintainers)
 

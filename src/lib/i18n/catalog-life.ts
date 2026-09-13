@@ -430,7 +430,7 @@ NLC facts:
 - Cover: jpg with the same name as the audio. Dumps do not inherit folder cover.jpg.
 - Flat podcast = one album per episode.
 - yt-dlp: host and port from Settings → Downloads (default :8091).
-- Spotify: imported and matched against the NAS; Spotify is not played.
+- Spotify: imported and matched against the NAS; Spotify is not played. Playlists live on the phone; if there is a music source, nlc-playlists.json.
 - Video: configured share (e.g. Video); One Piece by saga → arc → file.
 - Tasks live on the phone (stored inbox name Bandeja + projects + board). If there is a source, nlc-tasks.json.
 - Wealth: stored cash account Caja + accounts + investments + entries + goals. If there is a source, nlc-wealth.json.`,
@@ -1005,7 +1005,7 @@ Hechos de NLC:
 - Portada: jpg con el mismo nombre que el audio. En dumps no se hereda cover.jpg de carpeta.
 - Podcast plano = un álbum por episodio.
 - yt-dlp: host y puerto de Ajustes → Descargas (por defecto :8091).
-- Spotify: se importa y se matchea contra el NAS; no se reproduce Spotify.
+- Spotify: se importa y se matchea contra el NAS; no se reproduce Spotify. Las playlists viven en el teléfono; si hay fuente de música, nlc-playlists.json.
 - Vídeo: share configurado (p. ej. Video); One Piece por saga → arco → archivo.
 - Productividad: vive en el teléfono (Bandeja + proyectos + tablero). Si hay fuente, nlc-tasks.json.
 - Patrimonio: Caja + cuentas + inversiones + movimientos + objetivos. Si hay fuente, nlc-wealth.json.`,
@@ -1059,7 +1059,7 @@ Hechos de NLC:
     utilDraftMissing:
       "No encuentro «artista / álbum / canción» en Biblioteca. ¿Debería salir en Canciones, Álbumes o Podcasts? ¿Hace falta refrescar?",
     utilDraftDownload:
-      "Quiero bajar «URL» con yt-dlp (Ajustes → Descargas, puerto 8091) a /Podcasts o /Music/Canciones, con jpg al lado. ¿Cómo lo dejo en Ajustes y en el NAS?",
+      "Quiero bajar «URL» con yt-dlp (Ajustes → Descargas, puerto 8091) a Podcasts o Canciones, con jpg al lado. ¿Cómo lo dejo en Ajustes y en el NAS?",
     utilDraftNas:
       "No conecta la carpeta compartida. Host, puerto, usuario y carpeta son los de Ajustes; HTTPS off. ¿Checklist?",
     utilDraftSpotify:

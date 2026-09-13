@@ -37,6 +37,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.net.URL
 
@@ -133,6 +134,9 @@ class AudioControlsService : MediaSessionService() {
 
   private fun buildContentIntent(): PendingIntent? {
     val appIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
+    appIntent.action = Intent.ACTION_VIEW
+    appIntent.data = android.net.Uri.parse("nlc://now-playing")
+    appIntent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
     return PendingIntent.getActivity(
       this,
       0,
@@ -301,14 +305,31 @@ class AudioControlsService : MediaSessionService() {
       p.setPlaylistMetadata(media3Metadata)
     }
 
-    // 2. Set high-resolution artwork directly onto the platform MediaSession & MediaSessionCompat.
-    // This feeds Android 13/14/15 SystemUI's MediaDataManager directly with a crisp full-res bitmap,
-    // bypassing the 113x113 downscaled Notification.EXTRA_LARGE_ICON fallback.
+    // 2. Set high-resolution artwork and duration directly onto the platform MediaSession & MediaSessionCompat.
+    // This feeds Android 13/14/15 SystemUI's MediaDataManager directly with a crisp full-res bitmap
+    // and accurate duration for the interactive seekbar.
     val highResBitmap = currentArtwork?.let { scaleBitmapForMediaMetadata(it) }
+    val playerDuration = try {
+      val player = currentPlayer?.ref
+      if (player != null && Looper.myLooper() == player.applicationLooper) {
+        player.duration.takeIf { it > 0 && it != androidx.media3.common.C.TIME_UNSET } ?: 0L
+      } else {
+        0L
+      }
+    } catch (_: Throwable) { 0L }
+    val metaDuration = currentMetadata?.duration?.takeIf { it > 0 }?.let { (it * 1000).toLong() } ?: 0L
+    val trackDuration = if (metaDuration > 0) metaDuration else playerDuration
+    val contentIntent = buildContentIntent()
 
     try {
       val platformSession = getPlatformMediaSession()
       if (platformSession != null) {
+        if (contentIntent != null) {
+          try {
+            platformSession.setSessionActivity(contentIntent)
+          } catch (_: Exception) {}
+        }
+
         val platformMetaBuilder = PlatformMediaMetadata.Builder()
           .putString(PlatformMediaMetadata.METADATA_KEY_TITLE, title)
           .putString(PlatformMediaMetadata.METADATA_KEY_ARTIST, artist)
@@ -317,6 +338,10 @@ class AudioControlsService : MediaSessionService() {
           .putString(PlatformMediaMetadata.METADATA_KEY_DISPLAY_TITLE, title)
           .putString(PlatformMediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, artist)
           .putString(PlatformMediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION, album)
+
+        if (trackDuration > 0) {
+          platformMetaBuilder.putLong(PlatformMediaMetadata.METADATA_KEY_DURATION, trackDuration)
+        }
 
         if (artworkUrlStr != null) {
           platformMetaBuilder.putString(PlatformMediaMetadata.METADATA_KEY_ALBUM_ART_URI, artworkUrlStr)
@@ -339,6 +364,12 @@ class AudioControlsService : MediaSessionService() {
     try {
       val compat = getSessionCompat()
       if (compat != null) {
+        if (contentIntent != null) {
+          try {
+            compat.setSessionActivity(contentIntent)
+          } catch (_: Exception) {}
+        }
+
         val compatBuilder = MediaMetadataCompat.Builder()
           .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
           .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
@@ -347,6 +378,10 @@ class AudioControlsService : MediaSessionService() {
           .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
           .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
           .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, album)
+
+        if (trackDuration > 0) {
+          compatBuilder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, trackDuration)
+        }
 
         if (artworkUrlStr != null) {
           compatBuilder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, artworkUrlStr)
@@ -433,11 +468,14 @@ class AudioControlsService : MediaSessionService() {
       val wrapper = LockScreenPlayer(player.ref) { direction ->
         currentPlayer?.emitLockScreenSkip(direction)
       }
-      lockScreenPlayer = wrapper
-      val session = MediaSession.Builder(this, wrapper)
+      val contentIntent = buildContentIntent()
+      val sessionBuilder = MediaSession.Builder(this, wrapper)
         .setId(SESSION_ID)
         .setCallback(AudioMediaSessionCallback())
-        .build()
+      if (contentIntent != null) {
+        sessionBuilder.setSessionActivity(contentIntent)
+      }
+      val session = sessionBuilder.build()
 
       addSession(session)
       mediaSession = session
@@ -457,7 +495,14 @@ class AudioControlsService : MediaSessionService() {
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+          if (playbackState == Player.STATE_READY) {
+            updateSessionMetadata()
+          }
           postOrStartForegroundNotification(startInForeground = false)
+        }
+
+        override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+          updateSessionMetadata()
         }
       }
       playbackListener = listener
@@ -566,8 +611,10 @@ class AudioControlsService : MediaSessionService() {
           if (url == currentArtworkUrl) {
             currentArtwork = bitmap
             currentArtworkBytes = safeBytes
-            updateSessionMetadata()
-            postOrStartForegroundNotification(startInForeground = false)
+            withContext(Dispatchers.Main) {
+              updateSessionMetadata()
+              postOrStartForegroundNotification(startInForeground = false)
+            }
           }
         }
       } catch (e: Exception) {

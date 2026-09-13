@@ -12,14 +12,14 @@ Hace falta un Ugreen **DXP** (u otro host) con Docker. En una serie DH sin Docke
 
 Auth (opcional): si `AUTH_TOKEN` está vacío, deja el token en blanco en NLC. Si pones un token en el compose, usa el mismo valor en NLC (`X-Download-Token` / Bearer).
 
-El audio se guarda como MP3 en **Music/Canciones** (canciones) o **Music/Podcasts** (podcasts), sin subcarpetas de canal. yt-dlp también escribe un JPG con el mismo nombre (`Episodio.mp3` + `Episodio.jpg`). NLC usa ese fichero como portada; nunca un `cover.jpg` compartido de la carpeta.
+El audio se guarda como MP3 en **Canciones** (canciones) o **Podcasts** (podcasts) dentro del share de música que montes, sin subcarpetas de canal. yt-dlp también escribe un JPG con el mismo nombre (`Episodio.mp3` + `Episodio.jpg`). NLC usa ese fichero como portada; nunca un `cover.jpg` compartido de la carpeta.
 
 ## Despliegue en Ugreen
 
-1. En el File Manager, dentro del share de música, crea **`Podcasts`** y **`Canciones`** (p. ej. `Music/Podcasts`, `Music/Canciones`).
+1. En el File Manager, dentro del share de música, crea **`Podcasts`** y **`Canciones`**.
 2. Copia este directorio al NAS (o pega el compose en Container Manager).
 3. Edita `docker-compose.yml`:
-   - Lado izquierdo del volumen → ruta real de `Podcasts` (a menudo `/volume1/Music/Podcasts`).
+   - Lado izquierdo del volumen → la ruta real de tu share (File Manager).
    - Pon un `AUTH_TOKEN` (el mismo que escribirás en NLC).
 4. Container Manager → **Compose** → crear stack → Deploy (build desde el Dockerfile).
 5. Comprueba `http://<IP-DEL-NAS>:8091/health` desde un PC en la LAN.
@@ -27,7 +27,7 @@ El audio se guarda como MP3 en **Music/Canciones** (canciones) o **Music/Podcast
 ## Usuario de solo lectura
 
 - El **contenedor** escribe ficheros (mount del volumen). No usa el usuario Viewer.
-- Viewer solo necesita **lectura** en `Music` / `Podcasts` para que NLC reproduzca por WebDAV.
+- Viewer solo necesita **lectura** en el share de música / podcasts para que NLC reproduzca por WebDAV.
 - Escritura en Viewer solo hace falta para `nlc.json` (Guardar configuración), no para las descargas.
 
 ## App NLC

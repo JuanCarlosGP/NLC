@@ -67,6 +67,8 @@ class DownloadRequest(BaseModel):
 
     url: str | None = None
     query: str | None = None
+    title: str | None = None
+    artist: str | None = None
     durationMs: int | None = Field(default=None, ge=0)
     kind: MediaKind = Field(default="song")
 
@@ -141,8 +143,10 @@ def _safe_filename(name: str) -> str:
 
 
 def _clean_media_title(name: str) -> str:
-    """Strip YouTube clutter: (Letra), [Official], _ Lyrics, etc."""
+    """Strip YouTube clutter; keep remix/rmx because they are part of the title."""
     cleaned = re.sub(r"\s*\[[a-zA-Z0-9_-]{11}\]\s*$", "", name or "")
+    cleaned = re.sub(r"\((remix|rmx)\)", r" \1 ", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\[(remix|rmx)\]", r" \1 ", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"[\[\({（【][^\]\)}）】]*[\]\)}）】]", " ", cleaned)
     cleaned = re.sub(
         r"(?:\s*[_\-|:/]+|\s+)\b(letra|lyrics?|oficial|official|video(?:clip)?|audio|visualizer|hd|4k|mv|topic|version|versión|legal)\b.*$",
@@ -269,7 +273,33 @@ def _normalize_text(value: str) -> str:
 
 
 def _tokens(value: str) -> list[str]:
-    return [part for part in _normalize_text(value).split(" ") if len(part) > 1]
+    parts = _normalize_text(value).split(" ")
+    kept = [part for part in parts if len(part) > 1]
+    if not kept:
+        kept = [part for part in parts if part]
+    return kept
+
+
+def _title_words_in(haystack: str, title: str) -> bool:
+    tokens = _tokens(title)
+    if not tokens:
+        return False
+    hay = set(_normalize_text(haystack).split())
+    return all(token in hay for token in tokens)
+
+
+def _split_search_parts(query: str, title: str | None, artist: str | None) -> tuple[str, str, str]:
+    """Search string without hyphen — closer to typing 'nana rojuu' on YouTube."""
+    track = (title or "").strip()
+    who = (artist or "").strip()
+    if track and who:
+        return f"{track} {who}", track, who
+    raw = (query or "").strip()
+    if " - " in raw:
+        left, right = raw.split(" - ", 1)
+        left, right = left.strip(), right.strip()
+        return f"{left} {right}".strip(), left, right
+    return raw, raw, ""
 
 
 def _text_overlap_score(haystack: str, needle: str) -> float:
@@ -277,7 +307,14 @@ def _text_overlap_score(haystack: str, needle: str) -> float:
     if not tokens:
         return 0.0
     hay = _normalize_text(haystack)
-    hits = sum(1 for token in tokens if token in hay)
+    hay_words = set(hay.split())
+    hits = 0
+    for token in tokens:
+        if len(token) <= 4:
+            if token in hay_words:
+                hits += 1
+        elif token in hay:
+            hits += 1
     return hits / len(tokens)
 
 
@@ -316,13 +353,16 @@ def _pick_search_result(
     job_id: str,
     query: str,
     expected_sec: float | None,
+    title: str | None = None,
+    artist: str | None = None,
 ) -> str:
-    """Search YouTube and pick best match; duration coincidence outweighs title noise."""
-    search = query
+    """Search YouTube and pick best match; ±1–3s + title/artist beats ranking noise."""
+    search_q, title_part, artist_part = _split_search_parts(query, title, artist)
+    search = search_q
     if not search.lower().startswith("ytsearch"):
-        search = f"ytsearch{SEARCH_RESULTS}:{query}"
+        search = f"ytsearch{SEARCH_RESULTS}:{search_q}"
 
-    _append_log(job_id, f"Buscando: {query}")
+    _append_log(job_id, f"Buscando: {search_q}")
     if expected_sec:
         mins = int(expected_sec // 60)
         secs = int(expected_sec % 60)
@@ -334,6 +374,7 @@ def _pick_search_result(
         "no_warnings": True,
         "skip_download": True,
         "noplaylist": False,
+        "ignoreerrors": True,
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(search, download=False)
@@ -347,12 +388,6 @@ def _pick_search_result(
     if not entries:
         raise RuntimeError("La búsqueda de YouTube no devolvió resultados.")
 
-    # query ≈ "Title - Artist"
-    title_part = query
-    artist_part = ""
-    if " - " in query:
-        title_part, artist_part = query.split(" - ", 1)
-
     scored: list[tuple[float, float, dict[str, Any], str]] = []
     for entry in entries:
         url = _candidate_url(entry)
@@ -363,15 +398,23 @@ def _pick_search_result(
         dur_score = _duration_score(cand_sec, expected_sec)
         if expected_sec and cand_sec is not None and abs(cand_sec - expected_sec) > DURATION_HARD_MAX:
             continue
-        title = str(entry.get("title") or "")
+        video_title = str(entry.get("title") or "")
+        uploader = str(entry.get("uploader") or entry.get("channel") or "")
+        blob = f"{video_title} {uploader}"
         text_score = (
-            _text_overlap_score(title, title_part) * 12.0
-            + _text_overlap_score(title, artist_part) * 8.0
-            + _text_overlap_score(str(entry.get("uploader") or entry.get("channel") or ""), artist_part) * 6.0
+            _text_overlap_score(video_title, title_part) * 12.0
+            + _text_overlap_score(blob, artist_part) * 8.0
+            + _text_overlap_score(uploader, artist_part) * 6.0
         )
-        # Duration dominates: a near-exact length beats a perfect title with wrong runtime.
         total = dur_score * 10.0 + text_score
         delta = abs(cand_sec - expected_sec) if cand_sec is not None and expected_sec else 999.0
+        # Same bar you use by hand: title is in the video, artist too, length almost exact.
+        if (
+            delta <= 3.0
+            and _title_words_in(video_title, title_part)
+            and (not artist_part or _text_overlap_score(blob, artist_part) > 0)
+        ):
+            total += 5000.0
         scored.append((total, delta, entry, url))
 
     if not scored:
@@ -383,8 +426,8 @@ def _pick_search_result(
             cand_dur = entry.get("duration")
             cand_sec = float(cand_dur) if isinstance(cand_dur, (int, float)) else None
             dur_score = _duration_score(cand_sec, expected_sec)
-            title = str(entry.get("title") or "")
-            text_score = _text_overlap_score(title, title_part) * 12.0 + _text_overlap_score(title, artist_part) * 8.0
+            video_title = str(entry.get("title") or "")
+            text_score = _text_overlap_score(video_title, title_part) * 12.0 + _text_overlap_score(video_title, artist_part) * 8.0
             total = dur_score * 10.0 + text_score
             delta = abs(cand_sec - expected_sec) if cand_sec is not None and expected_sec else 999.0
             scored.append((total, delta, entry, url))
@@ -430,6 +473,8 @@ def _run_download(
     source: str,
     requested_kind: MediaKind,
     duration_ms: int | None = None,
+    search_title: str | None = None,
+    search_artist: str | None = None,
 ) -> None:
     _update_job(job_id, status="running", kind=requested_kind)
     _append_log(job_id, "Resolviendo metadatos…")
@@ -449,7 +494,7 @@ def _run_download(
                 # ytsearchN:rest
                 parts = query.split(":", 1)
                 query = parts[1] if len(parts) > 1 else query
-            url = _pick_search_result(job_id, query, expected_sec)
+            url = _pick_search_result(job_id, query, expected_sec, search_title, search_artist)
             _update_job(job_id, url=url)
     except Exception as exc:  # noqa: BLE001
         _append_log(job_id, f"Error búsqueda: {exc}")
@@ -629,6 +674,7 @@ def health() -> HealthResponse:
 def _enqueue_body(body: DownloadRequest) -> DownloadResponse:
     job_id = uuid.uuid4().hex[:12]
     source = body.resolve_source()
+    initial_title = (body.title or "").strip() or None
     with _lock:
         _jobs[job_id] = {
             "id": job_id,
@@ -636,7 +682,7 @@ def _enqueue_body(body: DownloadRequest) -> DownloadResponse:
             "url": source,
             "kind": body.kind,
             "resolvedKind": None,
-            "title": None,
+            "title": initial_title,
             "filename": None,
             "error": None,
             "progress": None,
@@ -644,7 +690,7 @@ def _enqueue_body(body: DownloadRequest) -> DownloadResponse:
             "eta": None,
             "log": ["En cola…"],
         }
-    _pool.submit(_run_download, job_id, source, body.kind, body.durationMs)
+    _pool.submit(_run_download, job_id, source, body.kind, body.durationMs, body.title, body.artist)
     return DownloadResponse(id=job_id, status="queued")
 
 
@@ -702,6 +748,23 @@ def job_status(
             raise HTTPException(status_code=404, detail="Job no encontrado.")
         payload = _job_payload(job)
     return payload
+
+
+@app.post("/reload")
+def reload_service(
+    authorization: str | None = Header(default=None),
+    x_download_token: str | None = Header(default=None, alias="X-Download-Token"),
+) -> dict[str, Any]:
+    _require_auth(authorization, x_download_token)
+
+    def _exit() -> None:
+        import time
+
+        time.sleep(0.5)
+        os._exit(0)
+
+    threading.Thread(target=_exit, daemon=True).start()
+    return {"ok": True, "restarting": True}
 
 
 if __name__ == "__main__":

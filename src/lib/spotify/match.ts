@@ -2,17 +2,21 @@ import type { MusicSource, Track } from "@/lib/nas/types";
 import { isPodcastTrack } from "@/lib/nas/webdav";
 import { rememberTrackArtwork } from "@/lib/library/artwork-cache";
 import { persistTrackCovers } from "@/lib/library/persist-covers";
-import type { ImportedTrack } from "@/lib/spotify/types";
+import type { ImportedPlaylist, ImportedTrack } from "@/lib/spotify/types";
 
 function normalize(value: string): string {
   return value
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\((remix|rmx)\)/gi, " $1 ")
     .replace(/\(.*?\)/g, " ")
     .replace(/（.*?）/g, " ")
     .replace(/[｜|]/g, " ")
-    .replace(/\b(feat|ft|official|video|audio|lyrics?|letra|version|versión|legal)\b\.?/gi, " ")
+    .replace(
+      /\b(feat|ft|official|video|audio|lyrics?|letra|legal|prod|visualizer|topic)\b\.?/gi,
+      " ",
+    )
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
@@ -59,25 +63,48 @@ function trackBlob(track: Track): string {
   return `${track.title} ${track.artistName} ${track.albumName} ${track.id}`;
 }
 
+function titleHits(imported: ImportedTrack, track: Track): boolean {
+  const blob = trackBlob(track);
+  return (
+    titleClose(imported.title, track.title) ||
+    titleClose(imported.title, track.artistName) ||
+    titleClose(imported.title, blob)
+  );
+}
+
+function artistHits(imported: ImportedTrack, track: Track): boolean {
+  const blob = trackBlob(track);
+  return (
+    artistClose(imported.artistName, track.artistName) ||
+    artistClose(imported.artistName, track.title) ||
+    artistClose(imported.artistName, blob)
+  );
+}
+
+function durationClose(imported: ImportedTrack, track: Track): boolean {
+  const a = imported.durationMs || 0;
+  const b = track.durationMs || 0;
+  if (a < 1000 || b < 1000) return false;
+  return Math.abs(a - b) <= 4000;
+}
+
 function pickMatch(imported: ImportedTrack, candidates: Track[]): Track | null {
   const byBoth = candidates.find(
     (track) => titleClose(imported.title, track.title) && artistClose(imported.artistName, track.artistName),
   );
   if (byBoth) return byBoth;
 
+  // Lyric videos often store "Title - Artist". Either side can be the title.
+  const swapped = candidates.find((track) => titleHits(imported, track) && artistHits(imported, track));
+  if (swapped) return swapped;
+
   const byTitle = candidates.find((track) => titleClose(imported.title, track.title));
   if (byTitle) return byTitle;
 
-  // YouTube / yt-dlp names often keep artist+title in one string.
-  return (
-    candidates.find(
-      (track) =>
-        titleClose(imported.title, trackBlob(track)) &&
-        (artistClose(imported.artistName, trackBlob(track)) || artistClose(imported.artistName, track.artistName)),
-    ) ??
-    candidates.find((track) => titleClose(imported.title, trackBlob(track))) ??
-    null
-  );
+  const byDuration = candidates.find((track) => titleHits(imported, track) && durationClose(imported, track));
+  if (byDuration) return byDuration;
+
+  return candidates.find((track) => titleClose(imported.title, trackBlob(track))) ?? null;
 }
 
 export async function matchImportedTracks(
@@ -114,6 +141,52 @@ export async function matchImportedTracks(
   void rememberTrackArtwork(artwork);
   persistTrackCovers(source, artwork);
   return matched;
+}
+
+export async function fillUnmatchedImportedPlaylists(
+  source: MusicSource,
+  playlists: ImportedPlaylist[],
+): Promise<{ playlists: ImportedPlaylist[]; changed: boolean }> {
+  if (!playlists.some((playlist) => playlist.tracks.some((track) => !track.matched))) {
+    return { playlists, changed: false };
+  }
+  const library = await source.search("*");
+  const pool = library.tracks.filter((track) => !isPodcastTrack(track));
+  if (!pool.length) return { playlists, changed: false };
+
+  let changed = false;
+  const artwork: { trackId: string; url?: string; coverId?: string | null; durationMs?: number }[] = [];
+  const next = playlists.map((playlist) => {
+    let listChanged = false;
+    const tracks = playlist.tracks.map((track) => {
+      if (track.matched) return track;
+      const local = pickMatch(track, pool);
+      if (!local) return track;
+      listChanged = true;
+      changed = true;
+      const artworkUrl = track.coverUrl || local.artworkUrl || null;
+      artwork.push({
+        trackId: local.id,
+        url: track.coverUrl || undefined,
+        coverId: local.coverId,
+        durationMs: track.durationMs || local.durationMs || undefined,
+      });
+      return {
+        ...track,
+        matched: {
+          ...local,
+          artworkUrl,
+          durationMs: local.durationMs || track.durationMs || 0,
+        },
+      };
+    });
+    return listChanged ? { ...playlist, tracks } : playlist;
+  });
+  if (artwork.length) {
+    void rememberTrackArtwork(artwork);
+    persistTrackCovers(source, artwork);
+  }
+  return { playlists: next, changed };
 }
 
 export function matchedNasTracks(tracks: ImportedTrack[]): Track[] {

@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import * as Linking from "expo-linking";
 
 type PlayerUiContextValue = {
   nowPlayingOpen: boolean;
@@ -23,6 +24,19 @@ export function PlayerUiProvider({ children }: { children: ReactNode }) {
   const openQueue = useCallback(() => setQueueOpen(true), []);
   const dismissMiniPlayer = useCallback(() => setMiniPlayerDismissed(true), []);
   const revealMiniPlayer = useCallback(() => setMiniPlayerDismissed(false), []);
+
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      if (url.includes("now-playing") || url.endsWith("/now-playing")) {
+        openNowPlaying();
+      }
+    };
+
+    void Linking.getInitialURL().then(handleUrl);
+    const sub = Linking.addEventListener("url", (event) => handleUrl(event.url));
+    return () => sub.remove();
+  }, [openNowPlaying]);
 
   const value = useMemo(
     () => ({

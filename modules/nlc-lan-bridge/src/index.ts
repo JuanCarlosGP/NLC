@@ -26,6 +26,12 @@ export type BridgeRequestEvent = {
   range?: string | null;
 };
 
+export type DownloadWatchFinishedEvent = {
+  done: number;
+  failed: number;
+  finished?: boolean;
+};
+
 type NativeBridge = {
   start(port: number, token: string, resume: boolean): Promise<BridgeStartResult>;
   stop(): Promise<void>;
@@ -33,12 +39,19 @@ type NativeBridge = {
   isUnlinked(): boolean;
   linkState(): BridgeLinkState;
   pairToDesktop(host: string, port: number, token: string, jsonBody: string): Promise<string>;
+  startDownloadWatch?(json: string): Promise<boolean>;
+  stopDownloadWatch?(): Promise<void>;
+  isDownloadWatchRunning?(): boolean;
   resolveJson(id: string, status: number, body: string): void;
   resolveStream(id: string, uri: string, headersJson: string): void;
   fail(id: string, status: number, message: string): void;
   addListener(
-    event: "onBridgeRequest" | "onBridgeUnlinked" | "onBridgeClaimed",
-    listener: ((event: BridgeRequestEvent) => void) | ((event: BridgeClaimedEvent) => void) | (() => void),
+    event: "onBridgeRequest" | "onBridgeUnlinked" | "onBridgeClaimed" | "onDownloadWatchFinished",
+    listener:
+      | ((event: BridgeRequestEvent) => void)
+      | ((event: BridgeClaimedEvent) => void)
+      | ((event: DownloadWatchFinishedEvent) => void)
+      | (() => void),
   ): { remove(): void };
 };
 
@@ -122,4 +135,40 @@ export function addBridgeClaimedListener(listener: (event: BridgeClaimedEvent) =
   const mod = loadNative();
   if (!mod?.addListener) return { remove() {} };
   return mod.addListener("onBridgeClaimed", listener);
+}
+
+export type DownloadWatchParams = Record<string, string>;
+
+export function canWatchDownloadsNatively(): boolean {
+  const mod = loadNative();
+  return typeof mod?.startDownloadWatch === "function";
+}
+
+export async function startNativeDownloadWatch(params: DownloadWatchParams): Promise<boolean> {
+  const mod = loadNative();
+  if (typeof mod?.startDownloadWatch !== "function") return false;
+  try {
+    await mod.startDownloadWatch(JSON.stringify(params));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function stopNativeDownloadWatch(): Promise<void> {
+  const mod = loadNative();
+  if (typeof mod?.stopDownloadWatch !== "function") return;
+  try {
+    await mod.stopDownloadWatch();
+  } catch {
+    // Old APKs do not have this method.
+  }
+}
+
+export function addDownloadWatchFinishedListener(
+  listener: (event: DownloadWatchFinishedEvent) => void,
+): { remove(): void } {
+  const mod = loadNative();
+  if (!mod?.addListener) return { remove() {} };
+  return mod.addListener("onDownloadWatchFinished", listener);
 }

@@ -77,5 +77,10 @@ export function composeSources(primary: MusicSource, extra: MusicSource): MusicS
       if (trackId.startsWith("local")) return null;
       return primary.ensureCoverSidecar?.(trackId, imageUrl) ?? null;
     },
+
+    async refresh() {
+      if (primary.refresh) await primary.refresh();
+      if (extra.refresh) await extra.refresh();
+    },
   };
 }

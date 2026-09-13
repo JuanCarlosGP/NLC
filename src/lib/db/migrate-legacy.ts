@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { runInTransaction } from "@/lib/db/client";
 import type { CatalogDb } from "@/lib/db/types";
 import type { Track } from "@/lib/nas/types";
 import { isPodcastTrack } from "@/lib/nas/webdav";
@@ -63,7 +64,7 @@ export async function migrateLegacyIfNeeded(db: CatalogDb): Promise<void> {
     readJson<ImportedPlaylist[]>(PLAYLISTS_KEY, []),
   ]);
 
-  await db.withTransactionAsync(async () => {
+  await runInTransaction(db, async () => {
     await db.runAsync("DELETE FROM recents");
     await db.runAsync("DELETE FROM favorites");
     await db.runAsync("DELETE FROM playlist_tracks");

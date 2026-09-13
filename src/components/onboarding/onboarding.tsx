@@ -30,7 +30,7 @@ import { XMark } from "@/components/onboarding/x-mark";
 import { useI18n } from "@/lib/i18n/context";
 import { LOCALES } from "@/lib/i18n/locale";
 import { pingNasConnection } from "@/lib/nas/source-factory";
-import { joinPath, LIBRARY_DIR, type WebDavEntry } from "@/lib/nas/webdav";
+import { joinPath, LIBRARY_DIR, siblingOfShare, type WebDavEntry } from "@/lib/nas/webdav";
 import { ensureWebDavDir, listWebDavDir } from "@/lib/nas/webdav-source";
 import {
   UNSET_NAS_SETTINGS,
@@ -108,10 +108,11 @@ function fieldFromMessage(message: string): FieldKey | null {
 function libraryPaths(draft: Draft) {
   const root = draft.rootPath.trim() || "/";
   return {
-    music: draft.wantMusic ? joinPath(root, LIBRARY_DIR.music) : "",
+    music: draft.wantMusic ? root : "",
     podcasts: draft.wantPodcasts ? joinPath(root, LIBRARY_DIR.podcasts) : "",
-    video: draft.wantVideo ? joinPath(root, LIBRARY_DIR.video) : "",
-    wealth: draft.wantWealth ? joinPath(root, LIBRARY_DIR.wealth) : "",
+    songs: draft.wantMusic ? joinPath(root, LIBRARY_DIR.songs) : "",
+    video: draft.wantVideo ? siblingOfShare(root, LIBRARY_DIR.video) : "",
+    wealth: draft.wantWealth ? root : "",
   };
 }
 
@@ -468,13 +469,16 @@ export function Onboarding() {
     Keyboard.dismiss();
     triggerUiHaptic();
     const toCreate = [
-      paths.music,
-      paths.podcasts,
-      paths.video,
-      paths.video ? joinPath(paths.video, "series") : "",
-      paths.video ? joinPath(paths.video, "movies") : "",
-      paths.wealth,
-    ].filter(Boolean);
+      ...new Set(
+        [
+          paths.podcasts,
+          paths.songs,
+          paths.video,
+          paths.video ? joinPath(paths.video, "series") : "",
+          paths.video ? joinPath(paths.video, "movies") : "",
+        ].filter(Boolean),
+      ),
+    ];
     if (!toCreate.length) {
       setFeedback({ text: t("onboarding.pickLibrary"), color: colors.warn });
       return;
@@ -1063,10 +1067,9 @@ function FoldersStep({
       <Reveal delay={70} reduce={reduce}>
         <Text style={type.body}>
           {t("onboarding.foldersBody", {
-            music: LIBRARY_DIR.music,
             podcasts: LIBRARY_DIR.podcasts,
+            songs: LIBRARY_DIR.songs,
             video: LIBRARY_DIR.video,
-            wealth: LIBRARY_DIR.wealth,
           })}
         </Text>
       </Reveal>

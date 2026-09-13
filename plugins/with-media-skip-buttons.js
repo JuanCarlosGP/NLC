@@ -45,10 +45,10 @@ function patchExpoAudio(projectRoot) {
 
   const records = path.join(root, "android/src/main/java/expo/modules/audio/AudioRecords.kt");
   let source = read(records);
-  if (source && !source.includes("showNextTrack")) {
-    write(
-      records,
-      source.replace(
+  if (source && (!source.includes("showNextTrack") || !source.includes("val duration: Double?"))) {
+    let patchedRecords = source;
+    if (!patchedRecords.includes("showNextTrack")) {
+      patchedRecords = patchedRecords.replace(
         `class AudioLockScreenOptions(
   @Field val showSeekForward: Boolean,
   @Field val showSeekBackward: Boolean
@@ -60,8 +60,27 @@ function patchExpoAudio(projectRoot) {
   @Field val showNextTrack: Boolean = false,
   @Field val showPreviousTrack: Boolean = false
 ) : Record`,
-      ),
-    );
+      );
+    }
+    if (!patchedRecords.includes("val duration: Double?")) {
+      patchedRecords = patchedRecords.replace(
+        `class Metadata(
+  @Field val title: String?,
+  @Field val artist: String?,
+  @Field val albumTitle: String?,
+  @Field val artworkUrl: URL?
+) : Record`,
+        `class Metadata(
+  @Field val title: String?,
+  @Field val artist: String?,
+  @Field val albumTitle: String?,
+  @Field val artworkUrl: URL?,
+  // ${MARKER}
+  @Field val duration: Double? = null
+) : Record`,
+      );
+    }
+    write(records, patchedRecords);
   }
 
   const player = path.join(root, "android/src/main/java/expo/modules/audio/AudioPlayer.kt");

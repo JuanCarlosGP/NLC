@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getDb } from "@/lib/db/client";
 import type { MusicSourceKind } from "@/lib/nas/types";
-import { joinPath, siblingOfShare, LIBRARY_DIR } from "@/lib/nas/webdav";
+import { joinPath, LIBRARY_DIR } from "@/lib/nas/webdav";
 import { deleteSecret, getSecret, setSecret } from "@/lib/settings/secret-store";
 
 const SETTINGS_KEY = "nlc.settings.v1";
@@ -43,25 +43,25 @@ export const DEFAULT_NAS_SETTINGS: NasSettings = {
   host: "192.168.1.106",
   port: "5005",
   username: "Viewer",
-  sharePath: "/volume1/Music",
+  sharePath: "",
   useHttps: false,
   maxBitRate: "0",
   localFolderUri: "",
   localFolderName: "",
-  podcastSharePath: "/volume1/Music/Podcasts",
+  podcastSharePath: "",
   podcastLocalFolderUri: "",
   podcastLocalFolderName: "",
   videoHost: "192.168.1.106",
   videoPort: "5005",
   videoUsername: "Viewer",
-  videoSharePath: "/volume1/Popcorn",
+  videoSharePath: "",
   videoUseHttps: false,
   videoLocalFolderUri: "",
   videoLocalFolderName: "",
-  wealthSharePath: "/volume1/Music/NLC",
+  wealthSharePath: "",
   wealthLocalFolderUri: "",
   wealthLocalFolderName: "",
-  focusSharePath: "/volume1/Music/NLC",
+  focusSharePath: "",
   focusLocalFolderUri: "",
   focusLocalFolderName: "",
 };
@@ -91,7 +91,7 @@ export function looksLikeFactoryNas(settings: NasSettings): boolean {
   return factoryHost && factoryUser && factoryVideoHost && factoryVideoUser;
 }
 
-/** Soft migration: real setup, not the empty-host heuristic (defaults are never empty). */
+/** Soft migration: real setup, not the empty-host heuristic. */
 export function isClearlyConfiguredNas(settings: NasSettings, password: string): boolean {
   if (password.trim()) return true;
   if (
@@ -123,12 +123,7 @@ export function isClearlyConfiguredNas(settings: NasSettings, password: string):
 
 function asNasFolderPath(path: string | undefined, fallback: string): string {
   if (path === undefined) return fallback;
-  const trimmed = path.trim();
-  if (!trimmed) return "";
-  if (trimmed === "/Documents/NLC" || trimmed === "/volume1/Documents/NLC") {
-    return "/Music/NLC";
-  }
-  return trimmed;
+  return path.trim();
 }
 
 function hydrateSettings(parsed: Partial<NasSettings>): NasSettings {
@@ -138,13 +133,13 @@ function hydrateSettings(parsed: Partial<NasSettings>): NasSettings {
       Object.prototype.hasOwnProperty.call(parsed, key) ? parsed[key] : next[key],
       fallback,
     );
-  next.sharePath = picked("sharePath", "/volume1/Music");
-  next.podcastSharePath = picked("podcastSharePath", joinPath(next.sharePath, "Podcasts"));
-  next.videoSharePath = picked("videoSharePath", "/volume1/Popcorn");
-  next.wealthSharePath = picked("wealthSharePath", joinPath(next.sharePath, "NLC") || "/volume1/Music/NLC");
-  next.focusSharePath = picked("focusSharePath", joinPath(next.sharePath, "NLC") || "/volume1/Music/NLC");
+  next.sharePath = picked("sharePath", "");
+  next.podcastSharePath = picked("podcastSharePath", joinPath(next.sharePath, LIBRARY_DIR.podcasts));
+  next.videoSharePath = picked("videoSharePath", "");
+  next.wealthSharePath = picked("wealthSharePath", next.sharePath);
+  next.focusSharePath = picked("focusSharePath", next.sharePath);
   if (!Object.prototype.hasOwnProperty.call(parsed, "podcastSharePath") && !next.podcastSharePath.trim()) {
-    next.podcastSharePath = joinPath(next.sharePath, "Podcasts");
+    next.podcastSharePath = joinPath(next.sharePath, LIBRARY_DIR.podcasts);
   }
   return next;
 }
@@ -313,7 +308,7 @@ export function applyVideoSourceSettings(base: NasSettings, edited: NasSettings)
 export function podcastSourceSettings(settings: NasSettings): NasSettings {
   return {
     ...settings,
-    sharePath: settings.podcastSharePath.trim() || siblingOfShare(settings.sharePath, LIBRARY_DIR.podcasts),
+    sharePath: settings.podcastSharePath.trim() || joinPath(settings.sharePath, LIBRARY_DIR.podcasts),
   };
 }
 
@@ -332,7 +327,7 @@ export function applyPodcastSourceSettings(base: NasSettings, edited: NasSetting
 export function wealthSourceSettings(settings: NasSettings): NasSettings {
   return {
     ...settings,
-    sharePath: settings.wealthSharePath.trim() || siblingOfShare(settings.sharePath, LIBRARY_DIR.wealth),
+    sharePath: settings.wealthSharePath.trim() || settings.sharePath,
   };
 }
 
@@ -351,7 +346,7 @@ export function applyWealthSourceSettings(base: NasSettings, edited: NasSettings
 export function focusSourceSettings(settings: NasSettings): NasSettings {
   return {
     ...settings,
-    sharePath: settings.focusSharePath.trim() || siblingOfShare(settings.sharePath, LIBRARY_DIR.wealth),
+    sharePath: settings.focusSharePath.trim() || settings.sharePath,
   };
 }
 

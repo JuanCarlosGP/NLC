@@ -237,5 +237,9 @@ export function createLocalSource(folderUri: string, options: LocalSourceOptions
     async coverUrl(id: string): Promise<string | null> {
       return id || null;
     },
+
+    async refresh(): Promise<void> {
+      await this.ping();
+    },
   };
 }

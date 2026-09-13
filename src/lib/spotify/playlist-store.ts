@@ -4,12 +4,30 @@ import { getTrackArtworkUrl } from "@/lib/library/artwork-cache";
 import type { Track } from "@/lib/nas/types";
 import type { ImportedPlaylist, ImportedTrack } from "@/lib/spotify/types";
 
+const storeListeners = new Set<() => void>();
+
+export function onPlaylistStoreChanged(listener: () => void): () => void {
+  storeListeners.add(listener);
+  return () => {
+    storeListeners.delete(listener);
+  };
+}
+
+export function emitPlaylistStoreChanged() {
+  for (const listener of storeListeners) listener();
+}
+
 export async function loadImportedPlaylists(): Promise<ImportedPlaylist[]> {
   return loadPlaylists();
 }
 
-export async function saveImportedPlaylists(playlists: ImportedPlaylist[]): Promise<void> {
+async function persistPlaylists(playlists: ImportedPlaylist[]): Promise<void> {
   await savePlaylists(playlists);
+  emitPlaylistStoreChanged();
+}
+
+export async function saveImportedPlaylists(playlists: ImportedPlaylist[]): Promise<void> {
+  await persistPlaylists(playlists);
 }
 
 export async function upsertImportedPlaylist(playlist: ImportedPlaylist): Promise<ImportedPlaylist[]> {
@@ -20,7 +38,7 @@ export async function upsertImportedPlaylist(playlist: ImportedPlaylist): Promis
     liked: playlist.liked ?? prev?.liked,
   };
   const next = [merged, ...current.filter((item) => item.id !== playlist.id)];
-  await savePlaylists(next);
+  await persistPlaylists(next);
   return next;
 }
 
@@ -29,7 +47,7 @@ export async function renameImportedPlaylist(id: string, name: string): Promise<
   if (!trimmed) throw new Error(t("nasExtra.playlistNeedName"));
   const current = await loadPlaylists();
   const next = current.map((item) => (item.id === id ? { ...item, name: trimmed } : item));
-  await savePlaylists(next);
+  await persistPlaylists(next);
   return next;
 }
 
@@ -51,7 +69,7 @@ export async function updateImportedPlaylist(
       coverUrl,
     };
   });
-  await savePlaylists(next);
+  await persistPlaylists(next);
   return next;
 }
 
@@ -74,13 +92,13 @@ export async function createEmptyImportedPlaylist(name: string): Promise<Importe
 export async function toggleImportedPlaylistLiked(id: string): Promise<ImportedPlaylist[]> {
   const current = await loadPlaylists();
   const next = current.map((item) => (item.id === id ? { ...item, liked: !item.liked } : item));
-  await savePlaylists(next);
+  await persistPlaylists(next);
   return next;
 }
 
 export async function removeImportedPlaylist(id: string): Promise<ImportedPlaylist[]> {
   const next = (await loadPlaylists()).filter((item) => item.id !== id);
-  await savePlaylists(next);
+  await persistPlaylists(next);
   return next;
 }
 
@@ -112,7 +130,7 @@ export async function addTracksToImportedPlaylist(
       coverUrl: playlist.coverUrl ?? added.find((item) => item.coverUrl)?.coverUrl ?? null,
     };
   });
-  await savePlaylists(next);
+  await persistPlaylists(next);
   return next;
 }
 
@@ -128,7 +146,7 @@ export async function removeTrackFromImportedPlaylist(
       tracks: playlist.tracks.filter((item) => (item.matched?.id ?? item.spotifyId) !== trackId),
     };
   });
-  await savePlaylists(next);
+  await persistPlaylists(next);
   return next;
 }
 
@@ -138,7 +156,7 @@ export async function reorderImportedPlaylistTracks(
 ): Promise<ImportedPlaylist[]> {
   const current = await loadPlaylists();
   const next = current.map((playlist) => (playlist.id === id ? { ...playlist, tracks } : playlist));
-  await savePlaylists(next);
+  await persistPlaylists(next);
   return next;
 }
 
@@ -172,7 +190,7 @@ export async function updateImportedTrackCover(
     };
   });
   if (changed) {
-    await savePlaylists(next);
+    await persistPlaylists(next);
   }
   return next;
 }

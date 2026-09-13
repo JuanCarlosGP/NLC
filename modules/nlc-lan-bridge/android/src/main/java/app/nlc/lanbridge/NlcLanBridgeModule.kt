@@ -25,7 +25,7 @@ class PendingStream(
 class NlcLanBridgeModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("NlcLanBridge")
-    Events("onBridgeRequest", "onBridgeUnlinked", "onBridgeClaimed")
+    Events("onBridgeRequest", "onBridgeUnlinked", "onBridgeClaimed", "onDownloadWatchFinished")
 
     OnCreate {
       instance = this@NlcLanBridgeModule
@@ -109,6 +109,29 @@ class NlcLanBridgeModule : Module() {
       }
     }
 
+    AsyncFunction("startDownloadWatch") { json: String ->
+      val ctx = appContext.reactContext ?: throw IllegalStateException("React context lost")
+      val obj = org.json.JSONObject(json)
+      val params = mutableMapOf<String, Any?>()
+      val keys = obj.keys()
+      while (keys.hasNext()) {
+        val key = keys.next()
+        params[key] = obj.opt(key)
+      }
+      DownloadWatchService.start(ctx, params)
+      true
+    }
+
+    AsyncFunction("stopDownloadWatch") {
+      val ctx = appContext.reactContext ?: return@AsyncFunction false
+      DownloadWatchService.stop(ctx)
+      true
+    }
+
+    Function("isDownloadWatchRunning") {
+      DownloadWatchService.isRunning()
+    }
+
     Function("fail") { id: String, status: Int, message: String ->
       jsonWaiters.remove(id)?.let {
         it.status = status
@@ -178,6 +201,13 @@ class NlcLanBridgeModule : Module() {
       instance?.sendEvent(
         "onBridgeClaimed",
         mapOf("token" to token, "desktopHost" to desktopHost),
+      )
+    }
+
+    fun emitDownloadWatchFinished(done: Int, failed: Int) {
+      instance?.sendEvent(
+        "onDownloadWatchFinished",
+        mapOf("done" to done, "failed" to failed, "finished" to true),
       )
     }
   }

@@ -64,4 +64,6 @@ export interface MusicSource {
   deleteTrack?(trackId: string): Promise<void>;
   /** Write a sidecar image next to a WebDAV audio file. Returns the NAS path or null. */
   ensureCoverSidecar?(trackId: string, imageUrl: string): Promise<string | null>;
+  /** Force cache invalidation and rescan from the underlying storage. */
+  refresh?(): Promise<void>;
 }

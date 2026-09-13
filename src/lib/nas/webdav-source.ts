@@ -751,5 +751,11 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
       scanPromise = null;
       return dest;
     },
+
+    async refresh(): Promise<void> {
+      index = null;
+      scanPromise = null;
+      await scan();
+    },
   };
 }

@@ -11,6 +11,7 @@ import { listLocalVideoShows, forgetLocalVideoTree } from "@/lib/local/local-vid
 import { createLocalSource } from "@/lib/local/local-source";
 import { colors } from "@/lib/theme";
 import { pullFocusFromSources, pushFocusToSources } from "@/lib/productivity/sync";
+import { pullPlaylistsFromSources, pushPlaylistsToSources } from "@/lib/spotify/playlist-sync";
 import { pullWealthFromSources, pushWealthToSources } from "@/lib/wealth/sync";
 
 export type SettingsFeedback = {
@@ -202,13 +203,22 @@ export function useNasSettings() {
       const ping = await pingMusicSource(ctx.settings, ctx.password);
       cachedShareConnected = ping.ok;
       setConnected(ping.ok);
+      if (!ping.ok) {
+        setFeedback({
+          text: t("feedback.savedNoConnection", { detail: ping.message }),
+          color: colors.warn,
+        });
+        return;
+      }
+      await pullPlaylistsFromSources(ctx.settings, ctx.password);
+      const pushError = await pushPlaylistsToSources(ctx.settings, ctx.password);
       setFeedback(
-        ping.ok
-          ? { text: t("feedback.savedOk", { detail: ping.message }), color: colors.ok }
-          : {
-              text: t("feedback.savedNoConnection", { detail: ping.message }),
+        pushError
+          ? {
+              text: t("feedback.playlistsWriteFail", { path: ctx.settings.sharePath, error: pushError }),
               color: colors.warn,
-            },
+            }
+          : { text: t("feedback.savedOk", { detail: ping.message }), color: colors.ok },
       );
     } catch (error) {
       setFeedback({
@@ -500,9 +510,20 @@ export function useNasSettings() {
       }
       const source = createMusicSource(next, ctx.password);
       const ping = await source.ping();
+      if (!ping.ok) {
+        setFeedback({
+          text: ping.message,
+          color: colors.warn,
+        });
+        return;
+      }
+      await pullPlaylistsFromSources(next, ctx.password);
+      const pushError = await pushPlaylistsToSources(next, ctx.password);
       setFeedback({
-        text: ping.message,
-        color: ping.ok ? colors.ok : colors.warn,
+        text: pushError
+          ? t("feedback.playlistsLocalWriteFail", { error: pushError })
+          : ping.message,
+        color: pushError ? colors.warn : colors.ok,
       });
     } catch (error) {
       setFeedback({

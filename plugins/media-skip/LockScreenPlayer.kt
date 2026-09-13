@@ -30,6 +30,9 @@ class LockScreenPlayer(
 
   override fun getAvailableCommands(): Player.Commands {
     return super.getAvailableCommands().buildUpon()
+      .add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+      .add(Player.COMMAND_SEEK_BACK)
+      .add(Player.COMMAND_SEEK_FORWARD)
       .add(Player.COMMAND_SEEK_TO_NEXT)
       .add(Player.COMMAND_SEEK_TO_PREVIOUS)
       .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
@@ -39,6 +42,9 @@ class LockScreenPlayer(
 
   override fun isCommandAvailable(command: Int): Boolean {
     return when (command) {
+      Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
+      Player.COMMAND_SEEK_BACK,
+      Player.COMMAND_SEEK_FORWARD,
       Player.COMMAND_SEEK_TO_NEXT,
       Player.COMMAND_SEEK_TO_PREVIOUS,
       Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,

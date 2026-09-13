@@ -120,16 +120,23 @@ export async function enqueueDownload(
   return (await response.json()) as { id: string; status: DownloadJobStatus };
 }
 
-/** Build yt-dlp search text: "Title - Artist". */
+/** YouTube search text. No hyphen — yt-dlp ranking is closer to typing "nana rojuu". */
 export function downloadSearchQuery(title: string, artistName: string): string {
-  const track = title.trim();
-  const artist = (artistName.split(",")[0] ?? artistName).trim();
-  if (track && artist) return `${track} - ${artist}`;
-  return track || artist || "audio";
+  const track = title.replace(/[-–—]+/g, " ").replace(/\s+/g, " ").trim();
+  const artists = artistName
+    .split(/[,&]/)
+    .map((part) => part.replace(/\b(feat\.?|ft\.?)\b/gi, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const compact = track.replace(/[^a-zA-Z0-9\u00C0-\u024F]/g, "");
+  const short = compact.length <= 6 || track.split(/\s+/).filter(Boolean).length <= 1;
+  const names = short ? artists.slice(0, 3) : artists.slice(0, 1);
+  return [track, ...names].filter(Boolean).join(" ").trim() || "audio";
 }
 
 export type SearchDownloadItem = {
   query: string;
+  title?: string;
+  artist?: string;
   kind?: DownloadMediaKind;
   durationMs?: number | null;
 };
@@ -140,16 +147,28 @@ function searchDownloadPayload(item: SearchDownloadItem): {
   query: string;
   kind: DownloadMediaKind;
   durationMs?: number;
+  title?: string;
+  artist?: string;
 } {
   const trimmed = item.query.trim();
   if (!trimmed) throw new Error(t("feedback.missingTitleArtist"));
-  const payload: { query: string; kind: DownloadMediaKind; durationMs?: number } = {
+  const payload: {
+    query: string;
+    kind: DownloadMediaKind;
+    durationMs?: number;
+    title?: string;
+    artist?: string;
+  } = {
     query: trimmed,
     kind: item.kind ?? "song",
   };
   if (typeof item.durationMs === "number" && item.durationMs > 0) {
     payload.durationMs = Math.round(item.durationMs);
   }
+  const track = item.title?.trim();
+  const artist = item.artist?.trim();
+  if (track) payload.title = track;
+  if (artist) payload.artist = artist;
   return payload;
 }
 

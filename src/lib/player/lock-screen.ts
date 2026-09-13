@@ -24,6 +24,7 @@ export function lockScreenMetadata(track: Track, artworkUrl?: string | null) {
     artist: track.artistName,
     albumTitle: track.albumName,
     artworkUrl: lockScreenArtworkUrl(artworkUrl ?? track.artworkUrl),
+    duration: track.durationMs && track.durationMs > 0 ? track.durationMs / 1000 : undefined,
   };
 }
 

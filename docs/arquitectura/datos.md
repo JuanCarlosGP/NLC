@@ -9,7 +9,7 @@ Si este documento y el código discrepan, gana el código y se actualiza aquí.
 | --- | --- | --- |
 | Ficheros de música / podcast / vídeo | NAS (WebDAV) o carpeta local | El NAS / la carpeta |
 | Catálogo indexado (artistas, álbumes, tracks) | SQLite en el teléfono | Copia tras escaneo; el NAS manda |
-| Playlists importadas, recientes, likes de música | SQLite | Teléfono |
+| Playlists importadas, recientes, likes de música | SQLite | Teléfono; playlists: copia opcional `nlc-playlists.json` en el share de música |
 | Tareas (focus) y patrimonio (wealth) | SQLite | Teléfono; copia opcional en JSON del NAS |
 | Preferencias de UI (zona, orden, pestaña) | AsyncStorage | Teléfono |
 | Secretos (pass NAS, tokens) | SecureStore | Teléfono |
@@ -17,6 +17,27 @@ Si este documento y el código discrepan, gana el código y se actualiza aquí.
 | Sesión TUI + duraciones | `~/.config/nlc-tui/` | PC |
 
 En una frase: **el media vive en el NAS; el estado de la app y la vida (tareas, finanzas) viven en el teléfono**; el puente LAN sirve una vista de solo lectura (con caché) al escritorio.
+
+## Árbol del share de biblioteca
+
+Un share (el que configures; no hay ruta de fábrica). Dentro, no al lado:
+
+```
+<share>/
+  Artista/Álbum/pista.mp3     # biblioteca real
+  Canciones/                  # dumps de yt-dlp (canciones)
+  Podcasts/                   # dumps de yt-dlp (episodios)
+  nlc-playlists.json
+  nlc-tasks.json
+  nlc-wealth.json
+  nlc-push-tokens.json
+```
+
+Vídeo es **otro share** (Popcorn, Video, etc.). No va dentro de la biblioteca de música.
+
+Si dejas vacío el path de podcasts / tareas / patrimonio, NLC usa `Podcasts/` y los JSON en la raíz de ese share. Si tienes shares separados de verdad, rellena esas rutas a mano.
+
+El código del downloader (`nlc-downloader-app`, etc.) no se indexa. Mejor montarlo fuera del árbol de media.
 
 ```
 NAS (WebDAV / carpeta)
@@ -83,6 +104,7 @@ En web, los secretos caen en AsyncStorage (sin SecureStore).
 | `{documentDirectory}offline/` | Audio descargado offline |
 | NAS `nlc-wealth.json` | Copia opcional de patrimonio |
 | NAS `nlc-tasks.json` | Copia opcional de focus + reminders |
+| NAS `nlc-playlists.json` | Copia opcional de playlists (share de música o carpeta local) |
 | NAS `nlc-push-tokens.json` | Registro de tokens push (bajo el share de música) |
 | `~/.config/nlc-tui/session.json` | Token + host del teléfono |
 | `~/.config/nlc-tui/durations.json` | Duraciones aprendidas por el TUI |
@@ -95,7 +117,7 @@ Los JSON del NAS no se tratan como media (`SKIP_FILES` en WebDAV).
 
 - **SoT de ficheros:** NAS / Navidrome / carpeta local / mock (`src/lib/nas/`, `src/lib/local/`).
 - **Índice:** SQLite tras escaneo. Offline: columnas en `tracks` + ficheros en `offline/`.
-- **Playlists:** solo teléfono (`playlist-store.ts` → SQLite). Spotify aporta metadatos y match; no se reproduce Spotify.
+- **Playlists:** teléfono (`playlist-store.ts` → SQLite). Spotify aporta metadatos y match; no se reproduce Spotify. Copia opcional `nlc-playlists.json` en el share de música / carpeta local (`playlist-sync.ts`); gana el `updatedAt` más reciente. Tras un pull se reintenta el match de pistas sin `matched_id`. No se copian tokens.
 - **Artwork:** AsyncStorage `nlc.track-meta.v2` + URLs del NAS.
 
 ### Vídeo
@@ -108,7 +130,7 @@ Los JSON del NAS no se tratan como media (`SKIP_FILES` en WebDAV).
 
 - **SoT:** SQLite en el teléfono.
 - **Copia opcional:** JSON en NAS y/o carpeta SAF.
-- **Pull / push:** `pullFocusFromSources` / `pushFocusToSources`, análogo en wealth. Suele ganar el `updatedAt` más reciente; el teléfono es el sitio “vivo”.
+- **Pull / push:** `pullFocusFromSources` / `pushFocusToSources`, análogo en wealth y en playlists (`pullPlaylistsFromSources`). Suele ganar el `updatedAt` más reciente; el teléfono es el sitio “vivo”.
 - **Bridge:** solo lectura — `GET /v1/focus`, `GET /v1/wealth`.
 
 ### Ajustes y zonas

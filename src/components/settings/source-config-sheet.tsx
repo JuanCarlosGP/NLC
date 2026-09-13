@@ -35,13 +35,7 @@ export function SourceConfigSheet({
   const { t } = useI18n();
   const shared = settings.sourceKind !== "mock";
   const folderPlaceholder =
-    variant === "video"
-      ? "/Video"
-      : variant === "podcast"
-        ? "/Podcasts"
-        : variant === "wealth" || variant === "focus"
-          ? "/Finanzas"
-          : "/Music";
+    variant === "video" ? "/Video" : variant === "podcast" ? "/Music/Podcasts" : "/Music";
   const title =
     variant === "video"
       ? t("sourceSheet.videoTitle")

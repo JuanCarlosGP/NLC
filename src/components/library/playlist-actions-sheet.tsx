@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Heart, ListEnd, ListMusic, ListPlus, Pencil, Play, RefreshCw, Trash2 } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
@@ -47,9 +47,9 @@ function PlaylistActionsBody({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [rematchNote, setRematchNote] = useState<string | null>(null);
   const playable = matchedNasTracks(playlist.tracks);
   const liked = Boolean(playlist.liked);
-  const canRematch = playlist.kind !== "local";
   const kindLabel = playlist.kind === "album" ? t("playlistActions.album") : t("playlistActions.playlist");
   const trackCountLabel = t(
     playlist.tracks.length === 1 ? "playlistActions.trackOne" : "playlistActions.trackMany",
@@ -59,6 +59,29 @@ function PlaylistActionsBody({
   function closeAfter(action: () => unknown) {
     triggerUiHaptic();
     void Promise.resolve(action()).then(onClose);
+  }
+
+  async function onRematch() {
+    if (busy) return;
+    triggerUiHaptic();
+    setBusy(true);
+    setRematchNote(t("playlistActions.rematchBusy"));
+    try {
+      const result = await rematchPlaylist(playlist.id);
+      if (!result.matched) {
+        setRematchNote(t("playlistActions.rematchNone"));
+      } else if (result.missing) {
+        setRematchNote(
+          t("playlistActions.rematchLinked", { matched: result.matched, missing: result.missing }),
+        );
+      } else {
+        setRematchNote(t("playlistActions.rematchAll", { matched: result.matched }));
+      }
+    } catch (error) {
+      setRematchNote(error instanceof Error ? error.message : t("playlistActions.rematchNone"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onDelete() {
@@ -135,13 +158,18 @@ function PlaylistActionsBody({
           label={liked ? t("importedEntity.removeHome") : t("importedEntity.addHome")}
           onPress={() => closeAfter(() => togglePlaylistLiked(playlist.id))}
         />
-        {canRematch ? (
-          <ActionRow
-            icon={<RefreshCw color={colors.ink} size={22} strokeWidth={1.8} />}
-            label={t("playlistActions.rematch")}
-            onPress={() => closeAfter(() => rematchPlaylist(playlist.id))}
-          />
-        ) : null}
+        <ActionRow
+          icon={
+            busy && rematchNote ? (
+              <ActivityIndicator color={colors.ink} size={18} />
+            ) : (
+              <RefreshCw color={colors.ink} size={22} strokeWidth={1.8} />
+            )
+          }
+          label={rematchNote ?? t("playlistActions.rematch")}
+          disabled={busy}
+          onPress={() => void onRematch()}
+        />
         <ActionRow
           icon={<Trash2 color={colors.danger} size={22} strokeWidth={1.8} />}
           label={t("playlistActions.delete")}

@@ -129,6 +129,11 @@ export function BridgeHost({ children }: { children: ReactNode }) {
         if (started.running === false) await clearBridgeSession();
         await syncNativeLink();
       } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/EADDRINUSE|Address already in use/i.test(message)) {
+          console.warn("Lan bridge :7421 is already in use (the other NLC APK is probably open).");
+          return;
+        }
         console.warn("Lan bridge failed to start", error);
       }
     })();

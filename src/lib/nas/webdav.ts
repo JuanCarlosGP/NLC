@@ -30,12 +30,23 @@ const COVER_NAMES = new Set([
   "album.jpg",
   "artwork.jpg",
 ]);
-const SKIP_DIRS = new Set(["@eadir", "#recycle", "#snapshot", ".trash", "lost+found", ".ds_store"]);
+const SKIP_DIRS = new Set([
+  "@eadir",
+  "#recycle",
+  "#snapshot",
+  ".trash",
+  "lost+found",
+  ".ds_store",
+  "nlc-downloader-app",
+  "snd-downloader-app",
+  "podcast-downloader",
+]);
 const SKIP_FILES = new Set([
   "nlc.json",
   "nlc-push-tokens.json",
   "nlc-wealth.json",
   "nlc-tasks.json",
+  "nlc-playlists.json",
   "snd.json",
   "snd-push-tokens.json",
 ]);
@@ -71,7 +82,7 @@ export function isPathInside(parent: string, child: string): boolean {
   return b === a || b.startsWith(`${a}/`);
 }
 
-/** File Station shows /volume1/Music; Synology WebDAV usually serves that share as /Music. */
+/** File Station shows /volume1/Share; WebDAV often serves that share as /Share. */
 export function toWebDavPath(path: string): string {
   const normalized = normalizeSharePath(path);
   if (!normalized) return "";
@@ -92,12 +103,11 @@ export function joinPath(base: string, child: string): string {
   return `${prefix}/${clean}`.replace(/\/{2,}/g, "/");
 }
 
-/** Sibling libraries under the WebDAV root chosen in onboarding. */
+/** Folders inside the music library share. Video stays a separate share. */
 export const LIBRARY_DIR = {
-  music: "Music",
   podcasts: "Podcasts",
+  songs: "Canciones",
   video: "Video",
-  wealth: "Finanzas",
 } as const;
 
 export function parentDir(path: string): string {
@@ -229,7 +239,10 @@ export function cleanDisplayTitle(value: string): string {
   let next = value
     // yt-dlp video id suffix
     .replace(/\s*\[[a-zA-Z0-9_-]{11}\]\s*$/u, "")
-    // Anything in (), [], {}, fullwidth brackets
+    // Keep version tags that are part of the title (Spotify: "Hookah - Remix").
+    .replace(/\((remix|rmx)\)/gi, " $1 ")
+    .replace(/\[(remix|rmx)\]/gi, " $1 ")
+    // Drop the rest of (), [], {} — lyrics, official, prod, etc.
     .replace(/[([{（【][^)\]}）】]*[)\]}）】]/gu, " ")
     // Trailing junk: "_ Letra", "- Official Video", "| Lyrics"
     .replace(
@@ -252,16 +265,28 @@ export function parseTrackName(filename: string): { title: string; track?: numbe
   return { title: base };
 }
 
-/** "Artist - Title" filenames from yt-dlp song downloads. */
+function looksLikeArtistList(value: string): boolean {
+  const s = value.trim();
+  if (!s) return false;
+  if (/,/.test(s)) return true;
+  if (/\s+x\s+/i.test(s)) return true;
+  if (/\b(feat\.?|ft\.?)\b/i.test(s)) return true;
+  return false;
+}
+
+/** "Artist - Title", or YouTube lyric "Title - Artist, Artist". */
 export function splitArtistTitle(name: string): { artist: string; title: string } {
-  const match = name.match(/^(.+?)\s+[-–—]\s+(.+)$/u);
+  const spaced = name.replace(/_+/g, " ").trim();
+  const match = spaced.match(/^(.+?)\s+[-–—]\s+(.+)$/u);
   if (match?.[1] && match[2]) {
-    return {
-      artist: cleanDisplayTitle(match[1]),
-      title: cleanDisplayTitle(match[2]),
-    };
+    const left = cleanDisplayTitle(match[1]);
+    const right = cleanDisplayTitle(match[2]);
+    if (looksLikeArtistList(right) && !looksLikeArtistList(left)) {
+      return { artist: right, title: left };
+    }
+    return { artist: left, title: right };
   }
-  return { artist: t("nasExtra.unknownArtist"), title: cleanDisplayTitle(name) };
+  return { artist: t("nasExtra.unknownArtist"), title: cleanDisplayTitle(spaced || name) };
 }
 
 function parseYear(albumName: string): number | null {

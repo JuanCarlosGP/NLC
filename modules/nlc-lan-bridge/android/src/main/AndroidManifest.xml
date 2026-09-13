@@ -9,5 +9,9 @@
       android:name="app.nlc.lanbridge.LanBridgeService"
       android:exported="false"
       android:foregroundServiceType="dataSync" />
+    <service
+      android:name="app.nlc.lanbridge.DownloadWatchService"
+      android:exported="false"
+      android:foregroundServiceType="dataSync" />
   </application>
 </manifest>

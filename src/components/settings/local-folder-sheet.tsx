@@ -156,9 +156,11 @@ export function LocalFolderSheet({
                   ? t("localFolder.wealthFileHint")
                   : variant === "focus"
                     ? t("localFolder.focusFileHint")
-                    : Platform.OS === "web"
-                      ? t("localFolder.webHint")
-                      : t("localFolder.mediaHint")}
+                    : variant === "music" && Platform.OS !== "web"
+                      ? t("localFolder.musicFileHint")
+                      : Platform.OS === "web"
+                        ? t("localFolder.webHint")
+                        : t("localFolder.mediaHint")}
               </Text>
             </View>
             <View style={styles.actions}>
