@@ -15,6 +15,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.media.MediaMetadata as PlatformMediaMetadata
+import android.media.session.MediaSession as PlatformMediaSession
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.Player
@@ -25,6 +28,8 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.MediaStyleNotificationHelper
 import androidx.media3.session.SessionCommand
+import androidx.media3.session.legacy.MediaMetadataCompat
+import androidx.media3.session.legacy.MediaSessionCompat
 import expo.modules.audio.AudioLockScreenOptions
 import expo.modules.audio.AudioPlayer
 import expo.modules.audio.Metadata
@@ -216,21 +221,149 @@ class AudioControlsService : MediaSessionService() {
     session.setCustomLayout(customLayout)
   }
 
+  private fun scaleBitmapForMediaMetadata(source: Bitmap): Bitmap {
+    val maxDim = 512
+    val width = source.width
+    val height = source.height
+    if (width <= 0 || height <= 0) return source
+
+    val (scaledW, scaledH) = if (width > maxDim || height > maxDim) {
+      if (width >= height) {
+        val w = maxDim
+        val h = (height.toFloat() / width.toFloat() * maxDim).toInt().coerceAtLeast(1)
+        Pair(w, h)
+      } else {
+        val h = maxDim
+        val w = (width.toFloat() / height.toFloat() * maxDim).toInt().coerceAtLeast(1)
+        Pair(w, h)
+      }
+    } else {
+      Pair(width, height)
+    }
+
+    val scaled = if (scaledW != width || scaledH != height) {
+      Bitmap.createScaledBitmap(source, scaledW, scaledH, true)
+    } else {
+      source
+    }
+    // Convert to RGB_565 to halve memory footprint and stay safely under Binder 1MB transaction buffer
+    return scaled.copy(Bitmap.Config.RGB_565, false) ?: scaled
+  }
+
+  private fun getSessionCompat(): MediaSessionCompat? {
+    val session = mediaSession ?: return null
+    return try {
+      val implField = session.javaClass.getDeclaredField("impl").apply { isAccessible = true }
+      val impl = implField.get(session) ?: return null
+      val stubField = impl.javaClass.getDeclaredField("sessionLegacyStub").apply { isAccessible = true }
+      val stub = stubField.get(impl) ?: return null
+      val compatField = stub.javaClass.getDeclaredField("sessionCompat").apply { isAccessible = true }
+      compatField.get(stub) as? MediaSessionCompat
+    } catch (e: Exception) {
+      null
+    }
+  }
+
+  private fun getPlatformMediaSession(): PlatformMediaSession? {
+    return try {
+      val compat = getSessionCompat() ?: return null
+      compat.mediaSession as? PlatformMediaSession
+    } catch (e: Exception) {
+      null
+    }
+  }
+
   private fun updateSessionMetadata() {
+    val title = currentMetadata?.title ?: ""
+    val artist = currentMetadata?.artist ?: ""
+    val album = currentMetadata?.albumTitle ?: ""
+    val artworkUrlStr = currentArtworkUrl?.toString()
+
+    // 1. Media3 metadata (for Media3 controllers)
     val metaBuilder = Media3Metadata.Builder()
-      .setTitle(currentMetadata?.title ?: "")
-      .setArtist(currentMetadata?.artist ?: "")
-      .setAlbumTitle(currentMetadata?.albumTitle ?: "")
+      .setTitle(title)
+      .setArtist(artist)
+      .setAlbumTitle(album)
 
     currentArtworkBytes?.let { bytes ->
       if (bytes.isNotEmpty()) {
         metaBuilder.setArtworkData(bytes, Media3Metadata.PICTURE_TYPE_FRONT_COVER)
       }
     }
+    if (artworkUrlStr != null) {
+      try {
+        metaBuilder.setArtworkUri(android.net.Uri.parse(artworkUrlStr))
+      } catch (_: Exception) {}
+    }
     val media3Metadata = metaBuilder.build()
     lockScreenPlayer?.customMetadata = media3Metadata
     withPlayerOnAppThread { p ->
       p.setPlaylistMetadata(media3Metadata)
+    }
+
+    // 2. Set high-resolution artwork directly onto the platform MediaSession & MediaSessionCompat.
+    // This feeds Android 13/14/15 SystemUI's MediaDataManager directly with a crisp full-res bitmap,
+    // bypassing the 113x113 downscaled Notification.EXTRA_LARGE_ICON fallback.
+    val highResBitmap = currentArtwork?.let { scaleBitmapForMediaMetadata(it) }
+
+    try {
+      val platformSession = getPlatformMediaSession()
+      if (platformSession != null) {
+        val platformMetaBuilder = PlatformMediaMetadata.Builder()
+          .putString(PlatformMediaMetadata.METADATA_KEY_TITLE, title)
+          .putString(PlatformMediaMetadata.METADATA_KEY_ARTIST, artist)
+          .putString(PlatformMediaMetadata.METADATA_KEY_ALBUM, album)
+          .putString(PlatformMediaMetadata.METADATA_KEY_ALBUM_ARTIST, artist)
+          .putString(PlatformMediaMetadata.METADATA_KEY_DISPLAY_TITLE, title)
+          .putString(PlatformMediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, artist)
+          .putString(PlatformMediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION, album)
+
+        if (artworkUrlStr != null) {
+          platformMetaBuilder.putString(PlatformMediaMetadata.METADATA_KEY_ALBUM_ART_URI, artworkUrlStr)
+          platformMetaBuilder.putString(PlatformMediaMetadata.METADATA_KEY_ART_URI, artworkUrlStr)
+          platformMetaBuilder.putString(PlatformMediaMetadata.METADATA_KEY_DISPLAY_ICON_URI, artworkUrlStr)
+        }
+
+        if (highResBitmap != null) {
+          platformMetaBuilder.putBitmap(PlatformMediaMetadata.METADATA_KEY_ALBUM_ART, highResBitmap)
+          platformMetaBuilder.putBitmap(PlatformMediaMetadata.METADATA_KEY_ART, highResBitmap)
+          platformMetaBuilder.putBitmap(PlatformMediaMetadata.METADATA_KEY_DISPLAY_ICON, highResBitmap)
+        }
+
+        platformSession.setMetadata(platformMetaBuilder.build())
+      }
+    } catch (e: Exception) {
+      Log.w("AudioControlsService", "Could not set platform MediaMetadata", e)
+    }
+
+    try {
+      val compat = getSessionCompat()
+      if (compat != null) {
+        val compatBuilder = MediaMetadataCompat.Builder()
+          .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+          .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
+          .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album)
+          .putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ARTIST, artist)
+          .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
+          .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
+          .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, album)
+
+        if (artworkUrlStr != null) {
+          compatBuilder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM_ART_URI, artworkUrlStr)
+          compatBuilder.putString(MediaMetadataCompat.METADATA_KEY_ART_URI, artworkUrlStr)
+          compatBuilder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON_URI, artworkUrlStr)
+        }
+
+        if (highResBitmap != null) {
+          compatBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, highResBitmap)
+          compatBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, highResBitmap)
+          compatBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, highResBitmap)
+        }
+
+        compat.setMetadata(compatBuilder.build())
+      }
+    } catch (e: Exception) {
+      Log.w("AudioControlsService", "Could not set MediaMetadataCompat", e)
     }
   }
 
@@ -421,6 +554,7 @@ class AudioControlsService : MediaSessionService() {
 
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         if (bitmap != null) {
+          Log.d("AudioControlsService", "Loaded artwork: ${bitmap.width}x${bitmap.height}, ${bytes.size} bytes from $url")
           val safeBytes = if (bytes.size > 500_000) {
             val out = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
@@ -437,6 +571,7 @@ class AudioControlsService : MediaSessionService() {
           }
         }
       } catch (e: Exception) {
+        Log.w("AudioControlsService", "Failed to load artwork from $url", e)
         if (url == currentArtworkUrl) {
           currentArtworkUrl = null
         }
