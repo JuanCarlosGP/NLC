@@ -3,6 +3,7 @@ import Constants from "expo-constants";
 import { isRunningInExpoGo } from "expo";
 import * as Notifications from "expo-notifications";
 import { t } from "@/lib/i18n/runtime";
+import { notificationPresentation } from "@/lib/notifications/foreground";
 import type { NasSettings } from "@/lib/settings/storage";
 import { applyOtaUpdate, isApkNotification, isOtaNotification } from "@/lib/ota/apply-update";
 import { downloadAndInstallApk } from "@/lib/ota/install-apk";
@@ -12,13 +13,7 @@ import { isReminderNotification, openRemindersFromNotification } from "@/lib/rem
 const OTA_CHANNEL = "ota";
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => notificationPresentation(notification),
 });
 
 function projectId(): string | undefined {

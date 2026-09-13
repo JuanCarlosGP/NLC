@@ -128,24 +128,39 @@ export function downloadSearchQuery(title: string, artistName: string): string {
   return track || artist || "audio";
 }
 
+export type SearchDownloadItem = {
+  query: string;
+  kind?: DownloadMediaKind;
+  durationMs?: number | null;
+};
+
+type EnqueuedJob = { id: string; status: DownloadJobStatus };
+
+function searchDownloadPayload(item: SearchDownloadItem): {
+  query: string;
+  kind: DownloadMediaKind;
+  durationMs?: number;
+} {
+  const trimmed = item.query.trim();
+  if (!trimmed) throw new Error(t("feedback.missingTitleArtist"));
+  const payload: { query: string; kind: DownloadMediaKind; durationMs?: number } = {
+    query: trimmed,
+    kind: item.kind ?? "song",
+  };
+  if (typeof item.durationMs === "number" && item.durationMs > 0) {
+    payload.durationMs = Math.round(item.durationMs);
+  }
+  return payload;
+}
+
 export async function enqueueSearchDownload(
   settings: DownloadSettings,
   token: string,
   query: string,
   kind: DownloadMediaKind = "song",
   durationMs?: number | null,
-): Promise<{ id: string; status: DownloadJobStatus }> {
-  const trimmed = query.trim();
-  if (!trimmed) throw new Error(t("feedback.missingTitleArtist"));
-
-  const payload: { query: string; kind: DownloadMediaKind; durationMs?: number } = {
-    query: trimmed,
-    kind,
-  };
-  if (typeof durationMs === "number" && durationMs > 0) {
-    payload.durationMs = Math.round(durationMs);
-  }
-
+): Promise<EnqueuedJob> {
+  const payload = searchDownloadPayload({ query, kind, durationMs });
   const response = await downloaderFetch(settings, "/download", {
     method: "POST",
     headers: {
@@ -155,7 +170,44 @@ export async function enqueueSearchDownload(
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(await readError(response));
-  return (await response.json()) as { id: string; status: DownloadJobStatus };
+  return (await response.json()) as EnqueuedJob;
+}
+
+/** Queue many searches on the NAS and return immediately. Jobs keep running if the app leaves. */
+export async function enqueueSearchDownloads(
+  settings: DownloadSettings,
+  token: string,
+  items: SearchDownloadItem[],
+): Promise<EnqueuedJob[]> {
+  if (!items.length) return [];
+  const payload = items.map((item) => searchDownloadPayload(item));
+  const headers = {
+    "Content-Type": "application/json",
+    ...authHeaders(token),
+  };
+  const batch = await downloaderFetch(settings, "/download/batch", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ items: payload }),
+  });
+  if (batch.ok) {
+    const body = (await batch.json()) as { jobs?: EnqueuedJob[] };
+    if (Array.isArray(body.jobs) && body.jobs.length) return body.jobs;
+  }
+  if (batch.status !== 404 && batch.status !== 405) {
+    throw new Error(await readError(batch));
+  }
+  const jobs: EnqueuedJob[] = [];
+  for (const item of payload) {
+    const response = await downloaderFetch(settings, "/download", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(item),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    jobs.push((await response.json()) as EnqueuedJob);
+  }
+  return jobs;
 }
 
 export async function getDownloadJob(
@@ -169,6 +221,60 @@ export async function getDownloadJob(
   });
   if (!response.ok) throw new Error(await readError(response));
   return (await response.json()) as DownloadJob;
+}
+
+export async function listDownloadJobs(
+  settings: DownloadSettings,
+  token: string,
+  ids: string[],
+): Promise<DownloadJob[]> {
+  if (!ids.length) return [];
+  const unique = [...new Set(ids.filter(Boolean))];
+  const headers = authHeaders(token);
+  const chunks: string[][] = [];
+  for (let i = 0; i < unique.length; i += 80) {
+    chunks.push(unique.slice(i, i + 80));
+  }
+  const collected: DownloadJob[] = [];
+  let useFallback = false;
+  for (const chunk of chunks) {
+    const query = chunk.map((id) => encodeURIComponent(id)).join(",");
+    const listed = await downloaderFetch(settings, `/jobs?ids=${query}`, {
+      method: "GET",
+      headers,
+    });
+    if (listed.ok) {
+      const body = (await listed.json()) as { jobs?: DownloadJob[] };
+      if (Array.isArray(body.jobs)) {
+        collected.push(...body.jobs);
+        continue;
+      }
+    }
+    if (listed.status !== 404 && listed.status !== 405 && listed.ok === false) {
+      throw new Error(await readError(listed));
+    }
+    useFallback = true;
+    break;
+  }
+  if (!useFallback) return collected;
+  const jobs: DownloadJob[] = [];
+  const sliceSize = 6;
+  for (let i = 0; i < unique.length; i += sliceSize) {
+    const slice = unique.slice(i, i + sliceSize);
+    const part = await Promise.all(
+      slice.map(async (id) => {
+        try {
+          return await getDownloadJob(settings, token, id);
+        } catch {
+          return null;
+        }
+      }),
+    );
+    for (const job of part) {
+      if (job) jobs.push(job);
+    }
+  }
+  return jobs;
 }
 
 export async function waitForDownloadJob(

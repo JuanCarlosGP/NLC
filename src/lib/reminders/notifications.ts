@@ -1,19 +1,14 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import { t } from "@/lib/i18n/runtime";
+import { notificationPresentation } from "@/lib/notifications/foreground";
 import { isReminderNotification, openRemindersFromNotification } from "@/lib/reminders/open";
 import type { ProdReminder } from "@/lib/reminders/types";
 
 export const REMINDER_CHANNEL = "reminders";
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => notificationPresentation(notification),
 });
 
 function idsFor(id: string): string[] {

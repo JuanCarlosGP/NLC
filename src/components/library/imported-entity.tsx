@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { AppState, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useSharedValue } from "react-native-reanimated";
@@ -25,10 +25,10 @@ import { usePlayer } from "@/lib/player/player-context";
 import { usePlayerUi } from "@/lib/player/player-ui-context";
 import {
   downloadSearchQuery,
-  enqueueSearchDownload,
+  enqueueSearchDownloads,
   checkDownloaderHealth,
-  waitForDownloadJob,
 } from "@/lib/podcasts/downloader";
+import { watchNasDownloads } from "@/lib/podcasts/download-progress";
 import { matchedNasTracks } from "@/lib/spotify/match";
 import { useSpotify } from "@/lib/spotify/spotify-context";
 import { formatPlaylistDuration } from "@/lib/spotify/txt";
@@ -122,15 +122,25 @@ export function ImportedEntityView({
 
   const local = playlist.kind === "local";
 
-  // Re-link after NAS downloads / previous broken matches.
+  // Re-link after NAS downloads / previous broken matches, including on return to the app.
   useEffect(() => {
-    if (local || !missing.length) {
+    if (local) return;
+    const tryRematch = () => {
+      if (!missing.length) {
+        rematchTried.current = null;
+        return;
+      }
+      if (rematchTried.current === playlist.id) return;
+      rematchTried.current = playlist.id;
+      void rematchPlaylist(playlist.id);
+    };
+    tryRematch();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state !== "active") return;
       rematchTried.current = null;
-      return;
-    }
-    if (rematchTried.current === playlist.id) return;
-    rematchTried.current = playlist.id;
-    void rematchPlaylist(playlist.id);
+      tryRematch();
+    });
+    return () => sub.remove();
   }, [local, missing.length, playlist.id, rematchPlaylist]);
   const liked = Boolean(playlist.liked);
   const totalMs = useMemo(
@@ -197,39 +207,26 @@ export function ImportedEntityView({
     setConfirmSuccess(false);
 
     void (async () => {
-      let done = 0;
-      let failed = 0;
       try {
-        for (const track of queue) {
-          const query = downloadSearchQuery(track.title, track.artistName);
-          setFetchNote(`${done + failed + 1}/${queue.length}: ${query}`);
-          const created = await enqueueSearchDownload(
-            settings,
-            token,
-            query,
-            "song",
-            track.durationMs || null,
-          );
-          const finalJob = await waitForDownloadJob(settings, token, created.id, (job) => {
-            setFetchNote(
-              `${done + failed + 1}/${queue.length} · ${job.title || query}${
-                job.progress != null ? ` · ${Math.round(job.progress)}%` : ""
-              }`,
-            );
-          });
-          if (finalJob.status === "done") done += 1;
-          else failed += 1;
-        }
-        setFetchNote(
-          failed
-            ? t("importedEntity.fetchPartialRematch", { done, failed })
-            : t("importedEntity.fetchOkRematch", { done }),
+        setFetchNote(t("importedEntity.fetchQueuing", { count: queue.length }));
+        const jobs = await enqueueSearchDownloads(
+          settings,
+          token,
+          queue.map((track) => ({
+            query: downloadSearchQuery(track.title, track.artistName),
+            kind: "song",
+            durationMs: track.durationMs || null,
+          })),
         );
-        await rematchPlaylist(playlist.id);
         setFetchNote(
-          failed
-            ? t("importedEntity.fetchPartialDone", { done, failed })
-            : t("importedEntity.fetchOkDone", { done }),
+          jobs.length < queue.length
+            ? t("importedEntity.fetchQueuedPartial", { done: jobs.length, total: queue.length })
+            : t("importedEntity.fetchQueued", { count: jobs.length }),
+        );
+        void watchNasDownloads(
+          settings,
+          token,
+          jobs.map((job) => job.id),
         );
       } catch (err) {
         setFetchNote(err instanceof Error ? err.message : t("importedEntity.downloadFail"));

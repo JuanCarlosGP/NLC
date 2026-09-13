@@ -44,7 +44,7 @@ JobStatus = Literal["queued", "running", "done", "error"]
 MediaKind = Literal["podcast", "song", "video", "auto"]
 ResolvedKind = Literal["podcast", "song", "video"]
 
-app = FastAPI(title="NLC media downloader", version="1.2.1")
+app = FastAPI(title="NLC media downloader", version="1.3.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -88,6 +88,15 @@ class DownloadResponse(BaseModel):
     status: JobStatus
 
 
+class BatchDownloadRequest(BaseModel):
+    items: list[DownloadRequest] = Field(min_length=1, max_length=400)
+
+
+class BatchDownloadResponse(BaseModel):
+    jobs: list[DownloadResponse]
+    queued: int
+
+
 class JobResponse(BaseModel):
     id: str
     status: JobStatus
@@ -101,6 +110,10 @@ class JobResponse(BaseModel):
     speed: str | None = None
     eta: str | None = None
     log: list[str] = Field(default_factory=list)
+
+
+class JobsListResponse(BaseModel):
+    jobs: list[JobResponse]
 
 
 class HealthResponse(BaseModel):
@@ -613,13 +626,7 @@ def health() -> HealthResponse:
     )
 
 
-@app.post("/download", response_model=DownloadResponse)
-def enqueue(
-    body: DownloadRequest,
-    authorization: str | None = Header(default=None),
-    x_download_token: str | None = Header(default=None, alias="X-Download-Token"),
-) -> DownloadResponse:
-    _require_auth(authorization, x_download_token)
+def _enqueue_body(body: DownloadRequest) -> DownloadResponse:
     job_id = uuid.uuid4().hex[:12]
     source = body.resolve_source()
     with _lock:
@@ -641,6 +648,47 @@ def enqueue(
     return DownloadResponse(id=job_id, status="queued")
 
 
+@app.post("/download", response_model=DownloadResponse)
+def enqueue(
+    body: DownloadRequest,
+    authorization: str | None = Header(default=None),
+    x_download_token: str | None = Header(default=None, alias="X-Download-Token"),
+) -> DownloadResponse:
+    _require_auth(authorization, x_download_token)
+    return _enqueue_body(body)
+
+
+@app.post("/download/batch", response_model=BatchDownloadResponse)
+def enqueue_batch(
+    body: BatchDownloadRequest,
+    authorization: str | None = Header(default=None),
+    x_download_token: str | None = Header(default=None, alias="X-Download-Token"),
+) -> BatchDownloadResponse:
+    _require_auth(authorization, x_download_token)
+    jobs = [_enqueue_body(item) for item in body.items]
+    return BatchDownloadResponse(jobs=jobs, queued=len(jobs))
+
+
+def _job_payload(job: dict[str, Any]) -> JobResponse:
+    return JobResponse(**{**job, "log": list(job.get("log") or [])})
+
+
+@app.get("/jobs", response_model=JobsListResponse)
+def list_jobs(
+    ids: str | None = None,
+    authorization: str | None = Header(default=None),
+    x_download_token: str | None = Header(default=None, alias="X-Download-Token"),
+) -> JobsListResponse:
+    _require_auth(authorization, x_download_token)
+    wanted = [item.strip() for item in (ids or "").split(",") if item.strip()]
+    with _lock:
+        if wanted:
+            jobs = [_job_payload(_jobs[job_id]) for job_id in wanted if job_id in _jobs]
+        else:
+            jobs = [_job_payload(job) for job in _jobs.values()]
+    return JobsListResponse(jobs=jobs)
+
+
 @app.get("/jobs/{job_id}", response_model=JobResponse)
 def job_status(
     job_id: str,
@@ -652,8 +700,8 @@ def job_status(
         job = _jobs.get(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job no encontrado.")
-        payload = {**job, "log": list(job.get("log") or [])}
-    return JobResponse(**payload)
+        payload = _job_payload(job)
+    return payload
 
 
 if __name__ == "__main__":

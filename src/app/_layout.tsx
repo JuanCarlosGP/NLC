@@ -24,6 +24,7 @@ import { DockProvider } from "@/lib/dock-context";
 import { FavoritesProvider } from "@/lib/favorites/favorites-context";
 import { CursorProvider } from "@/lib/cursor/cursor-context";
 import { DownloadSettingsProvider } from "@/lib/podcasts/download-settings-context";
+import { DownloadProgressHost } from "@/lib/podcasts/download-progress-host";
 import { PlayerProvider } from "@/lib/player/player-context";
 import { PlayerUiProvider } from "@/lib/player/player-ui-context";
 import { TrackActionsProvider } from "@/lib/player/track-actions-context";
@@ -93,6 +94,7 @@ export default function RootLayout() {
         <TaskActionsProvider>
         <OfflineProvider>
         <DownloadSettingsProvider>
+        <DownloadProgressHost />
         <CursorProvider>
         <SpotifyProvider>
           <FavoritesProvider>

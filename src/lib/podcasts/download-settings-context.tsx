@@ -25,6 +25,7 @@ import {
   type DownloadJob,
   type DownloadMediaKind,
 } from "@/lib/podcasts/downloader";
+import { watchNasDownloads } from "@/lib/podcasts/download-progress";
 
 export type DownloadFeedback = {
   text: string;
@@ -119,6 +120,7 @@ export function DownloadSettingsProvider({ children }: { children: ReactNode }) 
       setFeedback(null);
       try {
         const created = await enqueueDownload(settings, token, url, kind);
+        void watchNasDownloads(settings, token, [created.id]);
         let current = await getDownloadJob(settings, token, created.id);
         setJob(current);
         setFeedback({ text: jobStatusLabel(current.status), color: colors.inkSoft });
