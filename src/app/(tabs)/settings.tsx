@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react-native";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useActiveProjects, useProductivity } from "@/lib/productivity/productivity-context";
 import { useWealth } from "@/lib/wealth/wealth-context";
+import { DesktopWebTui } from "@/components/settings/desktop-web-tui";
 import { DownloadSheet } from "@/components/settings/download-sheet";
 import { NasExplorerSheet } from "@/components/settings/nas-explorer-sheet";
 import { OfflineSheet } from "@/components/settings/offline-sheet";
@@ -440,6 +441,8 @@ export default function SettingsScreen() {
               router.push("/desktop-bridge" as Href);
             }}
           />
+          <View style={styles.divider} />
+          <DesktopWebTui />
         </SettingsGroup>
 
         <SettingsGroup label={t("settings.zones")}>

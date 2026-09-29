@@ -19,6 +19,24 @@ fn session_path() -> Option<PathBuf> {
     Some(dir.join("session.json"))
 }
 
+pub fn env_session() -> Option<Session> {
+    let host = std::env::var("NLC_BRIDGE_HOST").ok()?;
+    if host.is_empty() {
+        return None;
+    }
+    let port = std::env::var("NLC_BRIDGE_PORT").ok()?.parse().ok()?;
+    let token = std::env::var("NLC_BRIDGE_TOKEN").unwrap_or_default();
+    if token.is_empty() {
+        return None;
+    }
+    Some(Session {
+        token,
+        phone_host: host,
+        bridge_port: port,
+        device_id: "phone".into(),
+    })
+}
+
 pub fn load_session() -> Option<Session> {
     let path = session_path()?;
     let raw = fs::read_to_string(path).ok()?;

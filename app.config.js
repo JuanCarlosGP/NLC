@@ -33,7 +33,7 @@ export default {
     userInterfaceStyle: "dark",
     newArchEnabled: true,
     android: {
-      package: "app.nlc.player",
+      package: process.env.NLC_ANDROID_PACKAGE || "app.nlc.player",
       versionCode: 14,
       softwareKeyboardLayoutMode: "resize",
       usesCleartextTraffic: true,

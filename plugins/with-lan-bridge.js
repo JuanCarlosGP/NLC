@@ -14,6 +14,8 @@ function withLanBridge(config) {
     for (const permission of PERMISSIONS) {
       AndroidConfig.Permissions.ensurePermission(modConfig.modResults, permission);
     }
+    const app = AndroidConfig.Manifest.getMainApplicationOrThrow(modConfig.modResults);
+    app.$["android:extractNativeLibs"] = "true";
     return modConfig;
   });
   return config;

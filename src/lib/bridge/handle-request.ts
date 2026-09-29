@@ -10,6 +10,7 @@ import { listVideoShows } from "@/lib/video/catalog";
 import { createVideoClient } from "@/lib/video/source";
 import { createDavTransport } from "@/lib/nas/webdav-source";
 import { dumpWealth } from "@/lib/wealth/store";
+import { handleDeviceQuery } from "@/lib/bridge/device-player";
 
 export type BridgeJson = { status: number; body: unknown };
 export type BridgeStream = { uri: string; headers: Record<string, string> };
@@ -190,6 +191,10 @@ export async function handleBridgeRequest(
 ): Promise<BridgeResult> {
   const q = queryMap(query);
   const route = path.replace(/\/+$/, "") || "/";
+
+  if (route === "/v1/device") {
+    return { kind: "json", status: 200, body: handleDeviceQuery(q) };
+  }
 
   if (route === "/v1/hello") {
     return { kind: "json", status: 200, body: { ok: true } };

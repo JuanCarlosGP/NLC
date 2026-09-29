@@ -1,9 +1,12 @@
 use std::collections::{HashMap, HashSet};
+use std::io::{self, Write};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
 
+use base64::Engine;
 use image::imageops::FilterType;
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 
@@ -21,6 +24,40 @@ pub struct CoverArt {
 pub struct CoverPair {
     pub mini: CoverArt,
     pub large: CoverArt,
+    /// JPEG or PNG sent to the browser terminal as a real image.
+    pub bytes: Arc<Vec<u8>>,
+}
+
+/// Set by the ttyd launcher. The desktop TUI keeps half-block covers.
+pub fn web_covers() -> bool {
+    std::env::var("NLC_WEB").ok().as_deref() == Some("1")
+}
+
+#[derive(Clone)]
+pub struct WebCoverPaint {
+    pub key: String,
+    pub area: Rect,
+    pub bytes: Arc<Vec<u8>>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct WebCoverStamp {
+    key: String,
+    x: u16,
+    y: u16,
+    w: u16,
+    h: u16,
+    cols: u16,
+    rows: u16,
+}
+
+/// iTerm2 inline image. ttyd draws it on the page when started with `enableSixel`.
+pub fn iterm_inline(bytes: &[u8], width: u16, height: u16) -> String {
+    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+    format!(
+        "\u{1b}]1337;File=inline=1;size={};width={width};height={height};preserveAspectRatio=0:{b64}\u{7}",
+        bytes.len(),
+    )
 }
 
 pub fn render_halfblocks(img_bytes: &[u8], target_width: u32, target_height_lines: u32) -> Option<CoverArt> {
@@ -63,6 +100,85 @@ pub fn render_halfblocks(img_bytes: &[u8], target_width: u32, target_height_line
         width: target_width as u16,
         height: target_height_lines as u16,
     })
+}
+
+fn cover_payload(bytes: &[u8]) -> Vec<u8> {
+    let Ok(img) = image::load_from_memory(bytes) else {
+        return bytes.to_vec();
+    };
+    let jpeg = bytes.len() >= 3 && bytes[0] == 0xff && bytes[1] == 0xd8;
+    if jpeg && bytes.len() <= 150 * 1024 && img.width() <= 512 && img.height() <= 512 {
+        return bytes.to_vec();
+    }
+    let scaled = if img.width() > 512 || img.height() > 512 {
+        img.resize(512, 512, FilterType::Triangle)
+    } else {
+        img
+    };
+    let rgb = scaled.to_rgb8();
+    let mut out = Vec::new();
+    let mut enc = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 80);
+    if enc
+        .encode(
+            rgb.as_raw(),
+            rgb.width(),
+            rgb.height(),
+            image::ExtendedColorType::Rgb8,
+        )
+        .is_ok()
+    {
+        out
+    } else {
+        bytes.to_vec()
+    }
+}
+
+pub fn flush_web_cover(
+    paint: Option<&WebCoverPaint>,
+    stamp: &mut Option<WebCoverStamp>,
+    cols: u16,
+    rows: u16,
+) -> io::Result<()> {
+    if !web_covers() {
+        return Ok(());
+    }
+    let Some(paint) = paint else {
+        *stamp = None;
+        return Ok(());
+    };
+    if paint.area.width == 0 || paint.area.height == 0 || paint.bytes.is_empty() {
+        *stamp = None;
+        return Ok(());
+    }
+    let next = WebCoverStamp {
+        key: paint.key.clone(),
+        x: paint.area.x,
+        y: paint.area.y,
+        w: paint.area.width,
+        h: paint.area.height,
+        cols,
+        rows,
+    };
+    if stamp.as_ref() == Some(&next) {
+        return Ok(());
+    }
+    let mut out = io::stdout().lock();
+    let area = paint.area;
+    for row in 0..area.height {
+        write!(
+            out,
+            "\x1b[{};{}H{:width$}",
+            area.y + row + 1,
+            area.x + 1,
+            "",
+            width = area.width as usize
+        )?;
+    }
+    write!(out, "\x1b[{};{}H", area.y + 1, area.x + 1)?;
+    write!(out, "{}", iterm_inline(&paint.bytes, area.width, area.height))?;
+    out.flush()?;
+    *stamp = Some(next);
+    Ok(())
 }
 
 type CoverMsg = (String, Option<Arc<CoverPair>>);
@@ -121,7 +237,11 @@ impl CoverLoader {
             let pair = client.cover_bytes(&key_str).ok().and_then(|bytes| {
                 let mini = render_halfblocks(&bytes, 10, 5)?;
                 let large = render_halfblocks(&bytes, 34, 17)?;
-                Some(CoverPair { mini, large })
+                Some(CoverPair {
+                    mini,
+                    large,
+                    bytes: Arc::new(cover_payload(&bytes)),
+                })
             });
             let _ = tx.send((key_str, pair.map(Arc::new)));
         });
@@ -150,5 +270,12 @@ mod tests {
         assert_eq!(art.height, 1);
         assert_eq!(art.lines.len(), 1);
         assert_eq!(art.lines[0].spans.len(), 2);
+    }
+
+    #[test]
+    fn iterm_inline_names_size_and_cells() {
+        let seq = iterm_inline(b"hi", 10, 5);
+        assert!(seq.starts_with("\u{1b}]1337;File=inline=1;size=2;width=10;height=5;preserveAspectRatio=0:"));
+        assert!(seq.ends_with("aGk=\u{7}"));
     }
 }

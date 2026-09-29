@@ -36,11 +36,16 @@ type NativeBridge = {
   start(port: number, token: string, resume: boolean): Promise<BridgeStartResult>;
   stop(): Promise<void>;
   getLanAddress(): string;
+  isBridgeRunning?(): boolean;
+  bridgePort?(): number;
+  isWebTuiRunning?(): boolean;
   isUnlinked(): boolean;
   linkState(): BridgeLinkState;
   pairToDesktop(host: string, port: number, token: string, jsonBody: string): Promise<string>;
   startDownloadWatch?(json: string): Promise<boolean>;
   stopDownloadWatch?(): Promise<void>;
+  startWebTui?(token: string, port: number): Promise<boolean>;
+  stopWebTui?(): Promise<boolean>;
   isDownloadWatchRunning?(): boolean;
   resolveJson(id: string, status: number, body: string): void;
   resolveStream(id: string, uri: string, headersJson: string): void;
@@ -90,6 +95,24 @@ export function getBridgeLink(): BridgeLinkState | null {
   const mod = loadNative();
   if (!mod || typeof mod.linkState !== "function") return null;
   return mod.linkState();
+}
+
+export function isBridgeRunning(): boolean {
+  const mod = loadNative();
+  if (typeof mod?.isBridgeRunning !== "function") return false;
+  return mod.isBridgeRunning();
+}
+
+export function bridgePort(): number {
+  const mod = loadNative();
+  if (typeof mod?.bridgePort !== "function") return 0;
+  return mod.bridgePort() || 0;
+}
+
+export function isWebTuiRunning(): boolean {
+  const mod = loadNative();
+  if (typeof mod?.isWebTuiRunning !== "function") return false;
+  return mod.isWebTuiRunning();
 }
 
 export function getLanAddress(): string {
@@ -152,6 +175,24 @@ export async function startNativeDownloadWatch(params: DownloadWatchParams): Pro
     return true;
   } catch {
     return false;
+  }
+}
+
+export async function startWebTuiNative(token: string, port: number): Promise<void> {
+  const mod = loadNative();
+  if (typeof mod?.startWebTui !== "function") {
+    throw new Error("missing");
+  }
+  await mod.startWebTui(token, port);
+}
+
+export async function stopWebTuiNative(): Promise<void> {
+  const mod = loadNative();
+  if (typeof mod?.stopWebTui !== "function") return;
+  try {
+    await mod.stopWebTui();
+  } catch {
+    // Old APKs do not have this method.
   }
 }
 

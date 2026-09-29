@@ -6,8 +6,21 @@ mod pair;
 mod player;
 mod session;
 mod theme;
+mod webserve;
 
 fn main() {
+    if std::env::args().any(|arg| arg == "--serve") {
+        if let Err(err) = webserve::serve() {
+            eprintln!("{err}");
+            std::process::exit(1);
+        }
+        return;
+    }
+    for arg in std::env::args().skip(1) {
+        if let Some(path) = arg.strip_prefix("--media-file=") {
+            std::env::set_var("NLC_MEDIA_FILE", path);
+        }
+    }
     if let Err(err) = app::run() {
         eprintln!("{err}");
         std::process::exit(1);

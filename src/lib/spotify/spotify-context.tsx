@@ -44,6 +44,7 @@ type SpotifyContextValue = {
   togglePlaylistLiked: (id: string) => Promise<void>;
   rematchPlaylist: (id: string) => Promise<{ matched: number; missing: number }>;
   reloadPlaylists: () => Promise<void>;
+  syncFromSources: () => Promise<void>;
   updatePlaylistDetails: (id: string, updates: { name?: string; coverUrl?: string | null }) => Promise<void>;
   updateTrackCover: (trackId: string, coverUrl: string) => Promise<void>;
 };
@@ -318,10 +319,11 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
       togglePlaylistLiked,
       rematchPlaylist,
       reloadPlaylists,
+      syncFromSources,
       updatePlaylistDetails,
       updateTrackCover,
     }),
-    [addTracksToPlaylist, createLocalPlaylist, deletePlaylist, hydratePlaylistCovers, importPlaylistUrl, playlists, reloadPlaylists, rematchPlaylist, removeTrackFromPlaylist, reorderPlaylistTracks, togglePlaylistLiked, updatePlaylistDetails, updateTrackCover],
+    [addTracksToPlaylist, createLocalPlaylist, deletePlaylist, hydratePlaylistCovers, importPlaylistUrl, playlists, reloadPlaylists, rematchPlaylist, removeTrackFromPlaylist, reorderPlaylistTracks, syncFromSources, togglePlaylistLiked, updatePlaylistDetails, updateTrackCover],
   );
 
   return <SpotifyContext.Provider value={value}>{children}</SpotifyContext.Provider>;

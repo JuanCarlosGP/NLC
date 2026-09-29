@@ -13,8 +13,10 @@ import java.io.FileInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.HttpURLConnection
+import java.net.BindException
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
@@ -46,10 +48,10 @@ object LanBridgeServer {
   private val pool = Executors.newCachedThreadPool()
 
   fun start(port: Int, bearer: String, onRequest: (String, String, String, String, String?) -> Unit): Int {
+    if (running.get() && boundPort > 0 && token == bearer) return boundPort
     stop()
     token = bearer
-    val socket = ServerSocket(if (port > 0) port else 0)
-    socket.reuseAddress = true
+    val socket = openSocket(port)
     serverSocket = socket
     boundPort = socket.localPort
     running.set(true)
@@ -75,7 +77,7 @@ object LanBridgeServer {
           break
         }
         if (!running.get()) break
-        if (token.isNotEmpty() && tuiSeen.get() && System.currentTimeMillis() - lastTuiMs.get() > IDLE_UNLINK_MS) {
+        if (token.isNotEmpty() && tuiSeen.get() && !WebTuiProcess.running() && System.currentTimeMillis() - lastTuiMs.get() > IDLE_UNLINK_MS) {
           requestUnlink()
           break
         }
@@ -118,6 +120,27 @@ object LanBridgeServer {
   }
 
   fun currentToken(): String = token
+
+  fun isRunning(): Boolean = running.get()
+
+  fun listeningPort(): Int = boundPort
+
+  /** Prefer `port`. If another NLC already holds it, take the next free one. */
+  private fun openSocket(port: Int): ServerSocket {
+    if (port <= 0) return ServerSocket(0)
+    var last: Exception? = null
+    for (candidate in port until port + 20) {
+      try {
+        val socket = ServerSocket()
+        socket.reuseAddress = true
+        socket.bind(InetSocketAddress(candidate))
+        return socket
+      } catch (error: BindException) {
+        last = error
+      }
+    }
+    throw last ?: BindException("bridge")
+  }
 
   fun tuiSeen(): Boolean = tuiSeen.get()
 
@@ -262,7 +285,7 @@ object LanBridgeServer {
       }
       if (path == "/v1/bye") {
         writeStatus(socket.getOutputStream(), 200, "application/json", """{"ok":true}""", method == "HEAD")
-        requestUnlink()
+        if (!WebTuiProcess.running()) requestUnlink()
         return
       }
       val id = UUID.randomUUID().toString()

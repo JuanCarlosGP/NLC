@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowUpDown, LayoutGrid, List, Plus } from "lucide-react-native";
 import { AlbumRow } from "@/components/library/album-row";
@@ -103,7 +103,7 @@ export default function LibraryScreen() {
   const router = useRouter();
   const { t } = useI18n();
   const { zone } = useZone();
-  const { tab, setTab, artists, albums, tracks, error } = useLibrary();
+  const { tab, setTab, artists, albums, tracks, error, refresh } = useLibrary();
   const tabs = useMemo(
     () =>
       zone === "podcast"
@@ -121,13 +121,23 @@ export default function LibraryScreen() {
   );
   const { items: visibleTracks, isExiting } = useExitingList(tracks);
   const { playTracks } = usePlayer();
-  const { playlists } = useSpotify();
+  const { playlists, syncFromSources } = useSpotify();
   const { openPlaylistActions } = usePlaylistActions();
   const [importOpen, setImportOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { sort, viewMode, setSort, setViewMode, ready: browseReady } = useBrowsePrefs("nlc.library.browse.v1");
   const grid = viewMode === "grid";
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.allSettled([refresh(), syncFromSources()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refresh, syncFromSources]);
 
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -332,7 +342,16 @@ export default function LibraryScreen() {
 
   return (
     <>
-      <Screen>
+      <Screen
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
+          />
+        }
+      >
         <View style={styles.header}>
           <Text style={[type.pageTitle, styles.title]}>{t("library.title")}</Text>
           {zone === "music" ? (

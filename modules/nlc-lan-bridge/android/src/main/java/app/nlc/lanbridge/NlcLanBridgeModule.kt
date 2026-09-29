@@ -36,6 +36,18 @@ class NlcLanBridgeModule : Module() {
       LanBridgeServer.stop()
     }
 
+    Function("isBridgeRunning") {
+      LanBridgeServer.isRunning()
+    }
+
+    Function("bridgePort") {
+      LanBridgeServer.listeningPort()
+    }
+
+    Function("isWebTuiRunning") {
+      WebTuiProcess.running()
+    }
+
     Function("getLanAddress") {
       LanBridgeServer.lanAddress()
     }
@@ -119,6 +131,18 @@ class NlcLanBridgeModule : Module() {
         params[key] = obj.opt(key)
       }
       DownloadWatchService.start(ctx, params)
+      true
+    }
+
+    AsyncFunction("startWebTui") { token: String, port: Int ->
+      val ctx = appContext.reactContext ?: throw IllegalStateException("React context lost")
+      WebTuiService.start(ctx, token, port)
+      true
+    }
+
+    AsyncFunction("stopWebTui") {
+      val ctx = appContext.reactContext ?: return@AsyncFunction false
+      WebTuiService.stop(ctx)
       true
     }
 

@@ -189,6 +189,14 @@ impl BridgeClient {
         }
     }
 
+    pub fn device(&self, query: &str) -> Result<serde_json::Value, String> {
+        let res = self.get_with_timeout(
+            &format!("/v1/device?{query}"),
+            std::time::Duration::from_secs(8),
+        )?;
+        res.into_json().map_err(|e| e.to_string())
+    }
+
     pub fn hello(&self) -> Result<(), String> {
         let res = self.get_with_timeout("/v1/hello", std::time::Duration::from_secs(2))?;
         if res.status() >= 300 {

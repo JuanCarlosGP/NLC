@@ -7,6 +7,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronLeft, RotateCw, SkipForward } from "lucide-react-native";
 import type { PlayableSource } from "@/lib/nas/types";
+import { bindDeviceVideo, deviceVideoActive, markDeviceEnded } from "@/lib/bridge/device-player";
 import { usePlayer } from "@/lib/player/player-context";
 import { useSettings } from "@/lib/settings/settings-context";
 import { episodeLocation, inspectFolder, seriesFromPath, toVideoEpisode } from "@/lib/video/browse";
@@ -129,6 +130,34 @@ function EpisodePlayer({
     } catch {
       // Native player may reject before the view is attached.
     }
+  }, [player]);
+
+  useEffect(() => {
+    bindDeviceVideo({
+      pause(paused) {
+        try {
+          if (paused) player.pause();
+          else player.play();
+        } catch {
+          // Native player may already be released.
+        }
+      },
+      stop() {
+        try {
+          player.pause();
+        } catch {
+          // Native player may already be released.
+        }
+      },
+      snapshot() {
+        try {
+          return { pos: player.currentTime || 0, dur: player.duration || 0, paused: !player.playing };
+        } catch {
+          return { pos: 0, dur: 0, paused: true };
+        }
+      },
+    });
+    return () => bindDeviceVideo(null);
   }, [player]);
 
   useEffect(() => {
@@ -331,6 +360,10 @@ export default function WatchScreen() {
   }, [arcPath, initialPath, settings, password]);
 
   const playNext = useCallback(() => {
+    if (deviceVideoActive()) {
+      markDeviceEnded();
+      return;
+    }
     if (!nextEpisode) return;
     setIndex((value) => value + 1);
   }, [nextEpisode]);

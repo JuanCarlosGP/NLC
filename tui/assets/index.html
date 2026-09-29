@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NLC</title>
+<link rel="stylesheet" href="/xterm.css">
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+#stage{display:flex;flex-direction:column;height:100%}
+#player{display:none;width:100%;max-height:62vh;background:#000}
+#player.show{display:block}
+#t{flex:1;min-height:0}
+.xterm-viewport{overflow:hidden!important;scrollbar-width:none}
+.xterm-viewport::-webkit-scrollbar{display:none;width:0;height:0}
+</style>
+</head>
+<body>
+<div id="stage">
+<video id="player" controls playsinline></video>
+<audio id="audio"></audio>
+<div id="t"></div>
+</div>
+<script src="/xterm.js"></script>
+<script src="/addon-fit.js"></script>
+<script src="/addon-image.js"></script>
+<script>
+const term = new Terminal({
+  cursorBlink: true,
+  fontSize: 15,
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+  theme: { background: "#000000" },
+  scrollback: 0
+});
+const fit = new FitAddon.FitAddon();
+term.loadAddon(fit);
+term.loadAddon(new ImageAddon.ImageAddon({ iipSupport: true, sixelScrolling: true }));
+term.open(document.getElementById("t"));
+fit.fit();
+const video = document.getElementById("player");
+const audio = document.getElementById("audio");
+let current = null;
+function report(el) {
+  if (!current || ws.readyState !== 1) return;
+  const dur = Number.isFinite(el.duration) ? el.duration : 0;
+  ws.send(JSON.stringify({
+    media: { id: current.id, pos: el.currentTime || 0, dur, paused: el.paused, ended: el.ended }
+  }));
+}
+function bind(el) {
+  ["timeupdate", "pause", "play", "ended", "seeked"].forEach((name) => {
+    el.addEventListener(name, () => report(el));
+  });
+}
+bind(video);
+bind(audio);
+function applyMedia(msg) {
+  if (msg.op === "stop") {
+    video.pause();
+    audio.pause();
+    video.classList.remove("show");
+    video.removeAttribute("src");
+    audio.removeAttribute("src");
+    current = null;
+    fit.fit();
+    term.focus();
+    return;
+  }
+  if (msg.op === "pause" && current) {
+    const el = current.video ? video : audio;
+    if (msg.paused) el.pause();
+    else el.play();
+    return;
+  }
+  if (msg.op === "volume" && current) {
+    const el = current.video ? video : audio;
+    el.volume = Math.max(0, Math.min(1, (msg.v || 0) / 100));
+    return;
+  }
+  if (msg.op !== "play" || !msg.id) return;
+  const el = msg.video ? video : audio;
+  const other = msg.video ? audio : video;
+  other.pause();
+  current = { id: msg.id, video: !!msg.video };
+  el.volume = Math.max(0, Math.min(1, (msg.volume || 0) / 100));
+  el.src = "/media?id=" + encodeURIComponent(msg.id);
+  video.classList.toggle("show", !!msg.video);
+  fit.fit();
+  el.play().catch(() => {});
+  term.focus();
+}
+const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+ws.binaryType = "arraybuffer";
+ws.onopen = () => {
+  const sendSize = () => ws.send(JSON.stringify({ cols: term.cols, rows: term.rows }));
+  sendSize();
+  term.onData((data) => { if (ws.readyState === 1) ws.send(data); });
+  term.onResize(sendSize);
+};
+ws.onmessage = (ev) => {
+  if (ev.data instanceof ArrayBuffer) {
+    term.write(new Uint8Array(ev.data));
+    return;
+  }
+  const text = typeof ev.data === "string" ? ev.data : "";
+  try {
+    const msg = JSON.parse(text);
+    if (msg && msg.op) {
+      applyMedia(msg);
+      return;
+    }
+  } catch (_) {}
+  if (text) term.write(text);
+};
+window.addEventListener("resize", () => fit.fit());
+</script>
+</body>
+</html>

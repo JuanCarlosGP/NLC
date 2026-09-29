@@ -16,6 +16,7 @@ import {
   type AudioPlayer,
 } from "expo-audio";
 import * as Haptics from "expo-haptics";
+import { bindDevicePlayer, deviceDrivesPlayback, findDeviceTrack, markDeviceEnded } from "@/lib/bridge/device-player";
 import { getLocalUri } from "@/lib/db/catalog";
 import { pushRecent } from "@/lib/library/cache";
 import type { Track } from "@/lib/nas/types";
@@ -378,11 +379,40 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!status.didJustFinish || finishingRef.current) return;
+    if (deviceDrivesPlayback()) {
+      markDeviceEnded();
+      return;
+    }
     finishingRef.current = true;
     void next().finally(() => {
       finishingRef.current = false;
     });
   }, [next, status.didJustFinish]);
+
+  useEffect(() => {
+    bindDevicePlayer({
+      play(id) {
+        void findDeviceTrack(id).then((track) => {
+          if (track) void playTracks([track], 0);
+        });
+      },
+      pause(paused) {
+        if (paused) pause();
+        else player.play();
+      },
+      stop() {
+        pause();
+      },
+      snapshot() {
+        return {
+          pos: currentTimeRef.current,
+          dur: status.duration ?? 0,
+          paused: !playingRef.current,
+        };
+      },
+    });
+    return () => bindDevicePlayer(null);
+  }, [pause, playTracks, player, status.duration]);
 
   const session = useMemo<PlayerSessionValue>(
     () => ({

@@ -19,14 +19,14 @@ use ratatui::widgets::{Block, Borders, Cell, Clear, Gauge, List, ListItem, ListS
 use ratatui::{DefaultTerminal, Frame};
 
 use crate::client::{Album, AlbumDetail, BridgeClient, Track};
-use crate::cover::CoverLoader;
+use crate::cover::{flush_web_cover, web_covers, CoverLoader, CoverPair, WebCoverPaint, WebCoverStamp};
 use crate::library::{is_podcast_track, is_imported_playlist};
 use crate::pair::{link_host, listen_for_pair, PairOffer};
 use crate::player::{
-    clamp_volume, format_ms, format_track_time, is_video_file, probe_stream_duration, MpvSession,
+    clamp_volume, format_ms, format_track_time, is_video_file, probe_stream_duration, Playback,
 };
 use crate::session::{
-    apply_cached_durations, lan_ip, load_session, pair_url, random_token, remember_duration, save_session, Session,
+    apply_cached_durations, env_session, lan_ip, load_session, pair_url, random_token, remember_duration, save_session, Session,
 };
 use crate::theme;
 
@@ -156,7 +156,7 @@ struct App {
     table: TableState,
     queue: Vec<Track>,
     queue_index: usize,
-    player: Option<MpvSession>,
+    player: Option<Playback>,
     now_playing: Option<Track>,
     volume: u8,
     muted: Option<u8>,
@@ -184,6 +184,8 @@ struct App {
     cover_key: Option<String>,
     show_cover_modal: bool,
     hit_cover: Rect,
+    web_cover: Option<WebCoverPaint>,
+    web_cover_stamp: Option<WebCoverStamp>,
 }
 
 impl App {
@@ -243,6 +245,8 @@ impl App {
             cover_key: None,
             show_cover_modal: false,
             hit_cover: Rect::default(),
+            web_cover: None,
+            web_cover_stamp: None,
         }
     }
 
@@ -368,12 +372,14 @@ impl App {
         let is_video = self.zone == Zone::Video
             || is_video_file(&track.id)
             || is_video_file(&track.title);
-        match MpvSession::spawn(
-            &client.stream_url(&track.id),
-            &client.auth_header(),
+        match Playback::start(
+            client,
+            &track.id,
+            &track.title,
             self.volume,
             is_video,
-            Some(&track.title),
+            &client.stream_url(&track.id),
+            &client.auth_header(),
         ) {
             Ok(player) => {
                 self.status = if is_video {
@@ -502,7 +508,7 @@ impl App {
     }
 
     fn poll_progress(&mut self) {
-        let Some(player) = self.player.as_ref() else { return };
+        let Some(player) = self.player.as_mut() else { return };
         if let Some((pos, dur)) = player.playback_times() {
             self.play_pos_ms = (pos * 1000.0).max(0.0) as u64;
             if dur > 0.0 {
@@ -984,9 +990,15 @@ fn spawn_library(client: BridgeClient) -> Receiver<Result<(Vec<Album>, Vec<Track
     rx
 }
 
+fn paint(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
+    terminal.draw(|frame| draw(frame, app))?;
+    let size = terminal.size()?;
+    flush_web_cover(app.web_cover.as_ref(), &mut app.web_cover_stamp, size.width, size.height)
+}
+
 fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result<()> {
     let mut app = App::new();
-    terminal.draw(|frame| draw(frame, &mut app))?;
+    paint(terminal, &mut app)?;
 
     let mut pair_rx = None;
     let mut pair_status = None;
@@ -997,7 +1009,8 @@ fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result
     app.duration_tx = Some(duration_tx);
     let mut last_key: Option<(KeyCode, KeyModifiers, Instant)> = None;
     let mut last_hello = Instant::now() - Duration::from_secs(4);
-    let saved = load_session();
+    let on_phone = std::env::var("NLC_ON_PHONE").ok().as_deref() == Some("1");
+    let saved = env_session().or_else(load_session);
 
     if let Some(session) = saved.clone() {
         app.push_pair_note(format!(
@@ -1024,6 +1037,10 @@ fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result
     let mut pair_unlink: Option<Receiver<()>> = None;
     let mut pair_tx: Option<Sender<Session>> = None;
 
+    if on_phone {
+        app.push_pair_note("Phone TUI. Connecting to this device…");
+    }
+    if !on_phone {
     match listen_for_pair(PairOffer {
         token: token_lock.clone(),
         port: PAIR_PORT,
@@ -1043,6 +1060,7 @@ fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result
                 app.error = Some(err.clone());
                 app.push_pair_note(format!("Could not listen on :{PAIR_PORT}: {err}"));
             }
+    }
     }
 
     let (hello_tick_tx, hello_tick_rx) = mpsc::channel();
@@ -1276,7 +1294,7 @@ fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result
             }
         }
 
-        terminal.draw(|frame| draw(frame, &mut app))?;
+        paint(terminal, &mut app)?;
 
         match keys.recv_timeout(Duration::from_millis(80)) {
             Ok(ev) => {
@@ -1602,7 +1620,19 @@ fn dispatch_key(app: &mut App, key: KeyEvent) -> bool {
     false
 }
 
+fn place_cover(app: &mut App, area: Rect, pair: &CoverPair) {
+    if !web_covers() {
+        return;
+    }
+    app.web_cover = Some(WebCoverPaint {
+        key: app.cover_key.clone().unwrap_or_default(),
+        area,
+        bytes: Arc::clone(&pair.bytes),
+    });
+}
+
 fn draw(frame: &mut Frame, app: &mut App) {
+    app.web_cover = None;
     if app.screen == Screen::Pair {
         app.hit_playlists = Rect::default();
         app.hit_tracks = Rect::default();
@@ -1631,6 +1661,9 @@ fn draw(frame: &mut Frame, app: &mut App) {
     }
     if app.show_cover_modal {
         draw_cover_modal(frame, app);
+    }
+    if app.help || app.nav {
+        app.web_cover = None;
     }
 }
 
@@ -2060,7 +2093,7 @@ fn track_table(tracks: &[Track], playing: Option<&Track>, lang: Lang) -> Table<'
     )
     .header(Row::new(headers).style(theme::dim()))
     .row_highlight_style(theme::highlight())
-    .highlight_symbol("")
+    .highlight_symbol(" › ")
 }
 
 fn draw_playback(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -2103,7 +2136,10 @@ fn draw_playback(frame: &mut Frame, app: &mut App, area: Rect) {
         let pair_opt = app.cover_key.as_deref().and_then(|k| app.cover_loader.get(k));
         let is_loading = app.cover_key.as_deref().map_or(false, |k| app.cover_loader.is_loading(k));
         if let Some(pair) = pair_opt {
-            frame.render_widget(Paragraph::new(pair.mini.lines.clone()), crect);
+            place_cover(app, crect, &pair);
+            if !web_covers() {
+                frame.render_widget(Paragraph::new(pair.mini.lines.clone()), crect);
+            }
         } else if is_loading {
             let loading_lines = vec![
                 Line::from(Span::styled("┌────────┐", theme::border())),
@@ -2288,7 +2324,7 @@ fn draw_playback(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 }
 
-fn draw_cover_modal(frame: &mut Frame, app: &App) {
+fn draw_cover_modal(frame: &mut Frame, app: &mut App) {
     let screen = frame.area();
     let modal_w = 44.min(screen.width.saturating_sub(4));
     let modal_h = 24.min(screen.height.saturating_sub(2));
@@ -2326,7 +2362,10 @@ fn draw_cover_modal(frame: &mut Frame, app: &App) {
 
         let cover_rect = centered(v_chunks[0], 34, 17);
         if let Some(pair) = pair_opt {
-            frame.render_widget(Paragraph::new(pair.large.lines.clone()), cover_rect);
+            place_cover(app, cover_rect, &pair);
+            if !web_covers() {
+                frame.render_widget(Paragraph::new(pair.large.lines.clone()), cover_rect);
+            }
         } else if is_loading {
             let loading_text = match app.lang {
                 Lang::En => "Loading high-resolution cover art…",
@@ -2387,7 +2426,10 @@ fn draw_cover_modal(frame: &mut Frame, app: &App) {
 
         let cover_rect = centered(v_chunks[0], 10, 5);
         if let Some(pair) = pair_opt {
-            frame.render_widget(Paragraph::new(pair.mini.lines.clone()), cover_rect);
+            place_cover(app, cover_rect, &pair);
+            if !web_covers() {
+                frame.render_widget(Paragraph::new(pair.mini.lines.clone()), cover_rect);
+            }
         } else {
             let loading_text = match app.lang {
                 Lang::En => "Loading…",
