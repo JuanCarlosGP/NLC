@@ -43,6 +43,8 @@ jobs:
       - run: npm ci
 
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Compile Android debug APK
         run: |
