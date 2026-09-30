@@ -56,6 +56,7 @@ export default {
       blockedPermissions: ["android.permission.RECORD_AUDIO"],
     },
     plugins: [
+      "./plugins/with-gradle-memory.js",
       ["expo-router", { root: "./src/app" }],
       "expo-secure-store",
       "expo-web-browser",
