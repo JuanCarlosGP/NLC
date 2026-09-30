@@ -160,6 +160,19 @@ export async function clearLastWatch(match?: string): Promise<void> {
   }
 }
 
+/** Record a play from the TUI. Creates the series row, then updates its position. */
+export async function noteVideoProgress(entry: Omit<VideoWatchEntry, "watchedAt">): Promise<void> {
+  await loadWatchHistory();
+  const known = memory.some((item) => item.path === entry.path);
+  if (!known) {
+    await markWatching(entry);
+    return;
+  }
+  if (entry.positionSec < 1 && entry.durationSec < 1) return;
+  activePath = entry.path;
+  updateWatchProgress(entry.positionSec, entry.durationSec);
+}
+
 export async function flushWatchProgress(positionSec?: number, durationSec?: number, path?: string) {
   await loadWatchHistory();
   if (writeTimer) {

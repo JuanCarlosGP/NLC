@@ -186,6 +186,7 @@ struct App {
     hit_cover: Rect,
     web_cover: Option<WebCoverPaint>,
     web_cover_stamp: Option<WebCoverStamp>,
+    watch_reported: Instant,
 }
 
 impl App {
@@ -247,6 +248,7 @@ impl App {
             hit_cover: Rect::default(),
             web_cover: None,
             web_cover_stamp: None,
+            watch_reported: Instant::now(),
         }
     }
 
@@ -353,6 +355,12 @@ impl App {
     }
 
     fn stop_player(&mut self) {
+        let video = self.now_playing.as_ref().is_some_and(|track| {
+            self.zone == Zone::Video || track.id.starts_with("video:")
+        });
+        if video {
+            self.report_video_watch();
+        }
         if let Some(mut player) = self.player.take() {
             player.stop();
         }
@@ -372,12 +380,14 @@ impl App {
         let is_video = self.zone == Zone::Video
             || is_video_file(&track.id)
             || is_video_file(&track.title);
+        let start_sec = if is_video { track.start_sec } else { 0 };
         match Playback::start(
             client,
             &track.id,
             &track.title,
             self.volume,
             is_video,
+            start_sec,
             &client.stream_url(&track.id),
             &client.auth_header(),
         ) {
@@ -402,6 +412,10 @@ impl App {
                 self.cover_key = cover_key;
                 self.now_playing = Some(track);
                 self.player = Some(player);
+                if is_video {
+                    self.play_pos_ms = start_sec.saturating_mul(1000);
+                    self.report_video_watch();
+                }
             }
             Err(err) => self.error = Some(err),
         }
@@ -525,6 +539,23 @@ impl App {
                 self.progress = (pct / 100.0).clamp(0.0, 1.0);
             }
         }
+        let video = self.now_playing.as_ref().is_some_and(|track| {
+            self.zone == Zone::Video || track.id.starts_with("video:")
+        });
+        if video && self.watch_reported.elapsed() >= Duration::from_secs(8) {
+            self.report_video_watch();
+        }
+    }
+
+    fn report_video_watch(&mut self) {
+        self.watch_reported = Instant::now();
+        let Some(client) = self.client.clone() else { return };
+        let Some(track) = self.now_playing.clone() else { return };
+        let pos = self.play_pos_ms / 1000;
+        let dur = self.play_dur_ms / 1000;
+        thread::spawn(move || {
+            client.note_video_watch(&track.id, &track.title, pos, dur);
+        });
     }
 
     fn apply_library(&mut self, listed: Vec<Album>, mut loose_tracks: Vec<Track>) {
@@ -845,7 +876,9 @@ fn fetch_music(client: &BridgeClient) -> Result<(Vec<Album>, Vec<Track>), String
 }
 
 fn fetch_video(client: &BridgeClient) -> Result<(Vec<Album>, Vec<Track>), String> {
-    Ok((client.videos()?, Vec::new()))
+    let albums = client.videos()?;
+    let continue_rows = client.video_continue().unwrap_or_default();
+    Ok((albums, continue_rows))
 }
 
 fn fetch_podcast(client: &BridgeClient) -> Result<(Vec<Album>, Vec<Track>), String> {
@@ -2034,7 +2067,19 @@ fn draw_library(frame: &mut Frame, app: &mut App, area: Rect) {
         .highlight_symbol(" › ");
     frame.render_stateful_widget(list, cols[0], &mut app.list);
 
-    let tracks_title = app.zone.right_title(app.loose_tracks.len(), app.lang);
+    let tracks_title = if app.zone == Zone::Video
+        && app
+            .loose_tracks
+            .iter()
+            .any(|track| track.artist_name == "resume" || track.artist_name == "next")
+    {
+        match app.lang {
+            Lang::En => "Continue".into(),
+            Lang::Es => "Continuar".into(),
+        }
+    } else {
+        app.zone.right_title(app.loose_tracks.len(), app.lang)
+    };
     if app.albums.is_empty() && app.loose_tracks.is_empty() {
         frame.render_widget(
             Paragraph::new(app.zone.empty_hint(app.lang))
@@ -2049,6 +2094,22 @@ fn draw_library(frame: &mut Frame, app: &mut App, area: Rect) {
         pane_block(&tracks_title, app.focus == Focus::Tracks).padding(Padding::new(1, 1, 0, 0)),
     );
     frame.render_stateful_widget(table, cols[2], &mut app.table);
+}
+
+fn continue_label(role: &str, series: &str, lang: Lang) -> Option<String> {
+    let word = match (role, lang) {
+        ("resume", Lang::Es) => "Seguir",
+        ("resume", Lang::En) => "Resume",
+        ("next", Lang::Es) => "Siguiente",
+        ("next", Lang::En) => "Next",
+        _ => return None,
+    };
+    let series = series.trim();
+    if series.is_empty() {
+        Some(word.to_string())
+    } else {
+        Some(format!("{word}  ·  {series}"))
+    }
 }
 
 fn track_table(tracks: &[Track], playing: Option<&Track>, lang: Lang) -> Table<'static> {
@@ -2069,10 +2130,12 @@ fn track_table(tracks: &[Track], playing: Option<&Track>, lang: Lang) -> Table<'
             } else {
                 format!("{num}")
             };
+            let artist = continue_label(&track.artist_name, &track.album_name, lang)
+                .unwrap_or_else(|| track.artist_name.clone());
             Row::new(vec![
                 Cell::from(num_cell),
                 Cell::from(track.title.clone()),
-                Cell::from(track.artist_name.clone()),
+                Cell::from(artist),
                 Cell::from(format_track_time(track.duration_ms)),
             ])
             .style(style)

@@ -120,6 +120,26 @@ export async function enqueueDownload(
   return (await response.json()) as { id: string; status: DownloadJobStatus };
 }
 
+/** Download audio only, under a temp name. Does not apply the YouTube title or cover. */
+export async function enqueueAudioReplace(
+  settings: DownloadSettings,
+  token: string,
+  url: string,
+): Promise<{ id: string; status: DownloadJobStatus }> {
+  const trimmed = url.trim();
+  if (!trimmed) throw new Error(t("feedback.pasteUrl"));
+  const response = await downloaderFetch(settings, "/download", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(token),
+    },
+    body: JSON.stringify({ url: trimmed, kind: "song", audioOnly: true }),
+  });
+  if (!response.ok) throw new Error(await readError(response));
+  return (await response.json()) as { id: string; status: DownloadJobStatus };
+}
+
 /** YouTube search text. No hyphen — yt-dlp ranking is closer to typing "nana rojuu". */
 export function downloadSearchQuery(title: string, artistName: string): string {
   const track = title.replace(/[-–—]+/g, " ").replace(/\s+/g, " ").trim();

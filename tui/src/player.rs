@@ -19,6 +19,7 @@ impl MpvSession {
         volume: u8,
         video: bool,
         title: Option<&str>,
+        start_sec: u64,
     ) -> Result<Self, String> {
         let sock = std::env::temp_dir().join(format!("nlc-tui-mpv-{}.sock", std::process::id()));
         let _ = std::fs::remove_file(&sock);
@@ -46,6 +47,9 @@ impl MpvSession {
             cmd.args(["--no-video", "--force-window=no"]);
         }
 
+        if start_sec > 3 {
+            cmd.arg(format!("--start={start_sec}"));
+        }
         cmd.arg(url);
 
         let child = cmd
@@ -141,6 +145,7 @@ impl WebPlayer {
         title: &str,
         volume: u8,
         video: bool,
+        start_sec: u64,
     ) -> Result<Self, String> {
         let _ = client.device("op=stop");
         let file = PathBuf::from(std::env::var("NLC_MEDIA_FILE").unwrap_or_default());
@@ -151,13 +156,14 @@ impl WebPlayer {
             id: track_id.to_string(),
             file,
         };
-        player.write_state(0.0, 0.0, false, false);
+        player.write_state(start_sec as f64, 0.0, false, false);
         emit_web(&json!({
             "op": "play",
             "id": track_id,
             "title": title,
             "volume": volume,
             "video": video,
+            "start": start_sec,
         }));
         Ok(player)
     }
@@ -255,16 +261,17 @@ impl Playback {
         title: &str,
         volume: u8,
         video: bool,
+        start_sec: u64,
         stream_url: &str,
         auth_header: &str,
     ) -> Result<Self, String> {
         if std::env::var("NLC_WEB").ok().as_deref() == Some("1") {
-            return WebPlayer::start(client, track_id, title, volume, video).map(Self::Web);
+            return WebPlayer::start(client, track_id, title, volume, video, start_sec).map(Self::Web);
         }
         if std::env::var("NLC_ON_PHONE").ok().as_deref() == Some("1") {
             return PhonePlayer::start(client.clone(), track_id, volume).map(Self::Phone);
         }
-        MpvSession::spawn(stream_url, auth_header, volume, video, Some(title)).map(Self::Mpv)
+        MpvSession::spawn(stream_url, auth_header, volume, video, Some(title), start_sec).map(Self::Mpv)
     }
 
     pub fn set_volume(&self, volume: u8) {

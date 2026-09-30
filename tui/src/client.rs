@@ -39,6 +39,9 @@ pub struct Track {
     pub cover_id: Option<String>,
     #[serde(default)]
     pub artwork_url: Option<String>,
+    /// Resume offset in seconds. The continue-watching rows send this.
+    #[serde(default)]
+    pub start_sec: u64,
 }
 
 impl Track {
@@ -231,6 +234,25 @@ impl BridgeClient {
         let res = self.get_with_timeout("/v1/video", std::time::Duration::from_secs(20))?;
         let body: AlbumsBody = res.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
         Ok(body.albums)
+    }
+
+    /// Last video watched and the following episode, when the phone has history.
+    pub fn video_continue(&self) -> Result<Vec<Track>, String> {
+        let res = self.get_with_timeout("/v1/video/continue", std::time::Duration::from_secs(20))?;
+        let mut body: SearchBody = res.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        for track in &mut body.tracks {
+            track.normalize();
+        }
+        Ok(body.tracks)
+    }
+
+    pub fn note_video_watch(&self, id: &str, title: &str, pos_sec: u64, dur_sec: u64) {
+        let path = format!(
+            "/v1/video/watch?id={}&title={}&pos={pos_sec}&dur={dur_sec}",
+            urlencoding::encode(id),
+            urlencoding::encode(title),
+        );
+        let _ = self.get_with_timeout(&path, std::time::Duration::from_secs(8));
     }
 
     pub fn cover_bytes(&self, key: &str) -> Result<Vec<u8>, String> {
@@ -455,6 +477,7 @@ impl Track {
             duration: None,
             cover_id: None,
             artwork_url: None,
+            start_sec: 0,
         }
     }
 }

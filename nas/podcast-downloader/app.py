@@ -71,6 +71,9 @@ class DownloadRequest(BaseModel):
     artist: str | None = None
     durationMs: int | None = Field(default=None, ge=0)
     kind: MediaKind = Field(default="song")
+    # Audio bytes only, under a unique temp name. The app copies them onto an
+    # existing track and deletes this file, so title and cover stay put.
+    audioOnly: bool = False
 
     @model_validator(mode="after")
     def require_source(self) -> DownloadRequest:
@@ -475,6 +478,7 @@ def _run_download(
     duration_ms: int | None = None,
     search_title: str | None = None,
     search_artist: str | None = None,
+    audio_only: bool = False,
 ) -> None:
     _update_job(job_id, status="running", kind=requested_kind)
     _append_log(job_id, "Resolviendo metadatos…")
@@ -534,12 +538,16 @@ def _run_download(
         _update_job(job_id, status="error", error=f"No se pudo leer la URL: {exc}"[:500])
         return
 
-    resolved = _resolve_kind(requested_kind, duration)
+    resolved = "song" if audio_only else _resolve_kind(requested_kind, duration)
     _update_job(job_id, resolvedKind=resolved)
     _append_log(job_id, f"Tipo: {resolved}")
 
     # Flat folders: Music/Podcasts, Music/Canciones, Popcorn/movies.
-    if resolved == "podcast":
+    if audio_only:
+        target_dir = SONG_DIR
+        target_dir.mkdir(parents=True, exist_ok=True)
+        outtmpl = str(target_dir / f"nlc-src-{job_id}.%(ext)s")
+    elif resolved == "podcast":
         target_dir = PODCAST_DIR
         outtmpl = str(target_dir / f"{_safe_filename(title)[:100]}.%(ext)s")
     elif resolved == "video":
@@ -583,14 +591,10 @@ def _run_download(
             "192",
             "--no-playlist",
             "--restrict-filenames",
-            "--write-thumbnail",
-            "--convert-thumbnails",
-            "jpg",
-            "--newline",
-            "-o",
-            outtmpl,
-            url,
         ]
+        if not audio_only:
+            cmd.extend(["--write-thumbnail", "--convert-thumbnails", "jpg"])
+        cmd.extend(["--newline", "-o", outtmpl, url])
     _append_log(job_id, "Descargando con yt-dlp…")
 
     try:
@@ -608,8 +612,11 @@ def _run_download(
         if code != 0:
             raise subprocess.CalledProcessError(code, cmd)
 
-        path = _find_output(target_dir, video_id or job_id) or _find_output(
-            target_dir, _safe_filename(title)[:100]
+        path = (
+            _find_output(target_dir, f"nlc-src-{job_id}")
+            if audio_only
+            else _find_output(target_dir, video_id or job_id)
+            or _find_output(target_dir, _safe_filename(title)[:100])
         )
         if not path:
             raise RuntimeError(
@@ -617,6 +624,19 @@ def _run_download(
                 if resolved == "video"
                 else "Descarga terminó pero no hay archivo de audio."
             )
+
+        if audio_only:
+            _append_log(job_id, f"Listo: {path.name}")
+            _update_job(
+                job_id,
+                status="done",
+                title=title,
+                filename=path.name,
+                resolvedKind=resolved,
+                progress=100.0,
+                error=None,
+            )
+            return
 
         desired = target_dir / f"{_safe_filename(title)[:100]}{path.suffix.lower()}"
         if path.resolve() != desired.resolve() and not desired.exists():
@@ -690,7 +710,16 @@ def _enqueue_body(body: DownloadRequest) -> DownloadResponse:
             "eta": None,
             "log": ["En cola…"],
         }
-    _pool.submit(_run_download, job_id, source, body.kind, body.durationMs, body.title, body.artist)
+    _pool.submit(
+        _run_download,
+        job_id,
+        source,
+        body.kind,
+        body.durationMs,
+        body.title,
+        body.artist,
+        body.audioOnly,
+    )
     return DownloadResponse(id=job_id, status="queued")
 
 

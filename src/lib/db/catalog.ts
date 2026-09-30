@@ -876,6 +876,20 @@ export async function catalogTrackCount(): Promise<number> {
   return row?.n ?? 0;
 }
 
+export async function patchTrackRow(
+  id: string,
+  patch: { contentType?: string; coverId?: string | null },
+): Promise<void> {
+  const db = await ready();
+  if (patch.contentType !== undefined) {
+    await db.runAsync("UPDATE tracks SET content_type = ? WHERE id = ?", patch.contentType, id);
+  }
+  if (patch.coverId !== undefined) {
+    await db.runAsync("UPDATE tracks SET cover_id = ? WHERE id = ?", patch.coverId, id);
+  }
+  notifyCatalog();
+}
+
 export async function renameTrackTitle(id: string, title: string): Promise<void> {
   const trimmed = title.trim();
   if (!trimmed) return;
@@ -914,6 +928,8 @@ export async function retargetCatalogPath(from: string, to: string): Promise<voi
   for (const row of tracks) {
     const next = row.id === from ? to : `${to}${row.id.slice(from.length)}`;
     await db.runAsync("UPDATE tracks SET id = ? WHERE id = ?", next, row.id);
+    await db.runAsync("UPDATE recents SET track_id = ? WHERE track_id = ?", next, row.id);
+    await db.runAsync("UPDATE favorites SET track_id = ? WHERE track_id = ?", next, row.id);
   }
   const albums = await db.getAllAsync<{ id: string }>(
     "SELECT id FROM albums WHERE id = ? OR id LIKE ?",

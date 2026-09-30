@@ -5,9 +5,11 @@ import { dumpProductivity } from "@/lib/productivity/store";
 import { listReminders } from "@/lib/reminders/store";
 import { loadNasPassword, loadNasSettings } from "@/lib/settings/storage";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
-import { inspectFolder } from "@/lib/video/browse";
+import { baseName, episodeLocation, findNextEpisode, inspectFolder, seriesFromPath } from "@/lib/video/browse";
 import { listVideoShows } from "@/lib/video/catalog";
+import { parseEpisodeName } from "@/lib/video/onepiece";
 import { createVideoClient } from "@/lib/video/source";
+import { isWatchFinished, loadWatchHistory, noteVideoProgress } from "@/lib/video/watch-history";
 import { createDavTransport } from "@/lib/nas/webdav-source";
 import { dumpWealth } from "@/lib/wealth/store";
 import { handleDeviceQuery } from "@/lib/bridge/device-player";
@@ -99,6 +101,21 @@ function videoPath(id: string): string {
   } catch {
     return raw;
   }
+}
+
+function continueTrack(
+  path: string,
+  title: string,
+  seriesTitle: string,
+  role: "resume" | "next",
+  durationSec: number,
+  startSec: number,
+): Track & { startSec: number } {
+  return {
+    ...videoTrack(videoId(path), title, videoId(path), seriesTitle, role, role === "next" ? 2 : 1),
+    durationMs: durationSec > 0 ? Math.round(durationSec * 1000) : 0,
+    startSec,
+  };
 }
 
 function videoTrack(id: string, title: string, albumId: string, albumName: string, artistName: string, track = 0): Track {
@@ -318,6 +335,49 @@ export async function handleBridgeRequest(
     const url = await source.coverUrl(id);
     if (!url) return { kind: "json", status: 404, body: { error: "no_cover" } };
     return { kind: "json", status: 200, body: { url } };
+  }
+
+  if (route === "/v1/video/watch") {
+    const id = q.id;
+    if (!id) return { kind: "json", status: 400, body: { error: "missing_id" } };
+    const path = videoPath(id);
+    const series = seriesFromPath(path);
+    const location = episodeLocation(path);
+    const parsed = parseEpisodeName(baseName(path));
+    const positionSec = Number(q.pos);
+    const durationSec = Number(q.dur);
+    await noteVideoProgress({
+      seriesId: series.id,
+      seriesTitle: series.title,
+      path,
+      arcPath: location.arcPath,
+      sagaPath: location.sagaPath,
+      number: parsed?.number ?? 0,
+      title: q.title?.trim() || parsed?.title || series.title,
+      arcTitle: location.arcTitle,
+      sagaTitle: location.sagaTitle,
+      positionSec: Number.isFinite(positionSec) ? Math.max(0, positionSec) : 0,
+      durationSec: Number.isFinite(durationSec) ? Math.max(0, durationSec) : 0,
+    });
+    return { kind: "json", status: 200, body: { ok: true } };
+  }
+
+  if (route === "/v1/video/continue") {
+    const history = await loadWatchHistory();
+    const last = history[0];
+    if (!last) return { kind: "json", status: 200, body: { tracks: [] } };
+    const [settings, password] = await Promise.all([loadNasSettings(), loadNasPassword()]);
+    const next = await findNextEpisode(settings, password, last.path).catch(() => null);
+    const resumeAt =
+      !isWatchFinished(last) && last.positionSec > 3 ? Math.floor(last.positionSec) : 0;
+    const tracks: Track[] = [
+      continueTrack(last.path, last.title, last.seriesTitle, "resume", last.durationSec, resumeAt),
+    ];
+    if (next && next.path !== last.path) {
+      const place = seriesFromPath(next.path);
+      tracks.push(continueTrack(next.path, next.title, place.title, "next", 0, 0));
+    }
+    return { kind: "json", status: 200, body: { tracks } };
   }
 
   if (route === "/v1/video") {

@@ -83,8 +83,16 @@ function applyMedia(msg) {
   other.pause();
   current = { id: msg.id, video: !!msg.video };
   el.volume = Math.max(0, Math.min(1, (msg.volume || 0) / 100));
+  const start = Number(msg.start) || 0;
   el.src = "/media?id=" + encodeURIComponent(msg.id);
   video.classList.toggle("show", !!msg.video);
+  if (start > 3) {
+    const seek = () => {
+      if (Number.isFinite(el.duration) && start < el.duration - 2) el.currentTime = start;
+      el.removeEventListener("loadedmetadata", seek);
+    };
+    el.addEventListener("loadedmetadata", seek);
+  }
   fit.fit();
   el.play().catch(() => {});
   term.focus();
