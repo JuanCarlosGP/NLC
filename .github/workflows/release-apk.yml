@@ -61,10 +61,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android SDK
+        run: |
+          export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;27.1.12297006"
 
       - run: npm ci
 
@@ -87,34 +102,11 @@ jobs:
       - name: Build APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: npx eas-cli build --platform android --profile github --non-interactive --wait
-
-      - name: Download APK
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          node <<'NODE'
-          const { spawnSync } = require("node:child_process");
-          const fs = require("node:fs");
-          const raw = spawnSync(
-            "npx",
-            ["eas-cli", "build:list", "--platform", "android", "--limit", "1", "--non-interactive", "--json", "--status", "finished"],
-            { encoding: "utf8" },
-          );
-          if (raw.status !== 0) {
-            console.error(raw.stderr);
-            process.exit(1);
-          }
-          const parsed = JSON.parse(raw.stdout);
-          const builds = Array.isArray(parsed) ? parsed : parsed.builds || [];
-          const url = builds[0]?.artifacts?.buildUrl || builds[0]?.artifacts?.applicationArchiveUrl;
-          if (!url) {
-            console.error(raw.stdout);
-            process.exit(1);
-          }
-          fs.writeFileSync("apk-url.txt", url);
-          NODE
-          curl -L --fail --output NLC.apk "$(cat apk-url.txt)"
+          export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          # Local build uses the same EAS keystore and does not spend the cloud quota.
+          npx eas-cli build --platform android --profile github --local --non-interactive --output NLC.apk
 
       - name: Publish rolling GitHub Release
         env:
