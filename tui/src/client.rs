@@ -208,6 +208,23 @@ impl BridgeClient {
         Ok(())
     }
 
+    /// The phone is already this process's parent. Claim so the bridge accepts our token.
+    pub fn claim(&self) -> Result<(), String> {
+        let body = format!(
+            "{{\"token\":\"{}\",\"desktopHost\":\"127.0.0.1\"}}",
+            self.token
+        );
+        let res = ureq::post(&format!("{}/v1/claim", self.base))
+            .set("Content-Type", "application/json")
+            .timeout(std::time::Duration::from_secs(3))
+            .send_string(&body)
+            .map_err(|e| e.to_string())?;
+        if res.status() >= 300 {
+            return Err(format!("claim {}", res.status()));
+        }
+        Ok(())
+    }
+
     pub fn bye(&self) {
         let _ = self.get_with_timeout("/v1/bye", std::time::Duration::from_secs(3));
     }

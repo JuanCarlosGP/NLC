@@ -985,6 +985,23 @@ fn spawn_hello(session: Session) -> Receiver<Result<Session, String>> {
     rx
 }
 
+/// Phone-hosted browser TUI. The bridge env is already set, so keep trying until it answers.
+fn spawn_phone_hello(session: Session) -> Receiver<Result<Session, String>> {
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let client = BridgeClient::new(&session);
+        loop {
+            let ready = client.hello().is_ok() || (client.claim().is_ok() && client.hello().is_ok());
+            if ready {
+                let _ = tx.send(Ok(session));
+                return;
+            }
+            thread::sleep(Duration::from_secs(1));
+        }
+    });
+    rx
+}
+
 fn spawn_zone(
     client: BridgeClient,
     zone: Zone,
@@ -1031,7 +1048,6 @@ fn paint(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
 
 fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result<()> {
     let mut app = App::new();
-    paint(terminal, &mut app)?;
 
     let mut pair_rx = None;
     let mut pair_status = None;
@@ -1045,7 +1061,24 @@ fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result
     let on_phone = std::env::var("NLC_ON_PHONE").ok().as_deref() == Some("1");
     let saved = env_session().or_else(load_session);
 
-    if let Some(session) = saved.clone() {
+    if on_phone {
+        if let Some(session) = saved.clone() {
+            let note = match app.lang {
+                Lang::En => format!("Opening the library on this phone ({}:{})…", session.phone_host, session.bridge_port),
+                Lang::Es => format!("Abriendo la biblioteca de este teléfono ({}:{})…", session.phone_host, session.bridge_port),
+            };
+            app.status = note.clone();
+            app.push_pair_note(note);
+            hello_rx = Some(spawn_phone_hello(session));
+        } else {
+            let note = match app.lang {
+                Lang::En => "This phone did not pass the bridge link.".to_string(),
+                Lang::Es => "Este teléfono no pasó el enlace del puente.".to_string(),
+            };
+            app.status = note.clone();
+            app.push_pair_note(note);
+        }
+    } else if let Some(session) = saved.clone() {
         app.push_pair_note(format!(
             "Saved link: {}:{}. Saying hello…",
             session.phone_host, session.bridge_port
@@ -1064,15 +1097,14 @@ fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result
     app.qr = render_qr(&url);
     app.pair_url = url.clone();
     app.pair_pc = ip.clone();
-    app.push_pair_note(format!("This PC is {ip}. Pair port {PAIR_PORT}. Phone bridge 7421."));
+    if !on_phone {
+        app.push_pair_note(format!("This PC is {ip}. Pair port {PAIR_PORT}. Phone bridge 7421."));
+    }
     let token_lock = Arc::new(RwLock::new(token));
     let last_host_lock = Arc::new(RwLock::new(saved.as_ref().map(|session| session.phone_host.clone())));
     let mut pair_unlink: Option<Receiver<()>> = None;
     let mut pair_tx: Option<Sender<Session>> = None;
 
-    if on_phone {
-        app.push_pair_note("Phone TUI. Connecting to this device…");
-    }
     if !on_phone {
     match listen_for_pair(PairOffer {
         token: token_lock.clone(),
@@ -1095,6 +1127,8 @@ fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result
             }
     }
     }
+
+    paint(terminal, &mut app)?;
 
     let (hello_tick_tx, hello_tick_rx) = mpsc::channel();
     let mut consecutive_hello_fails = 0usize;
@@ -1182,6 +1216,13 @@ fn run_app(terminal: &mut DefaultTerminal, keys: &Receiver<Event>) -> io::Result
                             stop.store(true, std::sync::atomic::Ordering::SeqCst);
                         }
                         app.push_pair_note(format!("Hello ok from {host}:{port}. Loading the library…"));
+                        if on_phone {
+                            app.screen = Screen::Library;
+                            app.status = match app.lang {
+                                Lang::En => "Loading the library…".into(),
+                                Lang::Es => "Cargando la biblioteca…".into(),
+                            };
+                        }
                         library_rx = Some(spawn_library(client));
                     }
                 }
@@ -1790,6 +1831,31 @@ fn friendly_activity_line(note: &str, lang: Lang) -> Option<Line<'static>> {
 }
 
 fn draw_pair(frame: &mut Frame, app: &App, area: Rect) {
+    if std::env::var("NLC_ON_PHONE").ok().as_deref() == Some("1") {
+        let title = "NLC";
+        let lead = match app.lang {
+            Lang::En => "This page is served by the phone. The library opens on its own.",
+            Lang::Es => "Esta página la sirve el teléfono. La biblioteca se abre sola.",
+        };
+        let mut lines = vec![
+            Line::from(Span::styled(lead, theme::title())),
+            Line::from(""),
+        ];
+        if app.pair_log.is_empty() {
+            lines.push(Line::from(Span::styled(app.status.as_str(), theme::dim())));
+        } else {
+            for note in app.pair_log.iter().rev().take(8).rev() {
+                lines.push(Line::from(Span::styled(format!("  · {note}"), theme::dim())));
+            }
+        }
+        frame.render_widget(
+            Paragraph::new(lines)
+                .wrap(Wrap { trim: false })
+                .block(block(title).padding(Padding::new(2, 2, 1, 0))),
+            area,
+        );
+        return;
+    }
     let cols = if area.width >= 79 {
         Layout::default()
             .direction(Direction::Horizontal)
