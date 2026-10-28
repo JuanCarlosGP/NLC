@@ -34,7 +34,7 @@ export default {
     newArchEnabled: true,
     android: {
       package: process.env.NLC_ANDROID_PACKAGE || "app.nlc.player",
-      versionCode: 16,
+      versionCode: 17,
       softwareKeyboardLayoutMode: "resize",
       usesCleartextTraffic: true,
       adaptiveIcon: {
