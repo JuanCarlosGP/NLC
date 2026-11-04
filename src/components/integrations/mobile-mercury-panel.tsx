@@ -36,7 +36,12 @@ export function MobileMercuryPanel() {
     if (working) return;
     setWorking(true); setError("");
     try { await operation(); }
-    catch (error) { setError(error instanceof MercuryError ? error.code : error instanceof Error && ["invalid", "size", "storage"].includes(error.message) ? error.message : "storage"); }
+    catch (error) {
+      // Connection errors belong to the controller so an automatic recovery can
+      // clear them. Keep only local input/file errors in this component.
+      if (error instanceof MercuryError && !["token", "configure"].includes(error.code)) setError("");
+      else setError(error instanceof MercuryError ? error.code : error instanceof Error && ["invalid", "size", "storage"].includes(error.message) ? error.message : "storage");
+    }
     finally { setWorking(false); }
   }
   async function acceptImport(value: MercurySnapshot) { await ctx.save(value); await ctx.select("mercury", value.mode); }

@@ -15,8 +15,9 @@ Verificación local: 4 de noviembre de 2026. Emulador Android 14 aislado en Linu
 - Primer paso del onboarding: orden idioma → NLC clásico / Geist Pixel → Empezar.
   Classic → Pixel actualiza fondo, fuente y controles sin salir del paso 1.
 - TypeScript, exportación Android de producción y `git diff --check` correctos.
-- 140 casos aprobados: 119 existentes y 21 de Mercury móvil, incluido el hook React
-  con SecureStore y fetch nativo simulados.
+- 141 casos aprobados: 119 existentes y 22 de Mercury móvil, incluido el hook React
+  con SecureStore y fetch nativo simulados, y la retirada del aviso de red cuando
+  una sincronización automática recupera la conexión.
 
 ## Casos de regresión de Mercury móvil
 
