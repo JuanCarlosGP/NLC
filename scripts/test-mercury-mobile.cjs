@@ -127,11 +127,12 @@ test('a late network failure preserves the previous complete copy and backs off 
   assert.equal(await h.controller.tick(), 'skipped'); assert.equal(h.calls.length, 1); failed = false; h.setTime(now + 30000);
   assert.equal(await h.controller.tick(), 'saved'); assert.equal(h.controller.getSnapshot().error, null);
 });
-test('rate limiting blocks early manual retries and auth failures do not loop automatically', async () => {
-  for (const code of ['rateLimit', 'auth']) {
+test('rate limiting blocks early retries and non-retryable failures pause automatic sync', async () => {
+  for (const code of ['rateLimit', 'auth', 'storage', 'invalid', 'currency', 'pagination', 'size']) {
     const h = harness({ collect: async () => { throw new MercuryError(code, now + 120000); } }); await h.controller.load();
     await assert.rejects(h.controller.tick()); assert.equal(await h.controller.tick(), 'skipped'); assert.equal(h.calls.length, 1);
     if (code === 'rateLimit') { await assert.rejects(h.controller.sync(), /rateLimit/); assert.equal(h.calls.length, 1); }
+    else assert.equal(h.controller.getSnapshot().retryAt, 0);
     await h.controller.configure('another-synthetic-token'); await assert.rejects(h.controller.sync()); assert.equal(h.calls.length, 2);
   }
 });
