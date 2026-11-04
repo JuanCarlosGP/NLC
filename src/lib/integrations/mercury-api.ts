@@ -99,6 +99,7 @@ export async function fetchMercurySnapshot(tokenInput: string, fetchImpl: Mercur
       } catch (error) { await reader.cancel().catch(() => {}); throw error; }
       return row(JSON.parse(json));
     } catch (error) {
+      request.abort();
       if (signal?.aborted) throw new MercuryError("cancelled");
       if (error instanceof MercuryError) throw error;
       // Never expose response bodies, URLs, authorization headers or provider errors.

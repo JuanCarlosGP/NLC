@@ -96,7 +96,7 @@ test('a partial failure, a foreign currency or broken account reference never pr
 });
 test('response size, invalid JSON and cancellation are bounded before saving data', async () => {
   const responses = [new Response('{}', { headers: { 'content-length': String(17 * 1024 * 1024) } }), new Response('{')];
-  for (const response of responses) await assert.rejects(fetchMercurySnapshot('synthetic-token', async () => response), MercuryError);
+  for (const response of responses) { let signal; await assert.rejects(fetchMercurySnapshot('synthetic-token', async (_url, init) => { signal = init.signal; return response; }), MercuryError); assert.equal(signal.aborted, true); }
   const abort = new AbortController(); abort.abort(); let requested = false;
   await assert.rejects(fetchMercurySnapshot('synthetic-token', async () => { requested = true; }, abort.signal), error => error.code === 'cancelled'); assert.equal(requested, false);
   assert.throws(() => normalizeMercuryToken('Bearer synthetic-token'), /token/); assert.throws(() => normalizeMercuryToken('a'.repeat(1801)), /token/);
