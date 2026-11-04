@@ -1,4 +1,5 @@
 import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { MobileMercuryPanel } from "./mobile-mercury-panel";
 import { useState, type ReactNode } from "react";
 import { Linking, Platform, Pressable, View } from "react-native";
 import { Text } from "@/components/ui/themed-text";
@@ -31,7 +32,12 @@ export function display(value:number|null|undefined,suffix="",digits=0){return v
 export function duration(minutes:number|null|undefined){if(minutes===null||minutes===undefined)return "—";const total=Math.round(minutes);return `${Math.floor(total/60)} h ${total%60} min`;}
 export function dateLabel(value:string,locale:string){return new Date(`${value.slice(0,10)}T12:00:00Z`).toLocaleDateString(locale,{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"});}
 const errorCodes=new Set(["network","configure","connect","auth","rateLimit","upstream","busy","invalid","size","pagination","storage","currency","state","consent","accountChanged"]);
-export function ConnectionPanel({provider}:{provider:Provider}){
+export function ConnectionPanel({provider}:{provider:Provider}) {
+  useThemeId();
+  const { mobileMercury }=useIntegrations();
+  return provider==="mercury" && mobileMercury ? <MobileMercuryPanel /> : <BridgeConnectionPanel provider={provider} />;
+}
+function BridgeConnectionPanel({provider}:{provider:Provider}){
   useThemeId();
   const ctx=useIntegrations();const{t,locale}=useI18n();const mode=ctx.selection[provider];const data=ctx.copies[provider][mode];const status=ctx.status?.[provider];
   const[working,setWorking]=useState(false);const[error,setError]=useState("");const[message,setMessage]=useState("");const[pending,setPending]=useState<Snapshot|null>(null);const[confirm,setConfirm]=useState<"clear"|"disconnect"|null>(null);const[authUrl,setAuthUrl]=useState("");

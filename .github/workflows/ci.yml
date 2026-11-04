@@ -29,6 +29,8 @@ jobs:
 
       - run: npm run test:appearance
 
+      - run: npm run test:mercury-mobile
+
       - run: npm run test:integrations
 
       - run: npm run test:health-backup

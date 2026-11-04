@@ -1,3 +1,4 @@
+import { mobileMercuryEn, mobileMercuryEs } from "@/lib/i18n/catalog-mobile-mercury";
 import { integrationsEn, integrationsEs } from "@/lib/i18n/catalog-integrations";
 import { appearanceEn, appearanceEs } from "@/lib/i18n/catalog-appearance";
 import { healthBackupEn, healthBackupEs } from "@/lib/i18n/catalog-health-backup";
@@ -252,6 +253,7 @@ export const messages = {
     ...healthBackupEn,
     ...appearanceEn,
     ...integrationsEn,
+    ...mobileMercuryEn,
   },
   es: {
     ...commonEs,
@@ -268,6 +270,7 @@ export const messages = {
     ...healthBackupEs,
     ...appearanceEs,
     ...integrationsEs,
+    ...mobileMercuryEs,
   },
 } as const;
 
