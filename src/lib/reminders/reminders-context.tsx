@@ -1,3 +1,4 @@
+import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { router } from "expo-router";
 import {
@@ -53,6 +54,8 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
       // NAS / carpeta local are best-effort.
     }
   }, []);
+
+  useEffect(() => onServiceImport(service => { if (service === "focus") void refresh().catch(() => {}); }), [refresh]);
 
   useEffect(() => onFocusStoreChanged(() => {
     void refresh();

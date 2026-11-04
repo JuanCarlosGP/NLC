@@ -1,6 +1,6 @@
 # NLC
 
-Reproductor Android de **código fuente público** para la biblioteca que ya tienes en un NAS de la LAN: música, podcasts, vídeo, y también foco y patrimonio. Sin cuenta en la nube, sin radio social y sin tienda.
+Aplicación Android de **código fuente público** para música, audio/podcasts, vídeo, tareas, finanzas y salud. Puedes usarla completamente en el teléfono o conectar un NAS de la LAN. Sin cuenta en la nube, sin radio social y sin tienda.
 
 [Descargar la última APK](https://github.com/JuanCarlosGP/NLC/releases/download/apk/NLC.apk) · [Releases](https://github.com/JuanCarlosGP/NLC/releases) · [Contribuir](CONTRIBUTING.md) · [Licencia](LICENSE)
 
@@ -15,7 +15,9 @@ NLC no es un clon de Spotify. Importa metadatos de playlists y las empareja con 
 
 - Reproducir música desde WebDAV (carpeta compartida del NAS), Navidrome / OpenSubsonic, carpeta local o una biblioteca de ejemplo
 - Podcasts y descargas yt-dlp en el NAS ([servicio Docker](nas/podcast-downloader/README.md))
-- Vídeo por WebDAV (p. ej. series organizadas por carpeta)
+- Vídeo desde carpetas locales o WebDAV (p. ej. series organizadas por carpeta)
+- Onboarding con elección teléfono/NAS y carpetas independientes para los seis servicios
+- Exportar e importar cada servicio desde Ajustes → App: datos, música, audio, vídeos y fotos en ZIP
 - Importar playlists de Spotify y matchearlas contra la biblioteca local
 - Salud: peso, entrenamientos, medicación, suplementos, fotos de evolución y nutrición sin conexión
 - Entrenamientos: sesiones con ejercicios, series, kg, repeticiones, calentamientos, descansos, calendario y analíticas de progresión
@@ -45,7 +47,7 @@ Una OTA no puede añadir módulos nativos. Si hace falta APK nueva, el aviso abr
 ## Requisitos
 
 - Node.js 20 o superior
-- Teléfono Android en la misma red que el NAS cuando dejes la biblioteca de ejemplo
+- Teléfono Android; el NAS es opcional. Solo necesitas la misma LAN cuando uses sus archivos.
 - Cuenta Expo solo si vas a construir la APK con EAS
 
 ## Desarrollo
@@ -57,7 +59,7 @@ npm install
 npx expo start
 ```
 
-En Windows / PowerShell el flujo es el mismo. La fuente por defecto del repo apunta a una carpeta compartida típica; en Ajustes puedes cambiar a Navidrome, carpeta local o **Biblioteca de ejemplo**.
+En Windows / PowerShell el flujo es el mismo. La primera apertura permite elegir teléfono o NAS. Puedes cambiar la fuente de cada servicio en Ajustes.
 
 ```bash
 npm run typecheck

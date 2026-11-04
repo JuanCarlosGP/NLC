@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { servicePreferences as AsyncStorage } from "@/lib/service-backup/preferences";
 import type { Track } from "@/lib/nas/types";
 import { isPodcastTrack } from "@/lib/nas/webdav";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
@@ -127,3 +127,5 @@ export async function syncArtworkFromPlaylists(playlists: ImportedPlaylist[]): P
   }
   await rememberTrackArtwork(entries);
 }
+
+export async function reloadTrackArtworkCache() { loaded = false; return hydrateTrackArtworkCache(); }

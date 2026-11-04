@@ -1,3 +1,4 @@
+import { usesNas } from "@/lib/settings/service-source";
 import { useEffect, useState } from "react";
 import { clearLocalLibrary } from "@/lib/db/catalog";
 import { t } from "@/lib/i18n/runtime";
@@ -36,7 +37,7 @@ export function useNasSettings() {
   const [focusConnected, setFocusConnected] = useState(cachedFocusConnected);
 
   useEffect(() => {
-    if (settings.sourceKind !== "webdav") {
+    if ((!usesNas(settings, "music") && !usesNas(settings, "podcast")) || settings.sourceKind === "mock") {
       cachedShareConnected = false;
       setConnected(false);
       return;
@@ -52,6 +53,7 @@ export function useNasSettings() {
       cancelled = true;
     };
   }, [
+    settings.serviceSources,
     password,
     settings.host,
     settings.port,
@@ -67,6 +69,7 @@ export function useNasSettings() {
     void (async () => {
       try {
         const conn = videoSourceSettings(settings);
+        if (!usesNas(settings, "video")) return;
         if (!conn.host.trim() || !conn.username.trim() || !conn.sharePath.trim() || !password) {
           cachedVideoConnected = false;
           if (!cancelled) setVideoConnected(false);
@@ -85,6 +88,7 @@ export function useNasSettings() {
       cancelled = true;
     };
   }, [
+    settings.serviceSources,
     password,
     settings.videoHost,
     settings.videoPort,
@@ -101,6 +105,7 @@ export function useNasSettings() {
     void (async () => {
       try {
         const conn = wealthSourceSettings(settings);
+        if (!usesNas(settings, "wealth")) return;
         if (
           !settings.wealthSharePath.trim() ||
           !conn.host.trim() ||
@@ -124,6 +129,7 @@ export function useNasSettings() {
       cancelled = true;
     };
   }, [
+    settings.serviceSources,
     password,
     settings.host,
     settings.port,
@@ -138,6 +144,7 @@ export function useNasSettings() {
     void (async () => {
       try {
         const conn = focusSourceSettings(settings);
+        if (!usesNas(settings, "focus")) return;
         if (
           !settings.focusSharePath.trim() ||
           !conn.host.trim() ||
@@ -161,6 +168,7 @@ export function useNasSettings() {
       cancelled = true;
     };
   }, [
+    settings.serviceSources,
     password,
     settings.host,
     settings.port,
@@ -439,7 +447,9 @@ export function useNasSettings() {
       const videoChanged = next.videoLocalFolderUri !== ctx.settings.videoLocalFolderUri;
       const wealthChanged = next.wealthLocalFolderUri !== ctx.settings.wealthLocalFolderUri;
       const focusChanged = next.focusLocalFolderUri !== ctx.settings.focusLocalFolderUri;
+      const healthChanged = next.healthLocalFolderUri !== ctx.settings.healthLocalFolderUri;
       await ctx.persist(next);
+      if (healthChanged) { setFeedback({ text: t("serviceBackup.folderSaved"), color: colors.ok }); return; }
 
       if (focusChanged && !musicChanged && !podcastChanged && !videoChanged && !wealthChanged) {
         if (!next.focusLocalFolderUri) {
@@ -536,6 +546,7 @@ export function useNasSettings() {
   }
 
   return {
+    setFeedback,
     ...ctx,
     feedback,
     busy,

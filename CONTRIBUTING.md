@@ -13,7 +13,7 @@ Gracias por interesarte en NLC. El código es público para usarlo en casa, estu
 - Node.js 20 o superior
 - npm
 - Windows, macOS o Linux
-- Un teléfono Android en la misma LAN que el NAS, o la **Biblioteca de ejemplo** para UI sin hardware
+- Un teléfono Android con carpetas locales, un NAS opcional en la misma LAN, o un emulador para QA
 
 ```bash
 git clone https://github.com/JuanCarlosGP/NLC.git

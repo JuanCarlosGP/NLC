@@ -1,3 +1,5 @@
+import { serviceImportEpoch } from "@/lib/service-backup/epochs";
+import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { t } from "@/lib/i18n/runtime";
 import { joinPath } from "@/lib/nas/webdav";
 import { getWebDavText, putWebDavText } from "@/lib/nas/webdav-source";
@@ -34,12 +36,8 @@ function focusDavPath(settings: NasSettings): string {
 
 async function dumpFocus(): Promise<FocusDump> {
   const [{ projects, tasks }, reminders] = await Promise.all([dumpProductivity(), listReminders()]);
-  const updatedAt = Math.max(
-    0,
-    ...projects.map((item) => item.createdAt),
-    ...tasks.map((item) => Math.max(item.createdAt, item.updatedAt)),
-    ...reminders.map((item) => Math.max(item.createdAt, item.updatedAt)),
-  );
+  let updatedAt = await serviceImportEpoch("focus");
+  for (const rows of [projects, tasks, reminders]) for (const row of rows) updatedAt = Math.max(updatedAt, row.createdAt, "updatedAt" in row ? row.updatedAt : 0);
   return { version: 1, updatedAt, projects, tasks, reminders };
 }
 
@@ -50,7 +48,7 @@ async function replaceFocus(dump: FocusDump): Promise<void> {
 }
 
 async function readNasFocus(settings: NasSettings, password: string): Promise<FocusDump | null> {
-  if (!password || !settings.focusSharePath.trim()) return null;
+  if (!usesNas(settings, "focus") || !password || !settings.focusSharePath.trim()) return null;
   try {
     const raw = await getWebDavText(focusSourceSettings(settings), password, focusDavPath(settings));
     return parseFocusDump(raw);
@@ -60,7 +58,7 @@ async function readNasFocus(settings: NasSettings, password: string): Promise<Fo
 }
 
 async function writeNasFocus(settings: NasSettings, password: string, dump: FocusDump): Promise<void> {
-  if (!password || !settings.focusSharePath.trim()) return;
+  if (!usesNas(settings, "focus") || !password || !settings.focusSharePath.trim()) return;
   await putWebDavText(
     focusSourceSettings(settings),
     password,
@@ -83,7 +81,7 @@ function isLocalEmpty(dump: FocusDump): boolean {
 export async function pullFocusFromSources(settings: NasSettings, password: string): Promise<boolean> {
   const local = await dumpFocus();
   const remoteNas = await readNasFocus(settings, password);
-  const remoteFolder = settings.focusLocalFolderUri
+  const remoteFolder = usesLocal(settings, "focus") && settings.focusLocalFolderUri
     ? await readLocalFocusFile(settings.focusLocalFolderUri)
     : null;
   const incoming = pickNewer(remoteNas, remoteFolder);
@@ -96,10 +94,10 @@ export async function pullFocusFromSources(settings: NasSettings, password: stri
 export async function pushFocusToSources(settings: NasSettings, password: string): Promise<string | null> {
   const dump = { ...(await dumpFocus()), updatedAt: Date.now() };
   const writes: Promise<void>[] = [];
-  if (settings.focusLocalFolderUri) {
+  if (usesLocal(settings, "focus") && settings.focusLocalFolderUri) {
     writes.push(writeLocalFocusFile(settings.focusLocalFolderUri, dump));
   }
-  if (settings.focusSharePath.trim() && password) {
+  if (usesNas(settings, "focus") && settings.focusSharePath.trim() && password) {
     writes.push(writeNasFocus(settings, password, dump));
   }
   if (!writes.length) return null;

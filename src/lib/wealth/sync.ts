@@ -1,3 +1,4 @@
+import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { t } from "@/lib/i18n/runtime";
 import { joinPath } from "@/lib/nas/webdav";
 import { getWebDavText, putWebDavText } from "@/lib/nas/webdav-source";
@@ -27,7 +28,7 @@ function wealthDavPath(settings: NasSettings): string {
 }
 
 async function readNasWealth(settings: NasSettings, password: string): Promise<WealthDump | null> {
-  if (!password || !settings.wealthSharePath.trim()) return null;
+  if (!usesNas(settings, "wealth") || !password || !settings.wealthSharePath.trim()) return null;
   try {
     const raw = await getWebDavText(wealthSourceSettings(settings), password, wealthDavPath(settings));
     return parseWealthDump(raw);
@@ -37,7 +38,7 @@ async function readNasWealth(settings: NasSettings, password: string): Promise<W
 }
 
 async function writeNasWealth(settings: NasSettings, password: string, dump: WealthDump): Promise<void> {
-  if (!password || !settings.wealthSharePath.trim()) return;
+  if (!usesNas(settings, "wealth") || !password || !settings.wealthSharePath.trim()) return;
   await putWebDavText(
     wealthSourceSettings(settings),
     password,
@@ -55,7 +56,7 @@ function pickNewer(a: WealthDump | null, b: WealthDump | null): WealthDump | nul
 export async function pullWealthFromSources(settings: NasSettings, password: string): Promise<boolean> {
   const local = await dumpWealth();
   const remoteNas = await readNasWealth(settings, password);
-  const remoteFolder = settings.wealthLocalFolderUri
+  const remoteFolder = usesLocal(settings, "wealth") && settings.wealthLocalFolderUri
     ? await readLocalWealthFile(settings.wealthLocalFolderUri)
     : null;
   const incoming = pickNewer(remoteNas, remoteFolder);
@@ -74,10 +75,10 @@ export async function pullWealthFromSources(settings: NasSettings, password: str
 export async function pushWealthToSources(settings: NasSettings, password: string): Promise<string | null> {
   const dump = { ...(await dumpWealth()), updatedAt: Date.now() };
   const writes: Promise<void>[] = [];
-  if (settings.wealthLocalFolderUri) {
+  if (usesLocal(settings, "wealth") && settings.wealthLocalFolderUri) {
     writes.push(writeLocalWealthFile(settings.wealthLocalFolderUri, dump));
   }
-  if (settings.wealthSharePath.trim() && password) {
+  if (usesNas(settings, "wealth") && settings.wealthSharePath.trim() && password) {
     writes.push(writeNasWealth(settings, password, dump));
   }
   if (!writes.length) return null;

@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { servicePreferences as AsyncStorage } from "@/lib/service-backup/preferences";
 import { encodeVideoPath } from "@/lib/video/catalog";
 import { seriesFromPath } from "@/lib/video/browse";
 import type { VideoActionsTarget } from "@/lib/video/video-actions-context";
@@ -85,3 +85,11 @@ export async function toggleVideoFavorite(show: VideoFavorite): Promise<boolean>
   await persist();
   return !exists;
 }
+
+export async function replaceVideoFavorites(rows: VideoFavorite[]) {
+  const previous = await loadVideoFavorites();
+  const merged = [...rows, ...previous.filter(row => !rows.some(incoming => incoming.path === row.path))];
+  await AsyncStorage.setItem(KEY, JSON.stringify(merged)); memory = merged; loaded = true;
+}
+
+export async function reloadVideoFavorites() { loaded = false; return loadVideoFavorites(); }

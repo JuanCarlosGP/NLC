@@ -1,3 +1,4 @@
+import { localFolder, withLocalFolder } from "@/lib/settings/service-source";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState } from "react";
@@ -36,6 +37,11 @@ const FOCUS_HELP_KEYS = [
   { title: "localFolder.nas", body: "localFolder.nasBody" },
 ] as const;
 
+const HEALTH_HELP_KEYS = [
+  { title: "localSetup.phone", body: "localSetup.healthDataHint" },
+  { title: "serviceBackup.title", body: "localSetup.healthCopyHint" },
+] as const;
+
 const VIDEO_HELP_KEYS = [
   { title: "localFolder.series", body: "localFolder.seriesBody" },
   { title: "localFolder.movies", body: "localFolder.moviesBody" },
@@ -57,41 +63,20 @@ export function LocalFolderSheet({
   applyLocalFolder: (next: NasSettings) => Promise<void>;
   busy: boolean;
   feedback: SettingsFeedback | null;
-  variant?: "music" | "podcast" | "video" | "wealth" | "focus";
+  variant?: "music" | "podcast" | "video" | "wealth" | "focus" | "health";
 }) {
   useThemeId();
   const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
-  const uri =
-    variant === "video"
-      ? settings.videoLocalFolderUri
-      : variant === "podcast"
-        ? settings.podcastLocalFolderUri
-        : variant === "wealth"
-          ? settings.wealthLocalFolderUri
-          : variant === "focus"
-            ? settings.focusLocalFolderUri
-            : settings.localFolderUri;
-  const storedName =
-    variant === "video"
-      ? settings.videoLocalFolderName
-      : variant === "podcast"
-        ? settings.podcastLocalFolderName
-        : variant === "wealth"
-          ? settings.wealthLocalFolderName
-          : variant === "focus"
-            ? settings.focusLocalFolderName
-            : settings.localFolderName;
+  const folder = localFolder(settings, variant);
+  const uri = folder.uri;
+  const storedName = folder.name;
   const name = folderDisplayName(uri, storedName);
   const hasFolder = Boolean(uri);
 
   function withFolder(nextUri: string, nextName: string): NasSettings {
-    if (variant === "video") return { ...settings, videoLocalFolderUri: nextUri, videoLocalFolderName: nextName };
-    if (variant === "podcast") return { ...settings, podcastLocalFolderUri: nextUri, podcastLocalFolderName: nextName };
-    if (variant === "wealth") return { ...settings, wealthLocalFolderUri: nextUri, wealthLocalFolderName: nextName };
-    if (variant === "focus") return { ...settings, focusLocalFolderUri: nextUri, focusLocalFolderName: nextName };
-    return { ...settings, localFolderUri: nextUri, localFolderName: nextName };
+    return withLocalFolder(settings, variant, nextUri, nextName);
   }
 
   async function choose() {
@@ -140,14 +125,14 @@ export function LocalFolderSheet({
 
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>
-            {variant === "wealth" || variant === "focus" ? t("localFolder.file") : t("localFolder.library")}
+            {variant === "wealth" || variant === "focus" || variant === "health" ? t("localSetup.dataFolder") : t("localFolder.library")}
           </Text>
           <View style={styles.card}>
             <View style={styles.cardBody}>
               <Text style={styles.pathLabel}>{t("localFolder.folder")}</Text>
               <Text style={styles.pathValue}>{hasFolder ? name : t("localFolder.none")}</Text>
               <Text style={styles.hint}>
-                {variant === "wealth"
+                {variant === "health" ? t("localSetup.healthFolderHint") : variant === "wealth"
                   ? t("localFolder.wealthFileHint")
                   : variant === "focus"
                     ? t("localFolder.focusFileHint")
@@ -202,12 +187,12 @@ function LocalFolderHelpDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  variant?: "music" | "podcast" | "video" | "wealth" | "focus";
+  variant?: "music" | "podcast" | "video" | "wealth" | "focus" | "health";
 }) {
   useThemeId();
   const { t } = useI18n();
   const stepKeys =
-    variant === "video"
+    variant === "health" ? HEALTH_HELP_KEYS : variant === "video"
       ? VIDEO_HELP_KEYS
       : variant === "podcast"
         ? PODCAST_HELP_KEYS

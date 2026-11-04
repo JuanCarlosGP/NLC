@@ -85,9 +85,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     async (next?: NasSettings, nextPassword?: string) => {
       const resolvedSettings = next ?? settings;
       const resolvedPassword = nextPassword !== undefined ? nextPassword : password;
+      await Promise.all([saveNasSettings(resolvedSettings), saveNasPassword(resolvedPassword)]);
       if (next) setSettings(next);
       if (nextPassword !== undefined) setPassword(nextPassword);
-      await Promise.all([saveNasSettings(resolvedSettings), saveNasPassword(resolvedPassword)]);
       setSourceKey((value) => value + 1);
     },
     [settings, password],
@@ -99,7 +99,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const skipOnboarding = useCallback(async () => {
     try {
-      if (!password.trim() && looksLikeFactoryNas(settings)) {
+      if (!isClearlyConfiguredNas(settings, password) && looksLikeFactoryNas(settings)) {
         setSettings(UNSET_NAS_SETTINGS);
         setPassword("");
         await Promise.all([saveNasSettings(UNSET_NAS_SETTINGS), saveNasPassword("")]);
@@ -114,13 +114,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const completeOnboarding = useCallback(
     async (next: NasSettings, nextPassword: string) => {
-      try {
-        await persist(next, nextPassword);
-        reloadSource();
-        await saveOnboardingComplete();
-      } finally {
-        setOnboardingNeeded(false);
-      }
+      await persist(next, nextPassword);
+      reloadSource();
+      await saveOnboardingComplete();
+      setOnboardingNeeded(false);
     },
     [persist, reloadSource],
   );

@@ -1,8 +1,8 @@
 {
   "name": "nlc",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "private": true,
-  "description": "Reproductor Android personal para la biblioteca de un NAS (música, podcasts, vídeo, foco y patrimonio).",
+  "description": "Aplicación Android personal con bibliotecas locales o NAS, tareas, finanzas y salud.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "JuanCarlosGP",
   "homepage": "https://github.com/JuanCarlosGP/NLC#readme",
@@ -56,7 +56,8 @@
     "integrations": "node --env-file-if-exists=.env.integrations.local scripts/integrations/server.mjs",
     "test:integrations": "node --test scripts/test-integrations.cjs",
     "test:appearance": "node --test scripts/test-appearance.cjs",
-    "test:mercury-mobile": "node --test scripts/test-mercury-mobile.cjs"
+    "test:mercury-mobile": "node --test scripts/test-mercury-mobile.cjs",
+    "test:service-backup": "node --test scripts/test-service-backup.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",

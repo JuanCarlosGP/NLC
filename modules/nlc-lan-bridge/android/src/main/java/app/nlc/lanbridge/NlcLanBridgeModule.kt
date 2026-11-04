@@ -23,15 +23,44 @@ class PendingStream(
 }
 
 class NlcLanBridgeModule : Module() {
+  private class ArchiveAuth(val job: String, val latch: CountDownLatch = CountDownLatch(1)) { @Volatile var headers: String? = null }
+  private val archiveAuth = ConcurrentHashMap<String, ArchiveAuth>()
+  private fun requestArchiveAuth(job: String, uri: String, retry: Boolean): org.json.JSONObject {
+    val id = java.util.UUID.randomUUID().toString(); val pending = ArchiveAuth(job); archiveAuth[id] = pending
+    try {
+      sendEvent("onServiceArchiveAuth", mapOf("id" to id, "job" to job, "uri" to uri, "retry" to retry))
+      if (!pending.latch.await(20, TimeUnit.SECONDS)) throw java.io.IOException("sourceUnreadable")
+      return org.json.JSONObject(pending.headers ?: throw java.io.IOException("sourceUnreadable"))
+    } finally { archiveAuth.remove(id) }
+  }
   override fun definition() = ModuleDefinition {
     Name("NlcLanBridge")
-    Events("onBridgeRequest", "onBridgeUnlinked", "onBridgeClaimed", "onDownloadWatchFinished")
+    Events("onBridgeRequest", "onBridgeUnlinked", "onBridgeClaimed", "onDownloadWatchFinished", "onServiceArchiveProgress", "onServiceArchiveAuth")
+
+    Function("cancelServiceArchive") { job: String -> ServiceArchive.cancel(job); archiveAuth.values.filter { it.job == job }.forEach { it.latch.countDown() } }
+    Function("resolveServiceArchiveAuth") { id: String, headers: String -> archiveAuth[id]?.let { it.headers = headers; it.latch.countDown() } }
+    AsyncFunction("listServiceFolder") { uri: String ->
+      ServiceArchive.list(appContext.reactContext ?: error("storage"), uri)
+    }
+    AsyncFunction("exportServiceArchive") { plan: String ->
+      val ctx = appContext.reactContext ?: error("storage")
+      ServiceArchive.export(ctx, plan, { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files)) }, { job, uri, retry -> requestArchiveAuth(job, uri, retry) })
+    }
+    AsyncFunction("prepareServiceArchive") { uri: String, job: String ->
+      ServiceArchive.prepare(appContext.reactContext ?: error("storage"), uri, job) { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files)) }
+    }
+    AsyncFunction("commitServiceFiles") { id: String, destination: String, job: String ->
+      ServiceArchive.commit(appContext.reactContext ?: error("storage"), id, destination, job) { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files)) }
+    }
+    AsyncFunction("discardServiceStage") { id: String -> ServiceArchive.discard(appContext.reactContext ?: error("storage"), id) }
 
     OnCreate {
       instance = this@NlcLanBridgeModule
     }
 
     OnDestroy {
+      archiveAuth.values.forEach { it.latch.countDown() }
+      archiveAuth.clear()
       if (instance === this@NlcLanBridgeModule) instance = null
       LanBridgeServer.stop()
     }

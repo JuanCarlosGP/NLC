@@ -1,3 +1,4 @@
+import { onServiceImport } from "@/lib/service-backup/events";
 import { t } from "@/lib/i18n/runtime";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
@@ -145,6 +146,8 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
     });
     return () => sub.remove();
   }, [syncFromSources]);
+
+  useEffect(() => onServiceImport((service, next) => { if (service === "music") void reloadPlaylists().then(() => pushPlaylistsToSources(next, passwordRef.current)).catch(() => {}); }), [reloadPlaylists]);
 
   useEffect(() => onPlaylistStoreChanged(() => {
     void reloadPlaylists();

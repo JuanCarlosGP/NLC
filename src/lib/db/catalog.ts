@@ -6,6 +6,8 @@ import { isPodcastAlbum, isPodcastTrack, isSongsAlbum, isSongsFolderName } from 
 import type { WebDavIndex } from "@/lib/nas/webdav";
 import type { ImportedPlaylist, ImportedTrack } from "@/lib/spotify/types";
 
+const MANAGED_DOWNLOADS = "id NOT LIKE 'local:%' AND id NOT LIKE 'localpod:%' AND id NOT LIKE '/local-video/%'";
+
 export type OfflineStatus = "none" | "downloading" | "ready" | "error" | "skipped";
 export type OfflineKind = "music" | "podcast" | "video";
 
@@ -239,10 +241,22 @@ export async function upsertLocalLibrary(
   index: WebDavIndex,
   locals: Map<string, { uri: string; bytes: number }>,
   prefix = "local:",
+  preserveMissing = false,
 ): Promise<void> {
   const db = await ready();
   const seen = new Set(index.tracks.map((track) => track.id));
   await runInTransaction(db, async () => {
+    // A scan started before a source change must not reinsert media from the old folder.
+    if (/^local(?:pod)?:.+/.test(prefix)) {
+      const stored = await db.getFirstAsync<{ value: string }>("SELECT value FROM meta WHERE key = 'nas_settings'");
+      if (stored) {
+        const settings = JSON.parse(stored.value);
+        const podcast = prefix.startsWith("localpod:");
+        const service = podcast ? "podcast" : "music";
+        const folder = podcast ? settings.podcastLocalFolderUri : settings.localFolderUri;
+        if (settings.serviceSources?.[service] === "nas" || prefix !== `${podcast ? "localpod" : "local"}:${folder ?? ""}`) return;
+      }
+    }
     for (const artist of index.artists) {
       await db.runAsync(
         `INSERT INTO artists (id, name, album_count, cover_id) VALUES (?, ?, ?, ?)
@@ -278,9 +292,9 @@ export async function upsertLocalLibrary(
           content_type, cover_id, artwork_url, kind, on_nas, nas_bytes, local_uri, local_bytes, offline_status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 'ready')
         ON CONFLICT(id) DO UPDATE SET
-          title = excluded.title, album_id = excluded.album_id, album_name = excluded.album_name,
-          artist_id = excluded.artist_id, artist_name = excluded.artist_name, kind = excluded.kind,
-          on_nas = 1, local_uri = excluded.local_uri, local_bytes = excluded.local_bytes, offline_status = 'ready'`,
+          on_nas = 1, local_uri = excluded.local_uri, local_bytes = excluded.local_bytes,
+          cover_id = COALESCE(tracks.cover_id, excluded.cover_id), artwork_url = COALESCE(tracks.artwork_url, excluded.artwork_url),
+          offline_status = 'ready' `,
         track.id,
         track.title,
         track.albumId,
@@ -299,10 +313,13 @@ export async function upsertLocalLibrary(
         local?.bytes ?? 0,
       );
     }
-    const previous = await db.getAllAsync<{ id: string }>("SELECT id FROM tracks WHERE id LIKE ?", `${prefix}%`);
-    for (const row of previous) {
-      if (seen.has(row.id)) continue;
-      await db.runAsync("DELETE FROM tracks WHERE id = ?", row.id);
+    if (!preserveMissing) {
+      const escaped = prefix.replace(/[\\%_]/g, "\\$&");
+      const previous = await db.getAllAsync<{ id: string }>("SELECT id FROM tracks WHERE id LIKE ? ESCAPE '\\'", `${escaped}%`);
+      for (const row of previous) {
+        if (seen.has(row.id)) continue;
+        await db.runAsync("DELETE FROM tracks WHERE id = ?", row.id);
+      }
     }
     await db.runAsync("DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)");
     await db.runAsync("DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM tracks)");
@@ -747,7 +764,7 @@ export async function getOfflineSummary(): Promise<{
       SUM(CASE WHEN offline_status = 'ready' THEN COALESCE(local_bytes, 0) ELSE 0 END) as bytes,
       SUM(CASE WHEN on_nas = 1 AND offline_status != 'ready' THEN 1 ELSE 0 END) as pending
      FROM tracks
-     WHERE kind != 'video'`,
+     WHERE kind != 'video' AND ${MANAGED_DOWNLOADS}`,
   );
   return {
     ready: row?.ready ?? 0,
@@ -760,9 +777,9 @@ export async function getOfflineSummary(): Promise<{
 export async function getOfflineInventory(): Promise<{ ready: OfflineItem[]; pending: OfflineItem[] }> {
   const db = await ready();
   const [readyRows, pendingRows] = await Promise.all([
-    db.getAllAsync<TrackRow>("SELECT * FROM tracks WHERE offline_status = 'ready' ORDER BY title COLLATE NOCASE"),
+    db.getAllAsync<TrackRow>(`SELECT * FROM tracks WHERE offline_status = 'ready' AND ${MANAGED_DOWNLOADS} ORDER BY title COLLATE NOCASE`),
     db.getAllAsync<TrackRow>(
-      "SELECT * FROM tracks WHERE on_nas = 1 AND offline_status != 'ready' ORDER BY title COLLATE NOCASE",
+      `SELECT * FROM tracks WHERE on_nas = 1 AND offline_status != 'ready' AND ${MANAGED_DOWNLOADS} ORDER BY title COLLATE NOCASE`,
     ),
   ]);
   return { ready: readyRows.map(rowToOfflineItem), pending: pendingRows.map(rowToOfflineItem) };
@@ -773,22 +790,22 @@ export async function clearLocalCopies(kind?: OfflineKind): Promise<string[]> {
   const db = await ready();
   const rows = await db.getAllAsync<{ local_uri: string }>(
     kind
-      ? "SELECT local_uri FROM tracks WHERE local_uri IS NOT NULL AND kind = ?"
-      : "SELECT local_uri FROM tracks WHERE local_uri IS NOT NULL AND kind != 'video'",
+      ? `SELECT local_uri FROM tracks WHERE local_uri IS NOT NULL AND kind = ? AND ${MANAGED_DOWNLOADS}`
+      : `SELECT local_uri FROM tracks WHERE local_uri IS NOT NULL AND kind != 'video' AND ${MANAGED_DOWNLOADS}`,
     ...(kind ? [kind] : []),
   );
   if (kind) {
     await db.runAsync(
-      "UPDATE tracks SET local_uri = NULL, local_bytes = NULL, offline_status = 'skipped' WHERE local_uri IS NOT NULL AND kind = ?",
+      `UPDATE tracks SET local_uri = NULL, local_bytes = NULL, offline_status = 'skipped' WHERE local_uri IS NOT NULL AND kind = ? AND ${MANAGED_DOWNLOADS}`,
       kind,
     );
   } else {
     await db.runAsync(
-      "UPDATE tracks SET local_uri = NULL, local_bytes = NULL, offline_status = 'skipped' WHERE local_uri IS NOT NULL AND kind != 'video'",
+      `UPDATE tracks SET local_uri = NULL, local_bytes = NULL, offline_status = 'skipped' WHERE local_uri IS NOT NULL AND kind != 'video' AND ${MANAGED_DOWNLOADS}`,
     );
   }
   await db.runAsync(
-    "DELETE FROM tracks WHERE on_nas = 0 AND (local_uri IS NULL OR offline_status != 'ready')",
+    `DELETE FROM tracks WHERE on_nas = 0 AND (local_uri IS NULL OR offline_status != 'ready') AND ${MANAGED_DOWNLOADS}`,
   );
   await db.runAsync("DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)");
   await db.runAsync("DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM tracks)");
@@ -799,6 +816,7 @@ export async function clearLocalCopies(kind?: OfflineKind): Promise<string[]> {
 }
 
 export async function clearLocalCopy(trackId: string): Promise<string | null> {
+  if (/^(local:|localpod:|\/local-video\/)/.test(trackId)) return null;
   const db = await ready();
   const row = await db.getFirstAsync<{ local_uri: string | null; on_nas: number }>(
     "SELECT local_uri, on_nas FROM tracks WHERE id = ?",

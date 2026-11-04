@@ -1,6 +1,7 @@
+import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { servicePreferences as AsyncStorage } from "@/lib/service-backup/preferences";
 import { localDemoEnabled } from "@/lib/dev/local-demo";
 import { useMobileMercury } from "./use-mobile-mercury";
 import type { MobileMercuryConnection } from "./mobile-types";
@@ -43,6 +44,12 @@ export function IntegrationsProvider({children}:{children:ReactNode}) {
       const stored=await AsyncStorage.getItem(selectionKey);if(stored){const parsed=JSON.parse(stored);if(["live","demo"].includes(parsed.whoop)&&["live","demo"].includes(parsed.mercury)&&!cancelled)setSelection(parsed);}
     }catch{if(!cancelled){loadFailed.current=true;setError("storage");}}finally{if(!cancelled)setReady(true);}
   })();return()=>{cancelled=true;};},[]);
+  useEffect(() => onServiceImport((service) => { if (service !== "health" && service !== "wealth") return; void (async () => {
+    const result: Copies = { whoop: { live: null, demo: null }, mercury: { live: null, demo: null } };
+    for (const provider of ["whoop", "mercury"] as const) for (const mode of ["live", "demo"] as const) result[provider][mode] = await cache.read(provider, mode);
+    copiesRef.current = result; setCopies(result);
+    const stored = await AsyncStorage.getItem(selectionKey); if (stored) { const value = JSON.parse(stored); if (["live", "demo"].includes(value.whoop) && ["live", "demo"].includes(value.mercury)) setSelection(value); }
+  })().catch(() => setError("storage")); }), []);
   useEffect(()=>{if(!ready||!bridgeEnabled)return;void refresh();const timer=setInterval(()=>{if(AppState.currentState==="active")void refresh();},30000);const event=AppState.addEventListener("change",state=>{if(state==="active")void refresh();});return()=>{clearInterval(timer);event.remove();};},[ready,refresh,bridgeEnabled]);
   async function run(provider:Provider,action:"sync"|"example") {if(locked.current)throw new Error("busy");locked.current=true;setBusy(provider);setError(null);try{const snapshot=await bridgeSnapshot(provider,action);if(!snapshot)throw new Error("invalid");setOnline(true);return snapshot;}finally{locked.current=false;setBusy(null);void refresh();}}
   async function clear(provider:Provider,mode:Mode){await cache.clear(provider,mode);setError(null);setCopies(previous=>({...previous,[provider]:{...previous[provider],[mode]:null}}));}

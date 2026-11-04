@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { servicePreferences as AsyncStorage } from "@/lib/service-backup/preferences";
 
 const KEY = "nlc.video.watch.v2";
 const LEGACY_KEY = "nlc.video.watch.v1";
@@ -189,4 +189,16 @@ export async function flushWatchProgress(positionSec?: number, durationSec?: num
     watchedAt: Date.now(),
   });
   await persistAll();
+}
+
+export async function replaceWatchHistory(rows: VideoWatchEntry[]) {
+  if (writeTimer) { clearTimeout(writeTimer); writeTimer = null; }
+  const previous = await loadWatchHistory();
+  const merged = [...rows, ...previous.filter(row => !rows.some(incoming => incoming.seriesId === row.seriesId))].slice(0, MAX_SERIES);
+  await AsyncStorage.setItem(KEY, JSON.stringify(merged)); memory = merged; loaded = true; activePath = null;
+}
+
+export async function reloadWatchHistory() {
+  if (writeTimer) { clearTimeout(writeTimer); writeTimer = null; }
+  loaded = false; activePath = null; return loadWatchHistory();
 }

@@ -1,3 +1,4 @@
+import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
 import { useSettings } from "@/lib/settings/settings-context";
@@ -157,6 +158,8 @@ export function WealthProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, []);
 
+  useEffect(() => onServiceImport((service, next) => { if (service === "wealth") void refresh().then(() => pushWealthToSources(next, passwordRef.current)).catch(() => {}); }), [refresh]);
+
   useEffect(() => onWealthStoreChanged(() => {
     void refresh();
   }), [refresh]);
@@ -188,7 +191,7 @@ export function WealthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [password, refresh, settings.wealthLocalFolderUri, settings.wealthSharePath, settingsReady]);
+  }, [settings.serviceSources, password, refresh, settings.wealthLocalFolderUri, settings.wealthSharePath, settingsReady]);
 
   const liveAccounts = useMemo(() => accounts.filter((item) => !item.archived), [accounts]);
   const liveAssets = useMemo(

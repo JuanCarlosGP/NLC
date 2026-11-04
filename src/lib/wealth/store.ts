@@ -1,3 +1,4 @@
+import { serviceImportEpoch } from "@/lib/service-backup/epochs";
 import { getDb } from "@/lib/db/client";
 import { t } from "@/lib/i18n/runtime";
 import {
@@ -774,14 +775,8 @@ export async function dumpWealth(): Promise<WealthDump> {
     listTx(),
     listGoals({ includeArchived: true }),
   ]);
-  const updatedAt = Math.max(
-    0,
-    ...accounts.map((item) => item.createdAt),
-    ...assets.map((item) => Math.max(item.createdAt, item.updatedAt)),
-    ...quotes.map((item) => Math.max(item.bookedAt, item.createdAt)),
-    ...txs.map((item) => Math.max(item.bookedAt, item.createdAt)),
-    ...goals.map((item) => Math.max(item.createdAt, item.updatedAt)),
-  );
+  let updatedAt = await serviceImportEpoch("wealth");
+  for (const rows of [accounts, assets, quotes, txs, goals]) for (const row of rows) updatedAt = Math.max(updatedAt, row.createdAt, "updatedAt" in row ? row.updatedAt : 0, "bookedAt" in row ? row.bookedAt : 0);
   return { version: 1, updatedAt, accounts, assets, quotes, txs, goals };
 }
 

@@ -260,7 +260,8 @@ export default function WatchScreen() {
 
   const initialPath = useMemo(() => {
     if (!pathSegments.length) return "";
-    return `/${pathSegments.map((part) => decodeURIComponent(part)).join("/")}`;
+    // Expo Router already decodes route params. A literal % in a local filename must remain intact.
+    return `/${pathSegments.join("/")}`;
   }, [pathSegments]);
 
   const arcPath = useMemo(() => {

@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getDb } from "@/lib/db/client";
 import type { MusicSourceKind } from "@/lib/nas/types";
@@ -10,7 +11,13 @@ const PASSWORD_KEY = "nlc.nas.password";
 const ONBOARDING_KEY = "nlc.onboarding.v1";
 const ONBOARDING_META_KEY = "onboarding_v1";
 
+export type ServiceId = "music" | "podcast" | "video" | "focus" | "wealth" | "health";
+export type ServiceSourceMode = "local" | "nas" | "both";
 export type NasSettings = {
+  serviceSources?: Partial<Record<ServiceId, ServiceSourceMode>>;
+  healthSharePath?: string;
+  healthLocalFolderUri?: string;
+  healthLocalFolderName?: string;
   sourceKind: MusicSourceKind;
   host: string;
   port: string;
@@ -69,6 +76,7 @@ export const DEFAULT_NAS_SETTINGS: NasSettings = {
 /** First launch / skip: no factory NAS credentials in memory or storage. */
 export const UNSET_NAS_SETTINGS: NasSettings = {
   ...DEFAULT_NAS_SETTINGS,
+  sourceKind: "local",
   host: "",
   username: "",
   videoHost: "",
@@ -99,11 +107,12 @@ export function isClearlyConfiguredNas(settings: NasSettings, password: string):
     settings.podcastLocalFolderUri.trim() ||
     settings.videoLocalFolderUri.trim() ||
     settings.wealthLocalFolderUri.trim() ||
-    settings.focusLocalFolderUri.trim()
+    settings.focusLocalFolderUri.trim() ||
+    settings.healthLocalFolderUri?.trim()
   ) {
     return true;
   }
-  if (settings.sourceKind !== "webdav") return true;
+  if (settings.sourceKind === "mock" || settings.sourceKind === "opensubsonic" || Object.keys(settings.serviceSources ?? {}).length > 0) return true;
   const host = settings.host.trim();
   const user = settings.username.trim();
   const videoHost = settings.videoHost.trim();
@@ -189,8 +198,8 @@ export async function saveNasSettings(settings: NasSettings): Promise<void> {
   const raw = JSON.stringify(settings);
   try {
     await writeSqliteSettings(settings);
-  } catch {
-    // Native SQLite is the source of truth; web falls back to AsyncStorage.
+  } catch (error) {
+    if (Platform.OS !== "web") throw error;
   }
   await AsyncStorage.setItem(SETTINGS_KEY, raw);
 }
@@ -359,4 +368,11 @@ export function applyFocusSourceSettings(base: NasSettings, edited: NasSettings)
     useHttps: edited.useHttps,
     focusSharePath: edited.sharePath,
   };
+}
+
+export function healthSourceSettings(settings: NasSettings): NasSettings {
+  return { ...settings, sharePath: settings.healthSharePath?.trim() || "" };
+}
+export function applyHealthSourceSettings(base: NasSettings, edited: NasSettings): NasSettings {
+  return { ...base, host: edited.host, port: edited.port, username: edited.username, useHttps: edited.useHttps, healthSharePath: edited.sharePath };
 }

@@ -1,3 +1,4 @@
+import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { collateLocale } from "@/lib/i18n/runtime";
 import type { NasSettings } from "@/lib/settings/storage";
 import { videoSourceSettings } from "@/lib/settings/storage";
@@ -55,6 +56,7 @@ async function listFolder(
   dir: string,
   kind: VideoShow["kind"],
 ): Promise<VideoShow[]> {
+  if (!usesNas(settings, "video") || !settings.videoSharePath.trim()) return [];
   const { listDir } = createVideoClient(settings, password);
   const entries = await listDir(dir);
   const items: VideoShow[] = [];
@@ -83,7 +85,7 @@ export async function listVideoShows(settings: NasSettings, password: string): P
   const [series, movies, local] = await Promise.all([
     listFolder(settings, password, videoSeriesRoot(settings), "series").catch(() => []),
     listFolder(settings, password, videoMoviesRoot(settings), "movie").catch(() => []),
-    settings.videoLocalFolderUri
+    usesLocal(settings, "video") && settings.videoLocalFolderUri
       ? listLocalVideoShows(settings.videoLocalFolderUri)
           .then((items) =>
             items.map((item) => ({
