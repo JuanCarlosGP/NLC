@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { memo, useEffect } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { MoreVertical } from "lucide-react-native";
 import { Cover } from "@/components/ui/cover";
@@ -36,6 +38,7 @@ export const TrackRow = memo(function TrackRow({
   playlistId?: string;
   onPress: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { openTrackActions } = useTrackActions();
   const cover = useTrackArtwork(track);
@@ -88,7 +91,7 @@ export const TrackRow = memo(function TrackRow({
   );
 });
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -111,4 +114,4 @@ const styles = createStyles({
   sub: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
   time: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
   active: { color: colors.accent },
-});
+}));

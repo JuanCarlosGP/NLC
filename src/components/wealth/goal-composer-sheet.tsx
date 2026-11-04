@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -52,6 +54,7 @@ export function GoalComposerSheet({
   onOpenChange: (open: boolean) => void;
   goal?: WealthGoal | null;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet
@@ -74,6 +77,7 @@ function GoalComposerBody({
   goal: WealthGoal | null;
   onDone: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { assets, createGoal, updateGoal, deleteGoal } = useWealth();
   const accounts = useLiveAccounts();
@@ -289,7 +293,7 @@ function GoalComposerBody({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,
@@ -341,4 +345,4 @@ const styles = createStyles({
   submitText: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.accentText },
   remove: { alignItems: "center", paddingVertical: 8 },
   removeText: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.danger },
-});
+}));

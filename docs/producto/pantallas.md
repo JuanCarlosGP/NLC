@@ -21,8 +21,13 @@ y un ancho de lectura contenido. Los grupos de tarjetas aprovechan columnas
 cuando caben. Los formularios mantienen campos y acciones cómodos de pulsar;
 las fotos y los gráficos conservan sus proporciones.
 
-En componentes nuevos, usar `createStyles` de `lib/appearance/density` y sus
-ayudas de espaciado para heredar las medidas del tema. Los valores usados en
+La APK Android usa Geist Pixel por defecto, con fuente incluida y selección
+sin conexión en Ajustes → App → Apariencia. NLC clásico sigue disponible.
+La opción ocupa una fila; no tiene tarjetas de vista previa.
+
+En componentes nuevos, usar `createStyles(() => ({ ... }))` de
+`lib/appearance/density`, sus ayudas de espaciado, `useThemeId()` y los
+componentes `Text`/`TextInput` de `components/ui/themed-text`. Los valores usados en
 geometría o animaciones siguen siendo números. Classic conserva sus tamaños.
 
 ## Home (F01)

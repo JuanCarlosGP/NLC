@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { Slot } from "expo-router";
 
 export const unstable_settings = {
@@ -5,5 +6,6 @@ export const unstable_settings = {
 };
 
 export default function TabsLayout() {
+  useThemeId();
   return <Slot />;
 }

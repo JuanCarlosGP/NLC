@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { memo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Cover } from "@/components/ui/cover";
 import { useCoverUrl } from "@/hooks/use-cover-url";
 import type { Album } from "@/lib/nas/types";
@@ -19,6 +21,7 @@ export const AlbumRow = memo(function AlbumRow({
   onPress: () => void;
   onLongPress?: () => void;
 }) {
+  useThemeId();
   const nasCover = useCoverUrl(coverUri ? null : album.coverId);
   const cover = coverUri ?? nasCover;
   return (
@@ -42,7 +45,7 @@ export const AlbumRow = memo(function AlbumRow({
   );
 });
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -54,4 +57,4 @@ const styles = createStyles({
   meta: { flex: 1, gap: 2 },
   name: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
   sub: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
-});
+}));

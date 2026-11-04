@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Check, Circle, CircleDot, Star, Trash2 } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -19,6 +21,7 @@ const STATUS_ICON: Record<TaskStatus, typeof Circle> = {
 };
 
 export function TaskActionsSheet() {
+  useThemeId();
   const { t } = useI18n();
   const { open, task, setOpen } = useTaskActions();
   return (
@@ -34,6 +37,7 @@ export function TaskActionsSheet() {
 }
 
 function TaskActionsBody({ taskId, onClose }: { taskId: string; onClose: () => void }) {
+  useThemeId();
   const { t } = useI18n();
   const { tasks, projects, updateTask, deleteTask } = useProductivity();
   const task = tasks.find((item) => item.id === taskId);
@@ -134,6 +138,7 @@ function ActionRow({
   danger?: boolean;
   onPress: () => void;
 }) {
+  useThemeId();
   return (
     <Pressable
       accessibilityRole="button"
@@ -146,7 +151,7 @@ function ActionRow({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -197,4 +202,4 @@ const styles = createStyles({
     color: colors.ink,
   },
   labelDanger: { color: colors.danger },
-});
+}));

@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef, useState } from "react";
 import { Image, Platform, View, type ImageStyle } from "react-native";
@@ -24,6 +25,7 @@ function later(minMs: number, extraMs: number) {
 }
 
 export function LadybugMark() {
+  useThemeId();
   const pose = useRef<Pose>("idle");
   const step = useRef(0);
   const nextBlinkAt = useRef(later(BLINK_GAP_MIN, BLINK_GAP_EXTRA));
@@ -104,7 +106,7 @@ export function LadybugMark() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   hit: {
     width: WIN_W,
     height: WIN_H + 2,
@@ -130,7 +132,7 @@ const styles = createStyles({
     width: 256 * SHOW,
     height: 192 * SHOW,
   },
-});
+}));
 
 const pixelWeb = {
   imageRendering: "pixelated",

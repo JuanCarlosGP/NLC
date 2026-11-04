@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { PermissionsAndroid, Platform, Pressable, Text, View } from "react-native";
+import { PermissionsAndroid, Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/ui/screen";
 import { Field } from "@/components/settings/source-fields";
@@ -21,6 +23,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function DesktopBridgeScreen() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const [paste, setPaste] = useState("");
@@ -154,7 +157,7 @@ export default function DesktopBridgeScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   title: { marginBottom: 8 },
   hint: { color: colors.muted, fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, marginBottom: 20 },
   block: { gap: 12 },
@@ -170,4 +173,4 @@ const styles = createStyles({
   error: { color: colors.danger, fontFamily: fonts.sans, fontSize: 14, marginTop: 12 },
   back: { marginTop: 24, alignItems: "center", paddingVertical: 12 },
   backLabel: { color: colors.muted, fontFamily: fonts.sans, fontSize: 15 },
-});
+}));

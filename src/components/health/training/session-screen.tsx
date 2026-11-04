@@ -1,7 +1,9 @@
-import { space, textSize } from "@/lib/appearance/density";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { space, textSize, radius } from "@/lib/appearance/density";
 import { InlineHelp } from "@/components/ui/inline-help";
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { Check, Trash2 } from "lucide-react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Screen } from "@/components/ui/screen";
@@ -16,6 +18,7 @@ import { RestCard } from "./rest-card";
 import { ExerciseComposer } from "./exercise-composer";
 
 function NumberInput({ value, label, max, integer = false, disabled = false, onChange }: { value: number | null; label: string; max: number; integer?: boolean; disabled?: boolean; onChange(value: number | null): void }) {
+  useThemeId();
   const { t } = useI18n(); const [text, setText] = useState(value === null ? "" : String(value)); const [error, setError] = useState(false);
   useEffect(() => { if ((text === "" ? null : Number(text.replace(",", "."))) !== value) setText(value === null ? "" : String(value)); }, [value]);
   return <View style={{ flex: 1, minWidth: 45 }}><TextInput accessibilityLabel={label} value={text} editable={!disabled} placeholder="—" placeholderTextColor={colors.muted} keyboardType={integer ? "number-pad" : "decimal-pad"} maxLength={8}
@@ -25,10 +28,11 @@ function NumberInput({ value, label, max, integer = false, disabled = false, onC
       if (!valid || (parsed !== null && (!Number.isFinite(parsed) || parsed > max || (integer && parsed < 1)))) { setError(true); return; }
       setError(false); setText(next); onChange(parsed);
     }} style={[styles.input, { paddingHorizontal: space(5), textAlign: "center", paddingVertical: space(10), borderColor: error ? colors.danger : colors.rule }]} />
-    {error ? <Text accessibilityRole="alert" style={[styles.error, { fontSize: 11 }]}>{t("training.errors.number")}</Text> : null}
+    {error ? <Text accessibilityRole="alert" style={[styles.error, { fontSize: textSize(11) }]}>{t("training.errors.number")}</Text> : null}
   </View>;
 }
 export function TrainingSessionScreen() {
+  useThemeId();
   const { id } = useLocalSearchParams<{ id: string }>(); const router = useRouter(); const { t, locale } = useI18n();
   const { sessions, rest, ready, loadFailed, status, change, create, remove, flush, setRest } = useTraining();
   const session = sessions.find((row) => row.id === id);
@@ -108,7 +112,7 @@ export function TrainingSessionScreen() {
                   onPress={() => {
                     if (!set.reps) { setError("training.errors.sets"); return; }
                     patch({ completed: !set.completed }); if (!set.completed) void startRest(exercise);
-                  }} style={{ width: 40, minHeight: 44, borderWidth: 1, borderColor: set.completed ? colors.ok : colors.rule, borderRadius: 8, backgroundColor: set.completed ? colors.sheetHover : colors.sheetRaised, alignItems: "center", justifyContent: "center" }}>
+                  }} style={{ width: 40, minHeight: 44, borderWidth: 1, borderColor: set.completed ? colors.ok : colors.rule, borderRadius: radius(8), backgroundColor: set.completed ? colors.sheetHover : colors.sheetRaised, alignItems: "center", justifyContent: "center" }}>
                   {set.completed ? <Check size={19} color={colors.ok} /> : <Text style={type.meta}>✓</Text>}
                 </Pressable>
               </View>

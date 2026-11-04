@@ -1,11 +1,14 @@
-import { space, textSize } from "@/lib/appearance/density";
-import { Text, View } from "react-native";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { space, textSize, radius } from "@/lib/appearance/density";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useI18n } from "@/lib/i18n/context";
 import { useAppearance } from "@/lib/appearance/shared";
 import { parseAppearance } from "@/lib/appearance/themes";
 import { colors, fonts, type } from "@/lib/theme";
 
 export function AppearancePicker() {
+  useThemeId();
   const { t } = useI18n();
   const { theme, ready, error, setTheme } = useAppearance();
 
@@ -21,7 +24,7 @@ export function AppearancePicker() {
         value={theme}
         disabled={!ready}
         onChange={(event) => { void setTheme(parseAppearance(event.currentTarget.value)); }}
-        style={{ maxWidth: "60%", minWidth: 0, padding: "6px 0", border: 0, borderRadius: 0, background: colors.sheet, color: colors.muted, fontFamily: fonts.sans, fontSize: textSize(13), cursor: "pointer" }}
+        style={{ maxWidth: "60%", minWidth: 0, padding: "6px 0", border: 0, borderRadius: radius(0), background: colors.sheet, color: colors.muted, fontFamily: fonts.sans, fontSize: textSize(13), cursor: "pointer" }}
       >
         <option value="classic">{t("appearance.classic")}</option>
         <option value="geist-pixel">{t("appearance.pixel")}</option>

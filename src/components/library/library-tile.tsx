@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { memo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Cover } from "@/components/ui/cover";
 import { triggerLongPressUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
@@ -22,6 +24,7 @@ export const LibraryTile = memo(function LibraryTile({
   onPress: () => void;
   onLongPress?: () => void;
 }) {
+  useThemeId();
   return (
     <Pressable
       onPress={onPress}
@@ -49,7 +52,7 @@ export const LibraryTile = memo(function LibraryTile({
   );
 });
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   tile: { gap: 8, width: "100%" },
   meta: { gap: 2, minHeight: 38 },
   title: {
@@ -64,4 +67,4 @@ const styles = createStyles({
     lineHeight: 14,
     color: colors.muted,
   },
-});
+}));

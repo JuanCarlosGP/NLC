@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Screen } from "@/components/ui/screen";
 import { InlineHelp } from "@/components/ui/inline-help";
 import { Button, Field } from "@/components/health/training/ui";
@@ -9,6 +11,7 @@ import { mercuryBalances } from "@/lib/integrations/model";
 import { type } from "@/lib/theme";
 import { ConnectionPanel, PageHeader, Metric, Stat, Stats, dateLabel, styles } from "./shared";
 export function MercuryScreen(){
+  useThemeId();
   const ctx=useIntegrations();const{t,locale}=useI18n();const snapshot=ctx.copies.mercury[ctx.selection.mercury];const data=snapshot?.provider==="mercury"?snapshot:null;
   const[account,setAccount]=useState("");const[month,setMonth]=useState("");const[search,setSearch]=useState("");const[limit,setLimit]=useState(50);
   const money=(value:number|null)=>value===null?"—":new Intl.NumberFormat(locale,{style:"currency",currency:"USD"}).format(value);

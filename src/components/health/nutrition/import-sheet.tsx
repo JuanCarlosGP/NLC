@@ -1,7 +1,9 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { InlineHelp } from "@/components/ui/inline-help";
 import { useEffect, useRef, useState } from "react";
-import { Switch, Text, View } from "react-native";
+import { Switch, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useNutrition } from "@/lib/health/nutrition/nutrition-context";
@@ -13,6 +15,7 @@ import { colors, type } from "@/lib/theme";
 import { Button, Field, styles } from "../training/ui";
 import { nutritionError } from "./composer";
 export function NutritionImport({ open, onClose, onDone }: { open: boolean; onClose(): void; onDone(message: string, date: string): void }) {
+  useThemeId();
   const { t, locale } = useI18n(); const { entries, importDays } = useNutrition();
   const [incoming, setIncoming] = useState<ImportedDay[] | null>(null); const [name, setName] = useState(""); const [csv, setCsv] = useState(""); const [paste, setPaste] = useState(false); const [replace, setReplace] = useState(false); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const locked = useRef(false);
   useEffect(() => { if (open) { setIncoming(null); setName(""); setCsv(""); setPaste(false); setReplace(false); setError(""); } }, [open]);

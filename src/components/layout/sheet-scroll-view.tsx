@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { type ReactNode } from "react";
 import { Platform, ScrollView, type StyleProp, type ViewStyle } from "react-native";
@@ -14,6 +15,7 @@ export function SheetScrollView({
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
 }) {
+  useThemeId();
   const sheet = useBottomSheet();
   const dock = useDock();
 
@@ -29,6 +31,7 @@ export function SheetScrollView({
       keyboardShouldPersistTaps="handled"
       scrollEnabled={!sheet?.scrollLocked}
       onScroll={mergeSheetScrollProps(sheet, mergeDockOnScroll(dock))}
+      onContentSizeChange={(_width, height) => sheet?.reportContentHeight?.(height)}
       {...(Platform.OS === "web" ? ({ "data-sheet-scroll": "true" } as object) : null)}
     >
       {children}
@@ -42,6 +45,6 @@ export function SheetScrollView({
   return <GestureDetector gesture={sheet.nativeGesture}>{scroll}</GestureDetector>;
 }
 
-export const sheetScrollStyles = createStyles({
+export const sheetScrollStyles = createStyles(() => ({
   fill: { flex: 1 },
-});
+}));

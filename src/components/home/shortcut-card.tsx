@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles, responsiveBasis } from "@/lib/appearance/density";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { CalendarDays, Clapperboard, FolderKanban, Heart, Inbox, Bell, Mic, Music2 } from "lucide-react-native";
 import { Cover } from "@/components/ui/cover";
 import { useCoverUrl } from "@/hooks/use-cover-url";
@@ -31,6 +33,7 @@ export function ShortcutCard({
   onPress: () => void;
   onLongPress?: () => void;
 }) {
+  useThemeId();
   const nasCover = useCoverUrl(uri || liked || podcast || music || video || focus ? null : coverId);
   const cover = uri ?? nasCover;
 
@@ -117,7 +120,7 @@ export function ShortcutCard({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   card: {
     flexGrow: 1,
     flexBasis: responsiveBasis("47%", "shortcut-basis"),
@@ -173,4 +176,4 @@ const styles = createStyles({
     lineHeight: 17,
     color: colors.ink,
   },
-});
+}));

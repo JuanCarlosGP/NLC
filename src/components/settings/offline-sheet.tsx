@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Clapperboard, Mic, Music2, Trash2 } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -27,6 +29,7 @@ export function OfflineSheet({
   onOpenChange: (open: boolean) => void;
   lockedKind?: OfflineKind;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { progress, readyTracks, pendingTracks, start, pause, clear, remove } = useOffline();
   const [kind, setKind] = useState<OfflineKind>(lockedKind ?? "music");
@@ -268,6 +271,7 @@ function InventorySection({
   onRemove?: (item: OfflineItem) => void;
   t: (path: string, vars?: Record<string, string | number>) => string;
 }) {
+  useThemeId();
   return (
     <View style={styles.section}>
       <Text style={styles.sectionLabel}>
@@ -310,7 +314,7 @@ function InventorySection({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,
@@ -447,4 +451,4 @@ const styles = createStyles({
     paddingHorizontal: 14,
     paddingBottom: 14,
   },
-});
+}));

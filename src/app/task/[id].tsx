@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Star } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
@@ -14,6 +16,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function TaskScreen() {
+  useThemeId();
   const { t } = useI18n();
   const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
   const id = libraryParamId(rawId);
@@ -223,7 +226,7 @@ export default function TaskScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: { gap: 6, paddingTop: 8 },
   art: {
     width: 96,
@@ -319,4 +322,4 @@ const styles = createStyles({
     color: colors.danger,
   },
   overdue: { color: colors.danger },
-});
+}));

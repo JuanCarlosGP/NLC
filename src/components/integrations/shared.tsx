@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { useState, type ReactNode } from "react";
-import { Linking, Platform, Pressable, Text, View } from "react-native";
+import { Linking, Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { ArrowLeft, ArrowUpRight, Activity, Landmark } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { createStyles, densityData, space } from "@/lib/appearance/density";
@@ -12,19 +14,25 @@ import { bridgeRequest, ConnectionError } from "@/lib/integrations/client";
 import { parseSnapshot, type Provider, type Snapshot } from "@/lib/integrations/model";
 import { pickIntegrationCopy, saveIntegrationCopy } from "@/lib/integrations/io";
 import { colors, type } from "@/lib/theme";
-export const styles = createStyles({
+export const styles = createStyles(() => ({
   card:{borderWidth:1,borderColor:colors.rule,backgroundColor:colors.sheet,borderRadius:14,padding:16,gap:12},row:{flexDirection:"row",alignItems:"center",flexWrap:"wrap",gap:10},spread:{flexDirection:"row",alignItems:"center",justifyContent:"space-between",gap:10},section:{gap:12},stat:{gap:5,flexGrow:1,flexBasis:"44%",borderWidth:1,borderColor:colors.rule,padding:12},error:{...type.body,color:colors.danger},line:{borderTopWidth:1,borderColor:colors.rule,paddingTop:12,gap:6},
-});
-export function IntegrationCard({provider}:{provider:Provider}){const router=useRouter();const{t}=useI18n();const Icon=provider==="whoop"?Activity:Landmark;return <Pressable accessibilityRole="button" onPress={()=>router.push(provider==="whoop"?"/health/whoop":"/wealth/mercury")} style={[styles.card,styles.row]}><Icon size={24} color={colors.accent} strokeWidth={1.6}/><View style={{flex:1,gap:space(5)}}><Text style={type.sectionTitle}>{provider==="whoop"?"WHOOP":"Mercury"}</Text><Text style={type.meta}>{t(`integrations.${provider}Hint`)}</Text></View><ArrowUpRight color={colors.inkSoft} size={20}/></Pressable>;}
-export function PageHeader({title}:{title:string}){const router=useRouter();const{t}=useI18n();return <View style={styles.row}><Pressable accessibilityRole="button" accessibilityLabel={t("chrome.home")} onPress={()=>router.push("/")} style={{paddingVertical:space(12),paddingRight:space(6)}}><ArrowLeft color={colors.ink} size={22}/></Pressable><Text style={type.pageTitle}>{title}</Text></View>;}
-export function Stats({children}:{children:ReactNode}){return <View {...densityData("stats")} style={[styles.row,{alignItems:"stretch"}]}>{children}</View>;}
-export function Stat({label,value}:{label:string;value:string}){return <View style={styles.stat}><Text style={type.meta}>{label}</Text><Text style={type.sectionTitle}>{value}</Text></View>;}
-export function Metric({label,value}:{label:string;value:string}){return <View style={styles.spread}><Text style={type.meta}>{label}</Text><Text style={type.body}>{value}</Text></View>;}
+}));
+export function IntegrationCard({provider}:{provider:Provider}){
+  useThemeId();const router=useRouter();const{t}=useI18n();const Icon=provider==="whoop"?Activity:Landmark;return <Pressable accessibilityRole="button" onPress={()=>router.push(provider==="whoop"?"/health/whoop":"/wealth/mercury")} style={[styles.card,styles.row]}><Icon size={24} color={colors.accent} strokeWidth={1.6}/><View style={{flex:1,gap:space(5)}}><Text style={type.sectionTitle}>{provider==="whoop"?"WHOOP":"Mercury"}</Text><Text style={type.meta}>{t(`integrations.${provider}Hint`)}</Text></View><ArrowUpRight color={colors.inkSoft} size={20}/></Pressable>;}
+export function PageHeader({title}:{title:string}){
+  useThemeId();const router=useRouter();const{t}=useI18n();return <View style={styles.row}><Pressable accessibilityRole="button" accessibilityLabel={t("chrome.home")} onPress={()=>router.push("/")} style={{minWidth:44,minHeight:44,justifyContent:"center",paddingVertical:space(12),paddingRight:space(6)}}><ArrowLeft color={colors.ink} size={22}/></Pressable><Text style={type.pageTitle}>{title}</Text></View>;}
+export function Stats({children}:{children:ReactNode}){
+  useThemeId();return <View {...densityData("stats")} style={[styles.row,{alignItems:"stretch"}]}>{children}</View>;}
+export function Stat({label,value}:{label:string;value:string}){
+  useThemeId();return <View style={styles.stat}><Text style={type.meta}>{label}</Text><Text style={type.sectionTitle}>{value}</Text></View>;}
+export function Metric({label,value}:{label:string;value:string}){
+  useThemeId();return <View style={styles.spread}><Text style={type.meta}>{label}</Text><Text style={type.body}>{value}</Text></View>;}
 export function display(value:number|null|undefined,suffix="",digits=0){return value===null||value===undefined?"—":`${value.toFixed(digits)}${suffix}`;}
 export function duration(minutes:number|null|undefined){if(minutes===null||minutes===undefined)return "—";const total=Math.round(minutes);return `${Math.floor(total/60)} h ${total%60} min`;}
 export function dateLabel(value:string,locale:string){return new Date(`${value.slice(0,10)}T12:00:00Z`).toLocaleDateString(locale,{day:"numeric",month:"short",year:"numeric",timeZone:"UTC"});}
 const errorCodes=new Set(["network","configure","connect","auth","rateLimit","upstream","busy","invalid","size","pagination","storage","currency","state","consent","accountChanged"]);
 export function ConnectionPanel({provider}:{provider:Provider}){
+  useThemeId();
   const ctx=useIntegrations();const{t,locale}=useI18n();const mode=ctx.selection[provider];const data=ctx.copies[provider][mode];const status=ctx.status?.[provider];
   const[working,setWorking]=useState(false);const[error,setError]=useState("");const[message,setMessage]=useState("");const[pending,setPending]=useState<Snapshot|null>(null);const[confirm,setConfirm]=useState<"clear"|"disconnect"|null>(null);const[authUrl,setAuthUrl]=useState("");
   const disabled=working||!!ctx.busy||!ctx.ready;

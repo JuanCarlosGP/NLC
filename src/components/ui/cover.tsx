@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { colors, coverTint, fonts } from "@/lib/theme";
 
 export function Cover({
@@ -15,6 +17,7 @@ export function Cover({
   size: number | "fill";
   radius?: number;
 }) {
+  useThemeId();
   const initial = (label.trim()[0] ?? "·").toUpperCase();
   const fill = size === "fill";
   return (
@@ -39,7 +42,7 @@ export function Cover({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   box: {
     overflow: "hidden",
     alignItems: "center",
@@ -54,4 +57,4 @@ const styles = createStyles({
     color: colors.accent,
     fontFamily: fonts.serif,
   },
-});
+}));

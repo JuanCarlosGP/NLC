@@ -1,9 +1,19 @@
 import { Platform, StyleSheet, type DimensionValue } from "react-native";
 import { metricScales, type MetricFamily } from "./metrics";
+import { getNativeAppearance } from "./native-store";
+
+let factoryDepth = 0;
+export function isStyleFactory() { return factoryDepth > 0; }
+export function isNativePixel() { return Platform.OS !== "web" && getNativeAppearance() === "geist-pixel"; }
+function nativeMetric(family: MetricFamily, value: number) {
+  const sign = value < 0 ? -1 : 1;
+  return sign * (metricScales[family][Math.abs(value)] ?? Math.abs(value));
+}
 
 function metric(family: MetricFamily, value: number): number {
   const original = Math.abs(value);
-  if (Platform.OS !== "web" || !Object.hasOwn(metricScales[family], original)) return value;
+  if (Platform.OS !== "web") return isNativePixel() && !isStyleFactory() ? nativeMetric(family, value) : value;
+  if (!Object.hasOwn(metricScales[family], original)) return value;
   const token = `var(--nlc-${family}-${original}, ${original}px)`;
   // RN Web accepts CSS lengths. Keep this cast at the platform boundary; native
   // styles always receive numbers. These helpers are for styles, not geometry.
@@ -13,11 +23,12 @@ function metric(family: MetricFamily, value: number): number {
 export const space = (value: number): number => metric("space", value);
 export const textSize = (value: number): number => metric("text", value);
 export const leading = (value: number): number => metric("leading", value);
+export const radius = (value: number): number => isNativePixel() ? 0 : value;
 
 export function insetSpace(inset: number, value: number): number {
   return Platform.OS === "web"
     ? `calc(${inset}px + var(--nlc-space-${value}, ${value}px))` as unknown as number
-    : inset + value;
+    : inset + space(value);
 }
 
 const spacingProperties = new Set([
@@ -27,19 +38,53 @@ const spacingProperties = new Set([
   "marginLeft", "marginRight", "marginStart", "marginEnd",
 ]);
 
-// Same contract as StyleSheet.create. Only presentation values become CSS
-// variables; widths, heights, hit areas, chart geometry and animations stay numeric.
+// Factories keep every palette/font lookup live. Sheets are cached per theme,
+// with new style identities on a change; frozen RN StyleSheets are never mutated.
+// Only presentation metrics change. Geometry, hit areas and animation values do not.
 export function createStyles<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
-  styles: T & StyleSheet.NamedStyles<any>,
+  source: () => T & StyleSheet.NamedStyles<any>,
 ): T {
-  if (Platform.OS !== "web") return StyleSheet.create(styles);
-  const themed = Object.fromEntries(Object.entries(styles).map(([name, style]) => [name,
-    Object.fromEntries(Object.entries(style).map(([property, value]) => [property,
-      typeof value !== "number" ? value : spacingProperties.has(property) ? space(value)
-        : property === "fontSize" ? textSize(value) : property === "lineHeight" ? leading(value) : value,
-    ])),
-  ])) as T;
-  return StyleSheet.create(themed);
+  function evaluate() {
+    factoryDepth++;
+    try { return source(); }
+    finally { factoryDepth--; }
+  }
+  function compile(styles: T): T {
+    const pixel = isNativePixel();
+    const themed = Object.fromEntries(Object.entries(styles).map(([name, style]) => {
+      const result: Record<string, unknown> = {};
+      for (const [property, value] of Object.entries(style)) {
+        let next = value;
+        if (typeof value === "number") {
+          if (spacingProperties.has(property)) next = Platform.OS === "web" ? space(value) : pixel ? nativeMetric("space",value) : value;
+          else if (property === "fontSize") next = Platform.OS === "web" ? textSize(value) : pixel ? nativeMetric("text",value) : value;
+          else if (property === "lineHeight") next = Platform.OS === "web" ? leading(value) : pixel ? nativeMetric("leading",value) : value;
+        }
+        if (pixel) {
+          if (property.startsWith("border") && property.endsWith("Radius")) next = 0;
+          if (["shadowOpacity","shadowRadius","letterSpacing"].includes(property)) next = 0;
+          if (property === "fontWeight") next = "400";
+        }
+        result[property] = next;
+      }
+      if (pixel && ("elevation" in result || "shadowColor" in result)) { result.shadowColor = "transparent"; result.shadowOpacity = 0; result.shadowRadius = 0; }
+      if (pixel && ("fontFamily" in result || "fontSize" in result)) { result.includeFontPadding = false; result.fontWeight = "400"; }
+      return [name,result];
+    })) as unknown as T;
+    return StyleSheet.create(themed);
+  }
+  const initial = evaluate();
+  if (Platform.OS === "web") return compile(initial);
+  const cache = new Map<string,T>();
+  cache.set(getNativeAppearance(),compile(initial));
+  const result = {} as T;
+  for (const key of Object.keys(initial)) Object.defineProperty(result,key,{ enumerable:true, get() {
+    if (isStyleFactory()) return evaluate()[key as keyof T];
+    const id = getNativeAppearance();
+    if (!cache.has(id)) cache.set(id,compile(evaluate()));
+    return cache.get(id)![key as keyof T];
+  } });
+  return result;
 }
 
 export function densityData(role: string): object {

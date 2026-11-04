@@ -1,6 +1,8 @@
-import { createStyles } from "@/lib/appearance/density";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { createStyles, isNativePixel } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Animated, PanResponder, Platform, Pressable, Text, View } from "react-native";
+import { Animated, PanResponder, Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,7 +23,6 @@ function isWatchRoute(pathname: string): boolean {
   return pathname === "/watch" || pathname.startsWith("/watch/");
 }
 
-const GLASS_FILL = colors.glass;
 const SWIPE_DISTANCE = 52;
 const SWIPE_VELOCITY = 650;
 const SWIPE_DOWN = 40;
@@ -32,6 +33,7 @@ const PAN_SPRING = { damping: 22, stiffness: 280, mass: 0.85 };
 const HIDE_SPRING = { damping: 22, stiffness: 280, mass: 0.85 };
 
 function glassChrome() {
+  if (isNativePixel()) return {};
   return Platform.OS === "web"
     ? ({
         backdropFilter: "blur(14px)",
@@ -42,6 +44,7 @@ function glassChrome() {
 }
 
 export function MiniPlayerTrack({ track }: { track: Track }) {
+  useThemeId();
   const { t } = useI18n();
   const { playing, buffering, togglePlay, skipQueue, pause } = usePlayer();
   const { openNowPlaying, dismissMiniPlayer } = usePlayerUi();
@@ -225,6 +228,7 @@ export function MiniPlayerTrack({ track }: { track: Track }) {
 }
 
 export function MiniPlayer() {
+  useThemeId();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const { current, playNonce } = usePlayer();
@@ -288,7 +292,7 @@ export function MiniPlayer() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   host: {
     position: "absolute",
     left: 16,
@@ -302,7 +306,7 @@ const styles = createStyles({
     alignItems: "center",
     gap: 10,
     paddingHorizontal: 8,
-    backgroundColor: GLASS_FILL,
+    backgroundColor: colors.glass,
     borderColor: colors.rule,
     borderWidth: 1,
     borderRadius: 22,
@@ -340,4 +344,4 @@ const styles = createStyles({
     alignItems: "center",
     justifyContent: "center",
   },
-});
+}));

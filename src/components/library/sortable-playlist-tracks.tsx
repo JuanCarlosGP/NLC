@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Gesture, GestureDetector, type GestureType } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
@@ -55,6 +57,7 @@ export function SortablePlaylistTracks({
   onReorder: (from: number, to: number) => void;
   sortable?: boolean;
 }) {
+  useThemeId();
   const [items, setItems] = useState(tracks);
   const count = items.length;
   const activeIndex = useSharedValue(-1);
@@ -199,6 +202,7 @@ function SortableRow({
   onHover: (index: number) => void;
   onDragEnd: (to: number) => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { openTrackActions } = useTrackActions();
   const local = track.matched;
@@ -343,7 +347,7 @@ function SortableRow({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   rowWrap: {
     backgroundColor: colors.void,
   },
@@ -394,4 +398,4 @@ const styles = createStyles({
     alignItems: "center",
     justifyContent: "center",
   },
-});
+}));

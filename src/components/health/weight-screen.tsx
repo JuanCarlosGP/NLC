@@ -1,7 +1,9 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { InlineHelp } from "@/components/ui/inline-help";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { ArrowLeft } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/ui/screen";
@@ -16,6 +18,7 @@ import { weightDate, weightNumber } from "./weight-format";
 import { AddWeightButton, WeightEmpty, WeightLoadState, WeightRow, WeightSummary } from "./weight-summary";
 
 export function WeightScreen({ searchOnly = false }: { searchOnly?: boolean }) {
+  useThemeId();
   const router = useRouter();
   const { t, locale } = useI18n();
   const { entries, ready, loadFailed, remove } = useWeight();
@@ -100,7 +103,7 @@ export function WeightScreen({ searchOnly = false }: { searchOnly?: boolean }) {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   heading: { flexDirection: "row", alignItems: "center", gap: 12 }, title: { flex: 1, gap: 5 }, back: { paddingVertical: 12, paddingRight: 8 },
   section: { gap: 10 }, input: { borderWidth: 1, borderColor: colors.rule, backgroundColor: colors.sheet, borderRadius: 10,
     paddingHorizontal: 14, paddingVertical: 12, fontFamily: fonts.sans, fontSize: 15, color: colors.ink },
@@ -110,4 +113,4 @@ const styles = createStyles({
   more: { padding: 12, alignItems: "center" }, link: { ...type.body, color: colors.accent },
   month: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.rule },
   monthTitle: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink }, monthValue: { alignItems: "flex-end", gap: 5 },
-});
+}));

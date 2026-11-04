@@ -1,14 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Modal, Platform, Pressable, ScrollView, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { Image as ImageIcon, Pencil, Upload, X } from "lucide-react-native";
 import { Cover } from "@/components/ui/cover";
 import { useI18n } from "@/lib/i18n/context";
@@ -27,6 +21,7 @@ export function EditPlaylistDialog({
   onClose: () => void;
   onSave: (updates: { name: string; coverUrl: string | null }) => Promise<void>;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const [name, setName] = useState(playlist.name);
   const [coverUrl, setCoverUrl] = useState<string>(playlist.coverUrl ?? "");
@@ -258,7 +253,7 @@ export function EditPlaylistDialog({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(6, 7, 10, 0.72)",
@@ -401,4 +396,4 @@ const styles = createStyles({
     fontSize: 15,
     color: colors.void,
   },
-});
+}));

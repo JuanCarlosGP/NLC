@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useMedication } from "@/lib/health/medication/medication-context";
@@ -11,6 +13,7 @@ import { type } from "@/lib/theme";
 import { Button, Field, medicationErrorKey, styles } from "./ui";
 
 export function DoseComposer({ slot, onClose }: { slot: DoseSlot | null; onClose(): void }) {
+  useThemeId();
   const { t } = useI18n(); const { record } = useMedication();
   const [status, setStatus] = useState<"taken" | "skipped">("taken"); const [actualTime, setTime] = useState(""); const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false); const locked = useRef(false);

@@ -1,4 +1,7 @@
-import { TextInput, type StyleProp, type TextStyle } from "react-native";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { createStyles } from "@/lib/appearance/density";
+import { type StyleProp, type TextStyle } from "react-native";
+import { TextInput } from "@/components/ui/themed-text";
 import { colors, fonts } from "@/lib/theme";
 import { formatAmountInput, parseAmount, sanitizeAmountInput } from "@/lib/wealth/money";
 
@@ -17,6 +20,7 @@ export function AmountInput({
   style?: StyleProp<TextStyle>;
   accessibilityLabel?: string;
 }) {
+  useThemeId();
   return (
     <TextInput
       value={value}
@@ -38,7 +42,7 @@ export function AmountInput({
   );
 }
 
-export const amountInputStyle = {
+const amountInputStyleSheet = createStyles(() => ({ item: {
   borderWidth: 1,
   borderColor: colors.rule,
   backgroundColor: colors.sheetRaised,
@@ -48,4 +52,5 @@ export const amountInputStyle = {
   paddingHorizontal: 14,
   paddingVertical: 12,
   borderRadius: 8,
-} as const;
+} }));
+export function amountInputStyle() { return amountInputStyleSheet.item; }

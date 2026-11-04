@@ -1,7 +1,9 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { IntegrationCard } from "@/components/integrations/shared";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { ArrowUpDown, Plus, Search } from "lucide-react-native";
 import { LadybugMark } from "@/components/brand/ladybug-mark";
@@ -33,6 +35,7 @@ import {
 } from "@/lib/wealth/types";
 
 export function WealthHome() {
+  useThemeId();
   const { t } = useI18n();
   const router = useRouter();
   const { total, cash, positions, txs, series, rangeChange, balanceOf, holdingsOf, ready, goalProgress } = useWealth();
@@ -211,7 +214,7 @@ export function WealthHome() {
               </Pressable>
             </View>
             {goalProgress.length ? (
-              <View style={goalListStyle}>
+              <View style={goalListStyle()}>
                 {goalProgress.map((item) => (
                   <GoalRow key={item.goal.id} progress={item} onPress={() => openGoal(item.goal)} />
                 ))}
@@ -229,7 +232,7 @@ export function WealthHome() {
               </Pressable>
             </View>
             {positions.length ? (
-              <View style={assetListStyle}>
+              <View style={assetListStyle()}>
                 {positions.map((position) => (
                   <AssetRow
                     key={position.asset.id}
@@ -277,7 +280,7 @@ export function WealthHome() {
             {recent.length ? (
               <View style={styles.section}>
                 <Text style={type.sectionTitle}>{t("wealth.recentActivity")}</Text>
-                <View style={txListStyle}>
+                <View style={txListStyle()}>
                   {recent.map((tx) => (
                     <TxRow key={tx.id} tx={tx} />
                   ))}
@@ -371,6 +374,7 @@ function QuickCard({
   onPress: () => void;
   onAdd: () => void;
 }) {
+  useThemeId();
   return (
     <View style={styles.card}>
       <Pressable
@@ -394,7 +398,7 @@ function QuickCard({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   hero: {
     flexDirection: "row",
     alignItems: "center",
@@ -560,4 +564,4 @@ const styles = createStyles({
     fontSize: 15,
     color: colors.void,
   },
-});
+}));

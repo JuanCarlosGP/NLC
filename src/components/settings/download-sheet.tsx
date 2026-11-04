@@ -1,18 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { Modal, Platform, Pressable, ScrollView, Share, StyleSheet, Switch, View, useWindowDimensions } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Check, Copy, Info } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
@@ -89,6 +79,7 @@ export function DownloadSheet({
   download: DownloadHook;
   zone?: AppZone;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet
@@ -103,6 +94,7 @@ export function DownloadSheet({
 }
 
 function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: AppZone }) {
+  useThemeId();
   const { t } = useI18n();
   const { settings, setSettings, token, setToken, busy, feedback, job, persist, testConnection, enqueue } =
     download;
@@ -306,6 +298,7 @@ async function copyCompose(): Promise<void> {
 }
 
 function DownloadHelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useThemeId();
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
@@ -420,6 +413,7 @@ function Field({
   autoCapitalize?: "none" | "sentences";
   placeholder?: string;
 }) {
+  useThemeId();
   return (
     <View style={styles.field}>
       <Text style={type.label}>{label}</Text>
@@ -438,7 +432,7 @@ function Field({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,
@@ -676,4 +670,4 @@ const styles = createStyles({
     lineHeight: 16,
     color: colors.muted,
   },
-});
+}));

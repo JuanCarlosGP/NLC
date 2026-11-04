@@ -1,6 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useEffect, useRef, useState } from "react";
-import { Text } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useBodyPhotos } from "@/lib/health/body-photos/body-context";
@@ -12,6 +13,7 @@ import { Button, Field, styles } from "../training/ui";
 
 export function bodyErrorKey(error: unknown): string { return error instanceof BodyPhotoError ? `body.errors.${error.code}` : "body.storageError"; }
 export function ReviewComposer({ open, entry, onClose, onSaved }: { open: boolean; entry: BodyReview | null; onClose(): void; onSaved(entry: BodyReview): void }) {
+  useThemeId();
   const { t } = useI18n(); const { save } = useBodyPhotos(); const [date, setDate] = useState(localDateKey()); const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false); const locked = useRef(false); const [error, setError] = useState<string | null>(null);
   useEffect(() => { if (open) { setDate(entry?.date ?? localDateKey()); setNote(entry?.note ?? ""); setError(null); } }, [open, entry]);

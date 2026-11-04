@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AppState, Platform, Pressable, Text, TextInput, View } from "react-native";
+import { AppState, Platform, Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useSharedValue } from "react-native-reanimated";
@@ -51,6 +53,7 @@ export function ImportedEntityView({
   onDelete?: () => void | Promise<void>;
   onToggleLiked?: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { playTracks, current, playing, togglePlay, shuffle, toggleShuffle } = usePlayer();
   const { miniPlayerDismissed } = usePlayerUi();
@@ -553,6 +556,7 @@ function IconButton({
   disabled?: boolean;
   children: ReactNode;
 }) {
+  useThemeId();
   return (
     <Pressable
       accessibilityRole="button"
@@ -570,7 +574,7 @@ function IconButton({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   page: { flex: 1, backgroundColor: "transparent" },
   pageContent: { flexGrow: 1, paddingHorizontal: layout.screenPad },
   searchBox: {
@@ -679,4 +683,4 @@ const styles = createStyles({
     marginTop: 4,
   },
   moreText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.ink },
-});
+}));

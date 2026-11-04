@@ -34,7 +34,7 @@ export default {
     newArchEnabled: true,
     android: {
       package: process.env.NLC_ANDROID_PACKAGE || "app.nlc.player",
-      versionCode: 18,
+      versionCode: 19,
       softwareKeyboardLayoutMode: "resize",
       usesCleartextTraffic: true,
       adaptiveIcon: {
@@ -63,7 +63,7 @@ export default {
       [
         "expo-splash-screen",
         {
-          backgroundColor: "#0E0D0C",
+          backgroundColor: "#000000",
           image: "./assets/splash-icon.png",
           imageWidth: 140,
         },

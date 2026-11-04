@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { LadybugMark } from "@/components/brand/ladybug-mark";
 import { ZoneSwitch } from "@/components/layout/zone-switch";
@@ -15,6 +17,7 @@ import { INBOX_PROJECT_ID } from "@/lib/productivity/types";
 import { type } from "@/lib/theme";
 
 export function FocusHome() {
+  useThemeId();
   const { t } = useI18n();
   const router = useRouter();
   const projects = useActiveProjects();
@@ -79,7 +82,7 @@ export function FocusHome() {
       {doing.length ? (
         <View style={styles.section}>
           <Text style={type.sectionTitle}>{t("focus.inProgress")}</Text>
-          <View style={taskListStyle}>
+          <View style={taskListStyle()}>
             {doing.map((task) => (
               <TaskRow
                 key={task.id}
@@ -96,7 +99,7 @@ export function FocusHome() {
       {upcoming.length ? (
         <View style={styles.section}>
           <Text style={type.sectionTitle}>{t("focus.upcoming")}</Text>
-          <View style={taskListStyle}>
+          <View style={taskListStyle()}>
             {upcoming.map((task) => (
               <TaskRow
                 key={task.id}
@@ -117,7 +120,7 @@ export function FocusHome() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   hero: {
     flexDirection: "row",
     alignItems: "center",
@@ -133,4 +136,4 @@ const styles = createStyles({
     gap: 8,
   },
   section: { gap: 8 },
-});
+}));

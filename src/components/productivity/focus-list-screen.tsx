@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { TaskRow, taskListStyle } from "@/components/productivity/task-row";
@@ -32,6 +34,7 @@ export function FocusListScreen({
   tasks: ProdTask[];
   onAdd?: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const router = useRouter();
   const projects = useActiveProjects();
@@ -62,7 +65,7 @@ export function FocusListScreen({
         </View>
       </View>
       {tasks.length ? (
-        <View style={taskListStyle}>
+        <View style={taskListStyle()}>
           {tasks.map((task) => (
             <TaskRow
               key={task.id}
@@ -80,7 +83,7 @@ export function FocusListScreen({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: { gap: 6, paddingTop: 8 },
   heading: {
     flexDirection: "row",
@@ -105,4 +108,4 @@ const styles = createStyles({
     backgroundColor: colors.sheetRaised,
     marginBottom: 8,
   },
-});
+}));

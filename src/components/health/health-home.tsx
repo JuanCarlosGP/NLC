@@ -1,12 +1,14 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { IntegrationCard } from "@/components/integrations/shared";
-import { createStyles, densityData } from "@/lib/appearance/density";
+import { isNativePixel, createStyles, densityData } from "@/lib/appearance/density";
 import { HealthBackupHomeCard } from "./backup/backup-screen";
 import { NutritionHomeCard } from "./nutrition/nutrition-screen";
 import { BodyPhotosHomeCard } from "./body-photos/body-screen";
 import { MedicationHomeCard } from "./medication/medication-screen";
 import { TrainingHomeCard } from "./training/training-home";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { ArrowUpRight, Scale } from "lucide-react-native";
 import { LadybugMark } from "@/components/brand/ladybug-mark";
@@ -19,6 +21,7 @@ import { WeightComposerSheet } from "./weight-composer-sheet";
 import { AddWeightButton, WeightEmpty, WeightLoadState, WeightSummary } from "./weight-summary";
 
 export function HealthHome() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { entries, ready, loadFailed } = useWeight();
@@ -58,9 +61,9 @@ export function HealthHome() {
   );
 }
 
-const styles = createStyles({
-  actions: { gap: 18 },
+const styles = createStyles(() => ({
+  actions: { gap: isNativePixel() ? 10 : 18 },
   hero: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingTop: 8, paddingBottom: 4, flexWrap: "wrap" },
   heading: { gap: 8 }, history: { flexDirection: "row", alignItems: "center", gap: 14, borderWidth: 1, borderColor: colors.rule,
     backgroundColor: colors.sheet, borderRadius: 14, padding: 18 }, historyText: { flex: 1, gap: 5 },
-});
+}));

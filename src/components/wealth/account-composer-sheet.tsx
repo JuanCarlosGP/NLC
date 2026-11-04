@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -33,6 +35,7 @@ export function AccountComposerSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet open={open} onOpenChange={onOpenChange} accessibilityCloseLabel={t("wealth.closeAccount")} viewportRatio={0.62}>
@@ -42,6 +45,7 @@ export function AccountComposerSheet({
 }
 
 function AccountComposerBody({ open, onDone }: { open: boolean; onDone: () => void }) {
+  useThemeId();
   const { t } = useI18n();
   const { createAccount } = useWealth();
   const [name, setName] = useState("");
@@ -112,6 +116,7 @@ export function CashComposerSheet({
   account: WealthAccount | null;
   onOpenChange: (open: boolean) => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet
@@ -126,6 +131,7 @@ export function CashComposerSheet({
 }
 
 function CashComposerBody({ account, onDone }: { account: WealthAccount; onDone: () => void }) {
+  useThemeId();
   const { t } = useI18n();
   const { createTx, balanceOf } = useWealth();
   const cash = balanceOf(account.id);
@@ -203,6 +209,7 @@ export function AssetComposerSheet({
   asset?: WealthAsset | null;
   defaultAccountId?: string | null;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet
@@ -232,6 +239,7 @@ function AssetComposerBody({
   defaultAccountId?: string | null;
   onDone: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { createAsset, updateAsset, createQuote, deleteQuote, assets, quotes, txs } = useWealth();
   const accounts = useLiveAccounts();
@@ -602,7 +610,7 @@ function AssetComposerBody({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingBottom: 28, gap: 12 },
   input: {
@@ -670,4 +678,4 @@ const styles = createStyles({
   eventTitle: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
   eventSub: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
   eventValue: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-});
+}));

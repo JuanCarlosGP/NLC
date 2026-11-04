@@ -1,5 +1,7 @@
-import { createStyles, densityData } from "@/lib/appearance/density";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { createStyles, densityData, isNativePixel } from "@/lib/appearance/density";
+import { isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   BackHandler,
   Modal,
@@ -59,10 +61,14 @@ export function BottomSheet({
   /** Extra space above the bottom edge (e.g. dock + mini player). */
   reserveBottom?: number;
 }) {
+  useThemeId();
   const insets = useSafeAreaInsets();
   const bottomInset = resolveBottomInset(insets.bottom);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const reportContentHeight = useCallback((height: number) => { if (Number.isFinite(height) && height > 0) setContentHeight(previous => previous !== null && Math.abs(previous-height) < 1 ? previous : height); }, []);
+  const fitContent = isNativePixel() && !expandable && isValidElement(children) && children.type === SheetScrollView;
   const chrome = Math.max(0, reserveBottom);
   const ratio = expandable && expanded ? expandedRatio : viewportRatio;
   const [layoutHeight, setLayoutHeight] = useState(() =>
@@ -84,7 +90,8 @@ export function BottomSheet({
   const viewportCap = layoutHeight * ratio;
   const available = Math.max(layoutHeight - chrome, 160);
   const maxSheetHeight = Math.min(viewportCap, available) + (chrome > 0 ? 0 : bottomInset);
-  const slideDistance = maxSheetHeight + 48;
+  const sheetHeight = fitContent && contentHeight !== null ? Math.min(maxSheetHeight, contentHeight + 36 + (chrome > 0 ? 0 : bottomInset)) : maxSheetHeight;
+  const slideDistance = sheetHeight + 48;
   const overlay = presentation === "overlay";
   const sheetMarginBottom = chrome > 0 ? chrome - SHEET_OVERDRAG_TAIL : -bottomInset - SHEET_OVERDRAG_TAIL;
 
@@ -142,6 +149,8 @@ export function BottomSheet({
     });
     return () => sub.remove();
   }, [open, onOpenChange]);
+
+  useEffect(() => { setContentHeight(null); }, [open, windowWidth]);
 
   useEffect(() => {
     if (open) setExpanded(false);
@@ -242,7 +251,7 @@ export function BottomSheet({
           style={[
             styles.sheet,
             {
-              height: maxSheetHeight + SHEET_OVERDRAG_TAIL,
+              height: sheetHeight + SHEET_OVERDRAG_TAIL,
               maxHeight: maxSheetHeight + SHEET_OVERDRAG_TAIL,
               paddingBottom: SHEET_OVERDRAG_TAIL,
               marginBottom: sheetMarginBottom,
@@ -257,6 +266,7 @@ export function BottomSheet({
           <View style={styles.sheetBody} collapsable={false}>
             <BottomSheetProvider
               reportScrollOffset={reportScrollOffset}
+              reportContentHeight={fitContent ? reportContentHeight : undefined}
               nativeGesture={nativeGesture}
               scrollLocked={scrollLocked}
             >
@@ -303,7 +313,7 @@ export function BottomSheet({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   overlayHost: {
     ...StyleSheet.absoluteFillObject,
     zIndex: OVERLAY_Z_INDEX,
@@ -348,4 +358,4 @@ const styles = createStyles({
     flex: 1,
     minHeight: 0,
   },
-});
+}));

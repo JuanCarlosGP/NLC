@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 import { weightChartPoints, type WeightEntry } from "@/lib/health/weight/model";
 import { useI18n } from "@/lib/i18n/context";
@@ -8,6 +10,7 @@ import { colors, fonts, type } from "@/lib/theme";
 import { weightDate, weightNumber } from "./weight-format";
 
 export function WeightChart({ entries, fromDate }: { entries: WeightEntry[]; fromDate?: string }) {
+  useThemeId();
   const { t, locale } = useI18n();
   const [width, setWidth] = useState(260);
   const points = useMemo(() => weightChartPoints(entries, fromDate), [entries, fromDate]);
@@ -46,10 +49,10 @@ export function WeightChart({ entries, fromDate }: { entries: WeightEntry[]; fro
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   card: { borderWidth: 1, borderColor: colors.rule, borderRadius: 14, backgroundColor: colors.sheet, padding: 16, gap: 10 },
   legend: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 8 },
   measured: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.accent },
   axis: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
   bounds: { ...type.meta, textAlign: "right" },
-});
+}));

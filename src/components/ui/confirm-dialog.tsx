@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import type { ReactNode } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { ArrowDownCircle, Check, CircleCheck, Trash2 } from "lucide-react-native";
 import { t } from "@/lib/i18n/runtime";
 import { colors, fonts, type } from "@/lib/theme";
@@ -33,6 +35,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  useThemeId();
   const defaultIcon = info ? (
     <CircleCheck color={colors.ok} size={22} strokeWidth={1.85} />
   ) : destructive ? (
@@ -122,7 +125,7 @@ export function ConfirmDialog({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   backdrop: {
     flex: 1,
     backgroundColor: colors.backdrop,
@@ -213,4 +216,4 @@ const styles = createStyles({
   btnOk: {
     backgroundColor: colors.ok,
   },
-});
+}));

@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { TrackRow } from "@/components/library/track-row";
@@ -9,6 +11,7 @@ import { usePlayerUi } from "@/lib/player/player-ui-context";
 import { type } from "@/lib/theme";
 
 export function QueueSheet() {
+  useThemeId();
   const { queueOpen, setQueueOpen } = usePlayerUi();
   const { t } = useI18n();
 
@@ -25,6 +28,7 @@ export function QueueSheet() {
 }
 
 function QueueBody() {
+  useThemeId();
   const { t } = useI18n();
   const { queue, index, playTracks, current } = useQueue();
 
@@ -48,11 +52,11 @@ function QueueBody() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
     paddingBottom: 28,
     gap: 8,
   },
-});
+}));

@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { Download, EyeOff, FolderOpen, Heart, Play, Smartphone, Trash2 } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
@@ -25,6 +27,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
 export function VideoActionsSheet() {
+  useThemeId();
   const { open, target, setOpen } = useVideoActions();
   const { t } = useI18n();
   return (
@@ -46,6 +49,7 @@ function VideoActionsBody({
   target: VideoActionsTarget;
   onClose: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const router = useRouter();
   const { settings, password } = useSettings();
@@ -324,6 +328,7 @@ function ActionRow({
   disabled?: boolean;
   onPress?: () => void;
 }) {
+  useThemeId();
   return (
     <Pressable
       accessibilityRole={onPress ? "button" : undefined}
@@ -337,7 +342,7 @@ function ActionRow({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -383,4 +388,4 @@ const styles = createStyles({
     color: colors.ink,
   },
   labelDanger: { color: colors.danger },
-});
+}));

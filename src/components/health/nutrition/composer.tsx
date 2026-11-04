@@ -1,6 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useEffect, useRef, useState } from "react";
-import { Text } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useNutrition } from "@/lib/health/nutrition/nutrition-context";
@@ -13,6 +14,7 @@ export function nutritionError(error: unknown, t: (key: string, params?: Record<
   return error instanceof NutritionError && error.line ? t("nutrition.errorLine", { line: error.line, message }) : message;
 }
 export function NutritionComposer({ open, entry, date: initial, onClose, onSaved }: { open: boolean; entry: NutritionDay | null; date: string; onClose(): void; onSaved(date: string): void }) {
+  useThemeId();
   const { t } = useI18n(); const { save } = useNutrition(); const [date, setDate] = useState(initial); const [note, setNote] = useState("");
   const [values, setValues] = useState({ calories: "", protein: "", carbs: "", fat: "" }); const [busy, setBusy] = useState(false); const locked = useRef(false); const [error, setError] = useState("");
   useEffect(() => { if (open) { setDate(entry?.date ?? initial); setNote(entry?.note ?? ""); setValues({ calories: entry ? String(entry.calories) : "", protein: entry ? String(entry.protein) : "", carbs: entry ? String(entry.carbs) : "", fat: entry ? String(entry.fat) : "" }); setError(""); } }, [open, entry?.date, initial]);

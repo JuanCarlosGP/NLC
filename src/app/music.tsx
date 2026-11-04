@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Music2 } from "lucide-react-native";
 import { AlbumRow } from "@/components/library/album-row";
@@ -17,6 +19,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function MusicScreen() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { source, ready } = useSettings();
@@ -124,7 +127,7 @@ export default function MusicScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: { gap: 6, paddingTop: 8 },
   art: {
     width: 96,
@@ -146,4 +149,4 @@ const styles = createStyles({
   solidText: { fontFamily: fonts.sansMedium, color: colors.accentText, fontSize: 14 },
   ghostText: { fontFamily: fonts.sansMedium, color: colors.ink, fontSize: 14 },
   error: { ...type.body, color: colors.danger },
-});
+}));

@@ -1,6 +1,8 @@
-import { space } from "@/lib/appearance/density";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { space, textSize } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import Svg, { Circle, G, Line, Path } from "react-native-svg";
 import { useRouter } from "expo-router";
 import { metricChange, progressGeometry, roundTraining, type ExercisePoint, type ProgressMetric } from "@/lib/health/training/analytics";
@@ -9,6 +11,7 @@ import { colors, type } from "@/lib/theme";
 import { Button, styles } from "../ui";
 
 export function ProgressChart({ points, metric }: { points: ExercisePoint[]; metric: ProgressMetric }) {
+  useThemeId();
   const { t, locale } = useI18n(); const router = useRouter(); const [width, setWidth] = useState(240); const [end, setEnd] = useState(points.length); const [selected, setSelected] = useState<string | null>(null);
   const limit = Math.min(end, points.length); const start = Math.max(0, limit - 24); const visible = points.slice(start, limit);
   const geometry = useMemo(() => progressGeometry(visible, metric, width), [visible, metric, width]);
@@ -24,7 +27,7 @@ export function ProgressChart({ points, metric }: { points: ExercisePoint[]; met
 
     {geometry ? <>
       <View style={{ flexDirection: "row", gap: space(8) }}>
-        <View style={{ width: 42, justifyContent: "space-between", paddingTop: 3, paddingBottom: space(4) }}><Text style={[type.meta, { fontSize: 11 }]}>{num(geometry.high)}</Text><Text style={[type.meta, { fontSize: 11 }]}>0 {unit}</Text></View>
+        <View style={{ width: 42, justifyContent: "space-between", paddingTop: space(3), paddingBottom: space(4) }}><Text style={[type.meta, { fontSize: textSize(11) }]}>{num(geometry.high)}</Text><Text style={[type.meta, { fontSize: textSize(11) }]}>0 {unit}</Text></View>
         <View style={{ flex: 1 }} accessible accessibilityRole="image" accessibilityLabel={t("trainingAnalytics.chartLabel", { metric: t(`trainingAnalytics.${metric}`), from: date(visible[0].date), to: date(visible[visible.length - 1].date) })} onLayout={(event) => setWidth(Math.max(100, event.nativeEvent.layout.width))}>
           <Svg width={width} height={164}>
             {[12, 82, 152].map((y) => <Line key={y} x1={0} x2={width} y1={y} y2={y} stroke={colors.rule} strokeDasharray="3 5" />)}

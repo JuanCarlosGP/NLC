@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Image, Modal, Pressable, Text, TextInput, View } from "react-native";
+import { Image, Modal, Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { ArrowLeft, ArrowUpRight, Images } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +20,7 @@ import { PhotoFrame } from "./photo-frame";
 import { ReviewComposer, bodyErrorKey } from "./review-composer";
 
 export function BodyPhotosHomeCard() {
+  useThemeId();
   const router = useRouter(); const { t } = useI18n(); const { entries, ready, loadFailed } = useBodyPhotos();
   return <Pressable accessibilityRole="button" onPress={() => router.push("/health/body-photos")} style={[styles.card, styles.spread]}>
     <Images size={24} color={colors.accent} strokeWidth={1.6} /><View style={{ flex: 1, gap: space(5) }}><Text style={type.sectionTitle}>{t("body.title")}</Text><Text style={type.meta}>{t(ready ? loadFailed ? "body.loadError" : "body.count" : "common.loading", { entries: entries.length, photos: entries.reduce((sum, entry) => sum + bodyPhotoCount(entry), 0) })}</Text></View><ArrowUpRight size={20} color={colors.inkSoft} /></Pressable>;
@@ -26,6 +29,7 @@ type SelectedPhoto = { entry: BodyReview; pose: BodyPose; photo: BodyPhoto };
 type PendingPhoto = { id: string; pose: BodyPose; picked: PickedBodyPhoto };
 function disposePicked(picked?: PickedBodyPhoto) { if (picked) void Promise.resolve(picked.dispose()).catch(() => {}); }
 export function BodyPhotosScreen() {
+  useThemeId();
   const router = useRouter(); const insets = useSafeAreaInsets(); const { t, locale } = useI18n(); const { entries, ready, loadFailed, refresh, setPhoto, remove } = useBodyPhotos();
   const [tab, setTab] = useState<"history" | "compare">("history"); const [activeId, setActiveId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false); const [editing, setEditing] = useState<BodyReview | null>(null);

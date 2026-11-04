@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Pressable, Text } from "react-native";
+import { Pressable } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Check } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -30,6 +32,7 @@ export function LibrarySortSheet({
   onOpenChange: (open: boolean) => void;
   onChange: (sort: LibrarySort) => void;
 }) {
+  useThemeId();
   return (
     <BottomSheet
       open={open}
@@ -60,7 +63,7 @@ export function LibrarySortSheet({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,
@@ -89,4 +92,4 @@ const styles = createStyles({
   optionActive: {
     fontFamily: fonts.sansMedium,
   },
-});
+}));

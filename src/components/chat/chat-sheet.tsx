@@ -1,16 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowUp, Headphones, Settings, Sparkles, Trash2 } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
@@ -62,6 +54,7 @@ function ChatDialog({
   onClose: () => void;
   children: ReactNode;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <Modal
@@ -87,6 +80,7 @@ function ChatDialog({
 }
 
 export function ChatSheet() {
+  useThemeId();
   const { t } = useI18n();
   const { chatOpen, setChatOpen } = useCursor();
   return (
@@ -102,6 +96,7 @@ export function ChatSheet() {
 }
 
 function ChatSheetBody() {
+  useThemeId();
   const { t } = useI18n();
   const {
     apiKey,
@@ -346,7 +341,7 @@ function ChatSheetBody() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   panel: { flex: 1, minHeight: 0 },
   dialogBackdrop: {
     flex: 1,
@@ -502,4 +497,4 @@ const styles = createStyles({
     alignItems: "center",
     justifyContent: "center",
   },
-});
+}));

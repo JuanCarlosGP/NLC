@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { AccountActivitySheet } from "@/components/wealth/account-activity-sheet";
@@ -13,6 +15,7 @@ import { ACCOUNT_KIND_LABEL, accountDisplayName, type WealthAccount, type Wealth
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 
 export default function WealthAccountsScreen() {
+  useThemeId();
   const { t } = useI18n();
   const { balanceOf, holdingsOf, totalOf } = useWealth();
   const accounts = useLiveAccounts();
@@ -100,7 +103,7 @@ export default function WealthAccountsScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -120,4 +123,4 @@ const styles = createStyles({
   name: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
   meta: { flex: 1, paddingRight: 12, gap: 2 },
   value: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
-});
+}));

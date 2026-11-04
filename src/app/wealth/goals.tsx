@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { GoalComposerSheet } from "@/components/wealth/goal-composer-sheet";
@@ -12,6 +14,7 @@ import { useWealth } from "@/lib/wealth/wealth-context";
 import type { WealthGoal } from "@/lib/wealth/types";
 
 export default function WealthGoalsScreen() {
+  useThemeId();
   const { t } = useI18n();
   const { goalProgress } = useWealth();
   const [open, setOpen] = useState(false);
@@ -35,7 +38,7 @@ export default function WealthGoalsScreen() {
           </Pressable>
         </View>
         {goalProgress.length ? (
-          <View style={goalListStyle}>
+          <View style={goalListStyle()}>
             {goalProgress.map((item) => (
               <GoalRow
                 key={item.goal.id}
@@ -64,7 +67,7 @@ export default function WealthGoalsScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -73,4 +76,4 @@ const styles = createStyles({
   },
   title: { flex: 1 },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-});
+}));

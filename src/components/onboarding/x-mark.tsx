@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { useEffect } from "react";
 import { View } from "react-native";
 import Animated, {
@@ -26,6 +27,7 @@ export function XMark({
   size?: number;
   color?: string;
 }) {
+  useThemeId();
   const first = useSharedValue(reduce || play ? 1 : 0);
   const second = useSharedValue(reduce || play ? 1 : 0);
 

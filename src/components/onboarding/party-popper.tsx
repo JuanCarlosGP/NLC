@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { useEffect } from "react";
 import { View } from "react-native";
 import Animated, {
@@ -23,6 +24,7 @@ export function PartyPopper({
   size?: number;
   color?: string;
 }) {
+  useThemeId();
   const burst = useSharedValue(reduce || play ? 1 : 0);
 
   useEffect(() => {

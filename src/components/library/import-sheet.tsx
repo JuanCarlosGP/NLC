@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check, ChevronLeft } from "lucide-react-native";
 import { BottomSheet, resolveBottomInset } from "@/components/layout/bottom-sheet";
@@ -28,6 +30,7 @@ export function ImportSheet({
   onOpenChange: (open: boolean) => void;
   onImported: (playlist: ImportedPlaylist) => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet
@@ -58,6 +61,7 @@ function PickTrackRow({
   pickIndex?: number;
   onToggle: () => void;
 }) {
+  useThemeId();
   const cover = useTrackArtwork(track);
   return (
     <Pressable
@@ -91,6 +95,7 @@ function ImportSheetBody({
   open: boolean;
   onImported: (playlist: ImportedPlaylist) => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const spotify = useSpotify();
   const { source } = useSettings();
@@ -329,7 +334,7 @@ function ImportSheetBody({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   panel: { flex: 1, minHeight: 0 },
   chooser: {
     paddingHorizontal: 20,
@@ -476,4 +481,4 @@ const styles = createStyles({
   },
   footerError: { paddingHorizontal: 20, paddingBottom: 10 },
   error: { ...type.body, color: colors.danger },
-});
+}));

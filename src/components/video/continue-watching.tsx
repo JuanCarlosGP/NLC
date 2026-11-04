@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { Play } from "lucide-react-native";
 import { useVideoContinue } from "@/hooks/use-video-continue";
@@ -9,7 +11,6 @@ import { useI18n } from "@/lib/i18n/context";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
-const RIPPLE = { color: colors.ripple };
 
 function progressRatio(entry: VideoWatchEntry): number {
   if (entry.durationSec <= 0) return 0;
@@ -34,6 +35,7 @@ function ContinueCard({
   onPress: () => void;
   t: (path: string, vars?: Record<string, string | number>) => string;
 }) {
+  useThemeId();
   const ratio = progressRatio(entry);
   const remaining = progressLabel(entry, t);
   const place = [entry.arcTitle].filter((value) => value && value !== entry.seriesTitle).join(" · ");
@@ -41,7 +43,7 @@ function ContinueCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${label}: ${entry.title}`}
-      android_ripple={RIPPLE}
+      android_ripple={{ color: colors.ripple }}
       onPress={() => {
         triggerSelectionUiHaptic();
         onPress();
@@ -71,6 +73,7 @@ function ContinueCard({
 }
 
 export function ContinueWatching() {
+  useThemeId();
   const { t } = useI18n();
   const router = useRouter();
   const { rows } = useVideoContinue();
@@ -107,7 +110,7 @@ export function ContinueWatching() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   block: { gap: 14 },
   series: { gap: 10 },
   seriesTitle: {
@@ -165,4 +168,4 @@ const styles = createStyles({
     borderRadius: 99,
     backgroundColor: colors.accent,
   },
-});
+}));

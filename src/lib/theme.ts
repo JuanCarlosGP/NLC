@@ -1,21 +1,29 @@
-import { leading, textSize } from "@/lib/appearance/density";
+import { leading, textSize, isStyleFactory, isNativePixel } from "@/lib/appearance/density";
 import { Platform, type TextStyle } from "react-native";
-import { classicPalette, classicWebFonts, type Palette } from "./appearance/themes";
+import { classicPalette, pixelPalette, type Palette } from "./appearance/themes";
+import { getNativeAppearance } from "./appearance/native-store";
 
-export const colors = Object.fromEntries(Object.entries(classicPalette).map(([key, value]) => [key,
-  Platform.OS === "web" ? `var(--nlc-color-${key}, ${value})` : value,
-])) as Readonly<Palette>;
+// The exported records remain stable; their values come from the active native
+// appearance. UI consumers subscribe with useThemeId and sheet factories resolve
+// them lazily, so switching themes never mutates a frozen StyleSheet.
+function liveRecord<T extends object>(keys: (keyof T)[], read: (key: keyof T) => T[keyof T]): Readonly<T> {
+  const record = {} as T;
+  for (const key of keys) Object.defineProperty(record,key,{ enumerable:true, get:() => read(key) });
+  return record;
+}
+export const colors = liveRecord<Palette>(Object.keys(classicPalette) as (keyof Palette)[], key =>
+  Platform.OS === "web" ? `var(--nlc-color-${key}, ${classicPalette[key]})` : (isNativePixel() ? pixelPalette : classicPalette)[key],
+);
+const nativeFonts = {
+  sans: "Figtree_400Regular", sansMedium: "Figtree_500Medium",
+  sansSemiBold: "Figtree_600SemiBold", sansBold: "Figtree_700Bold",
+  serif: "InstrumentSerif_400Regular",
+};
+export const fonts = liveRecord<typeof nativeFonts>(Object.keys(nativeFonts) as (keyof typeof nativeFonts)[], key =>
+  Platform.OS === "web" ? `var(--nlc-font-${key})` : isNativePixel() ? "GeistPixelSquare" : nativeFonts[key],
+);
 
-const font = (key: keyof typeof classicWebFonts, native: string) => Platform.OS === "web" ? `var(--nlc-font-${key})` : native;
-export const fonts = {
-  sans: font("sans", "Figtree_400Regular"),
-  sansMedium: font("sansMedium", "Figtree_500Medium"),
-  sansSemiBold: font("sansSemiBold", "Figtree_600SemiBold"),
-  sansBold: font("sansBold", "Figtree_700Bold"),
-  serif: font("serif", "InstrumentSerif_400Regular"),
-} as const;
-
-export const type = {
+function typography() { return {
   pageTitle: {
     fontFamily: fonts.serif,
     fontSize: textSize(32),
@@ -55,7 +63,23 @@ export const type = {
     lineHeight: leading(18),
     color: colors.muted,
   } satisfies TextStyle,
-};
+}; }
+type Typography = ReturnType<typeof typography>;
+const typographyCache = new Map<string,Typography>();
+const textRoles: (keyof Typography)[] = ["pageTitle","sectionTitle","body","label","track","meta"];
+export const type = liveRecord<Typography>(textRoles,key => {
+  // A factory consumes the original metrics; direct/inline styles consume the
+  // compact ones. This prevents an inherited text role being scaled twice.
+  const id = `${Platform.OS}:${getNativeAppearance()}:${isStyleFactory()}`;
+  if (!typographyCache.has(id)) {
+    const tokens = typography();
+    if (isNativePixel()) for (const role of Object.values(tokens)) {
+      Object.assign(role,{ letterSpacing:0, includeFontPadding:false, fontWeight:"400" });
+    }
+    typographyCache.set(id,tokens);
+  }
+  return typographyCache.get(id)![key];
+});
 
 export const layout = {
   dockHeight: 68,

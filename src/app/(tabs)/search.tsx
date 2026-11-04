@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { AlbumRow } from "@/components/library/album-row";
 import { ArtistRow } from "@/components/library/artist-row";
@@ -43,6 +45,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useZone } from "@/lib/zone/zone-context";
 
 export default function SearchScreen() {
+  useThemeId();
   const { zone } = useZone();
   if (zone === "health") return <WeightScreen searchOnly />;
   if (zone === "focus") return <FocusSearch />;
@@ -52,6 +55,7 @@ export default function SearchScreen() {
 }
 
 function CatalogSearch({ zone }: { zone: "music" | "podcast" }) {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { source } = useSettings();
@@ -161,6 +165,7 @@ function CatalogSearch({ zone }: { zone: "music" | "podcast" }) {
 }
 
 function VideoSearch() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { settings, password, ready } = useSettings();
@@ -224,7 +229,7 @@ function VideoSearch() {
       {series.length ? (
         <View>
           <Text style={type.sectionTitle}>{t("search.series")}</Text>
-          <View style={seriesListStyle}>
+          <View style={seriesListStyle()}>
             {series.map((show) => (
               <SeriesRow
                 key={show.id}
@@ -239,7 +244,7 @@ function VideoSearch() {
       {movies.length ? (
         <View>
           <Text style={type.sectionTitle}>{t("search.movies")}</Text>
-          <View style={seriesListStyle}>
+          <View style={seriesListStyle()}>
             {movies.map((show) => (
               <SeriesRow
                 key={show.id}
@@ -262,6 +267,7 @@ function hay(q: string, ...parts: Array<string | null | undefined>): boolean {
 }
 
 function WealthSearch() {
+  useThemeId();
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const { txs, assets, liveAccounts, goalProgress, totalOf } = useWealth();
@@ -370,7 +376,7 @@ function WealthSearch() {
         {matchedAssets.length ? (
           <View style={styles.block}>
             <Text style={type.sectionTitle}>{t("search.assets")}</Text>
-            <View style={assetListStyle}>
+            <View style={assetListStyle()}>
               {matchedAssets.map((position) => (
                 <AssetRow
                   key={position.asset.id}
@@ -389,7 +395,7 @@ function WealthSearch() {
         {matchedGoals.length ? (
           <View style={styles.block}>
             <Text style={type.sectionTitle}>{t("search.goals")}</Text>
-            <View style={goalListStyle}>
+            <View style={goalListStyle()}>
               {matchedGoals.map((item) => (
                 <GoalRow
                   key={item.goal.id}
@@ -408,7 +414,7 @@ function WealthSearch() {
         {matchedTx.length ? (
           <View style={styles.block}>
             <Text style={type.sectionTitle}>{t("search.txs")}</Text>
-            <View style={txListStyle}>
+            <View style={txListStyle()}>
               {matchedTx.map((tx) => (
                 <TxRow key={tx.id} tx={tx} />
               ))}
@@ -450,6 +456,7 @@ function WealthSearch() {
 }
 
 function FocusSearch() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const [query, setQuery] = useState("");
@@ -489,7 +496,7 @@ function FocusSearch() {
       {matchedProjects.length ? (
         <View>
           <Text style={type.sectionTitle}>{t("search.projects")}</Text>
-          <View style={seriesListStyle}>
+          <View style={seriesListStyle()}>
             {matchedProjects.map((project) => (
               <SeriesRow
                 key={project.id}
@@ -504,7 +511,7 @@ function FocusSearch() {
       {matchedTasks.length ? (
         <View>
           <Text style={type.sectionTitle}>{t("search.tasks")}</Text>
-          <View style={taskListStyle}>
+          <View style={taskListStyle()}>
             {matchedTasks.map((task) => (
               <TaskRow
                 key={task.id}
@@ -521,7 +528,7 @@ function FocusSearch() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   input: {
     borderWidth: 1,
     borderColor: colors.rule,
@@ -544,4 +551,4 @@ const styles = createStyles({
   },
   accountName: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
   accountBal: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
-});
+}));

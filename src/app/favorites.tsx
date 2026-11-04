@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Heart } from "lucide-react-native";
 import { TrackRow } from "@/components/library/track-row";
@@ -26,6 +28,7 @@ function parseKind(raw: string | string[] | undefined): FavoritesKind {
 }
 
 export default function FavoritesScreen() {
+  useThemeId();
   const { kind: kindParam } = useLocalSearchParams<{ kind?: string }>();
   const kind = parseKind(kindParam);
   if (kind === "video") return <VideoFavorites />;
@@ -33,6 +36,7 @@ export default function FavoritesScreen() {
 }
 
 function AudioFavorites({ kind }: { kind: "music" | "podcast" }) {
+  useThemeId();
   const podcast = kind === "podcast";
   const { t } = useI18n();
   const { favorites } = useFavorites();
@@ -111,6 +115,7 @@ function AudioFavorites({ kind }: { kind: "music" | "podcast" }) {
 }
 
 function VideoFavorites() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { favorites, refresh } = useVideoFavorites();
@@ -148,7 +153,7 @@ function VideoFavorites() {
       {series.length ? (
         <View>
           <Text style={type.sectionTitle}>{t("favorites.series")}</Text>
-          <View style={seriesListStyle}>
+          <View style={seriesListStyle()}>
             {series.map((show) => (
               <SeriesRow
                 key={show.path}
@@ -170,7 +175,7 @@ function VideoFavorites() {
       {movies.length ? (
         <View>
           <Text style={type.sectionTitle}>{t("favorites.movies")}</Text>
-          <View style={seriesListStyle}>
+          <View style={seriesListStyle()}>
             {movies.map((show) => (
               <SeriesRow
                 key={show.path}
@@ -193,7 +198,7 @@ function VideoFavorites() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: { gap: 6, paddingTop: 8 },
   art: {
     width: 96,
@@ -216,4 +221,4 @@ const styles = createStyles({
   ghost: { borderWidth: 1, borderColor: colors.rule },
   solidText: { fontFamily: fonts.sansMedium, color: colors.accentText, fontSize: 14 },
   ghostText: { fontFamily: fonts.sansMedium, color: colors.ink, fontSize: 14 },
-});
+}));
