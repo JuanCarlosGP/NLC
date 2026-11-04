@@ -55,10 +55,10 @@ SQLite nlc-catalog.db  ←── AsyncStorage / SecureStore (prefs + secretos)
 
 | Pieza | Ruta |
 | --- | --- |
-| Apertura / versión | `src/lib/db/client.ts` (schema v6, WAL, FK) |
+| Apertura / versión | `src/lib/db/sqlite-client.ts` (schema v7, WAL nativo, FK) |
 | DDL | `src/lib/db/schema.ts` |
 | API catálogo | `src/lib/db/catalog.ts` |
-| Web (sin SQLite real) | `src/lib/db/memory.ts` (sesión; no equivale al nativo) |
+| Web normal (sin SQLite real) | `src/lib/db/memory.ts` (sesión; no equivale al nativo) |
 
 | Tabla | Contenido |
 | --- | --- |
@@ -67,6 +67,7 @@ SQLite nlc-catalog.db  ←── AsyncStorage / SecureStore (prefs + secretos)
 | `recents` / `favorites` | Órdenes de tracks de música |
 | `playlists` / `playlist_tracks` | Import Spotify o locales + match a track del catálogo |
 | `prod_projects` / `prod_tasks` / `prod_reminders` | Focus |
+| `health_weight_entries` | Peso corporal: un registro por fecha, kg, nota y marcas de creación/edición |
 | `wealth_accounts` / `wealth_assets` / `wealth_quotes` / `wealth_tx` / `wealth_goals` | Patrimonio |
 
 Escrituras típicas de catálogo: `replaceLibrary` (scan NAS), `upsertLocalLibrary` (carpeta local). Lecturas: `getArtists`, `getAlbums`, `getTracks`, `searchCatalog`, `loadPlaylists`, etc.
@@ -133,10 +134,31 @@ Los JSON del NAS no se tratan como media (`SKIP_FILES` en WebDAV).
 - **Pull / push:** `pullFocusFromSources` / `pushFocusToSources`, análogo en wealth y en playlists (`pullPlaylistsFromSources`). Suele ganar el `updatedAt` más reciente; el teléfono es el sitio “vivo”.
 - **Bridge:** solo lectura — `GET /v1/focus`, `GET /v1/wealth`.
 
+### Escenario local de QA
+
+`EXPO_PUBLIC_NLC_DEMO=1` y desarrollo web habilitan una base OPFS independiente:
+`nlc-local-demo.db`. Usa las consultas reales de la app, no el intérprete SQL en
+memoria. El worker web necesita COOP/COEP (configurados en Metro para esta sesión)
+y diario DELETE; el nativo mantiene WAL. La sesión normal conserva su adaptador
+web anterior para el catálogo; Salud usa IndexedDB con migración de sus valores previos.
+
+`/dev/demo` carga datos sintéticos mediante los stores existentes. La biblioteca
+se indexa desde `scripts/local-demo-nas.py`, un servicio de pruebas en loopback
+con WebDAV, audio/vídeo generado y trabajos de descarga simulados. Los datos
+canónicos del teléfono y las conexiones reales no participan.
+
+### Salud
+
+- Peso manual: SQLite `health_weight_entries` en el teléfono, sin red ni dependencia del NAS.
+- Se actualiza por fecha; mover una entrada a un día ocupado se rechaza. Los días sin datos no se rellenan.
+- Media de siete días naturales hasta la última entrada, evolución y agregados mensuales.
+- La vista web conserva Salud en IndexedDB, migrando `nlc.health.weight.v1` y los otros dominios desde AsyncStorage; el catálogo general sigue en memoria.
+- Los registros de salud no se añaden al snapshot de Cursor ni se exponen por el bridge LAN.
+
 ### Ajustes y zonas
 
 - NAS: `NasSettings` en SQLite + password en SecureStore (`settings/storage.ts`, `settings-context.tsx`).
-- Zonas `music | podcast | video | focus | wealth`: AsyncStorage (`zone-context.tsx`).
+- Zonas `music | podcast | video | focus | wealth | health`: AsyncStorage (`zone-context.tsx`).
 
 ### OTA y push
 
@@ -177,10 +199,10 @@ El bridge **no escribe** focus/wealth desde el TUI: solo lee.
 
 ## Qué no hay (a propósito o pendiente)
 
-- **Backup completo** de `nlc-catalog.db` (export/import de toda la BBDD): no existe.
+- **Backup completo del catálogo** `nlc-catalog.db`: no existe. Salud tiene su propia copia ZIP portátil.
 - **Escritura** de tareas/finanzas desde el TUI: no existe.
 - **Índice SQLite de vídeo**: el listado es siempre live (puede ser lento; el TUI carga en background).
-- **Web:** memoria en proceso; no persiste como el APK.
+- **Web:** catálogo en memoria; Salud persiste en IndexedDB con migración de los valores anteriores.
 
 ## Mapa rápido de ficheros
 
@@ -203,3 +225,140 @@ El bridge **no escribe** focus/wealth desde el TUI: solo lee.
 2. Media → NAS; estado de usuario → teléfono; secretos → SecureStore.
 3. En el bridge, preferir caché SQLite para listados grandes; no bloquear el hilo UI del TUI con NAS lento.
 4. Si se añade tabla o clave AsyncStorage, actualizar este documento en el mismo cambio.
+
+
+### Entrenamientos sin conexión (esquema 8)
+
+`health_training_sessions` conserva una fila por sesión, fecha indexada y payload
+JSON validado con ejercicios y series ordenados. La escritura de la sesión completa
+es atómica en SQLite y no necesita red, cuentas ni NAS. La migración añade tablas
+sin reescribir peso, música o patrimonio. Los cambios consecutivos se serializan;
+una escritura fallida mantiene el último borrador pendiente para reintentar.
+
+`health_training_rest` contiene un único descanso con sesión, ejercicio y fecha
+límite absoluta. Los ticks solo actualizan la pantalla. Los avisos Android son
+notificaciones locales opcionales; se cancelan al sustituir o terminar el descanso.
+El modo web normal usa IndexedDB con migración de AsyncStorage; el modo demo usa SQLite OPFS aislado.
+Los entrenamientos no se envían a Cursor, al bridge LAN ni al NAS.
+
+
+### Medicación y suplementos (esquema 9)
+
+`health_medication_plans` almacena pautas como JSON validado con revisiones por
+fecha efectiva. Una edición o pausa conserva revisiones de días anteriores.
+`health_medication_logs` usa una clave única por pauta/fecha/hora y snapshots del
+nombre, dosis e instrucciones; las correcciones actualizan ese registro sin
+sumarlo dos veces. `health_medication_settings` conserva la preferencia de avisos.
+
+Las escrituras se serializan y cada pauta/toma se guarda con una única operación
+atómica. El estado visible se actualiza después de persistir; un error conserva
+el formulario. La fecha y hora civil del registro se guardan separadas del timestamp
+para no invalidar el historial si cambia la zona horaria del dispositivo.
+
+Las notificaciones se programan con Expo localmente por fechas absolutas calculadas
+desde horarios civiles, con límite de 40 avisos y 30 días. No requieren servidor,
+conexión ni token push. No se modifican notificaciones de tareas o descansos.
+Los datos no se incluyen en el bridge, NAS ni snapshot del asistente.
+
+
+### Fotos de evolución (esquema 10)
+
+`health_body_reviews` conserva metadatos validados y una fecha única por registro.
+Cada vista apunta a un identificador de archivo distinto. SQLite cambia todos los
+metadatos de un registro en una operación atómica; las escrituras del módulo se
+serializan. Las fotos se copian a `documentDirectory/health-body-photos` antes de
+referenciarlas, se limpian si falla el guardado y las anteriores se retiran después
+del commit. Si el proceso se interrumpe o falla la limpieza puede quedar una copia
+huérfana; no se borra automáticamente información existente para recuperarla.
+
+En web, IndexedDB usa los almacenes `reviews` (índice único de fecha) y `photos`
+(blobs), con transacciones conjuntas. La demo usa `nlc-body-photos-demo-v1` y la
+sesión normal `nlc-body-photos-v1`. No usa SQLite en memoria para imágenes ni URLs
+remotas. Las URL de blob son temporales y se liberan al desmontar cada vista.
+
+La preparación de imágenes ocurre localmente, con Expo ImagePicker/ImageManipulator
+nativos y canvas en web. Los módulos nuevos necesitan una APK reconstruida; sus
+imports nativos se difieren hasta seleccionar una foto. Estas imágenes no forman
+parte de sincronización al NAS, exportaciones existentes o snapshots del asistente.
+
+### Nutrición (esquema 11)
+
+`health_nutrition_days` guarda un JSON validado por fecha única: calorías, proteínas,
+carbohidratos, grasas, notas, procedencia y marcas de creación/edición. Los días
+importados pueden conservar un desglose de alimentos de MacroFactor. No se exige
+que las kcal coincidan con la fórmula 4/4/9: se conservan los valores del archivo.
+
+SQLite persiste en Android/iOS y en la demo web; la web normal usa IndexedDB,
+independiente del catálogo en memoria. Las escrituras se serializan y publican
+estado después del commit. La importación y los cambios de fecha usan transacciones
+SQLite; el fallback web escribe una única instantánea. Un fallo no sustituye los
+datos anteriores. El esquema es aditivo y conserva las tablas anteriores.
+
+La importación CSV es local, con selector de documentos de Expo o pegado de texto.
+Valida todas las filas antes de guardar, agrupa por fecha y muestra una vista
+previa. Por defecto añade fechas nuevas y conserva las existentes; sustituir es
+opcional y reemplaza cada fecha completa, conservando sus notas. Una reimportación
+idéntica no modifica filas ni timestamps. Editar manualmente totales importados
+retira el desglose, previa advertencia en el formulario. No se retiene el CSV ni
+se incluyen estos datos en el NAS, bridge o contexto del asistente.
+
+### Analíticas de entrenamientos
+
+`src/lib/health/training/analytics.ts` deriva los resultados de las sesiones
+existentes de `TrainingProvider`. No añade tablas, migraciones ni dependencias.
+Cada reapertura usa las mismas sesiones SQLite/IndexedDB del registro local.
+Editar, reabrir o eliminar una sesión recalcula los resultados sin índices de
+marcas que puedan quedar obsoletos. Los cambios pendientes de persistir se señalan.
+
+Solo cuentan series realizadas de sesiones terminadas con fecha hasta hoy; se
+excluyen calentamientos y series pendientes. Se agrupan bloques del mismo ejercicio
+por nombre NFC, espacios normalizados y minúsculas, sin inventar alias entre
+máquinas o modalidades. Cada sesión conserva su punto aunque coincida en fecha.
+
+El volumen suma carga registrada × repeticiones. Una carga nula no se convierte en
+peso corporal ni en volumen conocido; cero explícito es cero. En mezclas se suma
+el volumen conocido y se indica cuántas series carecen de carga. Las cargas y
+volúmenes positivos, las repeticiones y la estimación Epley (1–10 reps, singles con
+carga real) producen marcas con referencia a la sesión y serie. Los empates retienen
+la primera aparición cronológica y el redondeo evita falsas marcas por flotantes.
+
+Los filtros de 30/90/365 días usan fechas civiles inclusivas; las marcas y sus
+mejoras conservan todo el historial como referencia. El gráfico mantiene huecos
+para valores ausentes, muestra hasta 24 sesiones navegables y no rellena valores ausentes.
+Las semanas se agrupan de lunes a domingo, mostrando las últimas ocho con sesiones
+dentro del período. Todo se calcula en el dispositivo y no se envía al NAS o API.
+
+### Backup y restauración de Salud
+
+`health/backup` exporta un ZIP v1 con `manifest.json` y bytes de imágenes en rutas
+`photos/<id>.<ext>`. El manifiesto incluye SHA-256 de datos e imágenes; el lector
+comprueba estructura y CRC antes de aceptar el archivo. No lleva rutas del teléfono,
+credenciales, datos de otros dominios ni resultados derivados de analíticas. Es un
+archivo sin cifrar. Límites: 128 MiB de archivo/contenido, manifiesto de 8 MiB y
+5.000 fotos; no se descomprimen entradas ni se extraen rutas arbitrarias.
+
+Los stores de Salud usan `coordinatedHealthStore`, compartiendo una barrera con la
+instantánea y restauración. La cola optimista de sesiones se vacía antes de operar.
+Los proveedores se recargan tras aplicar el cambio. Los avisos se apagan y el
+contador de descanso se limpia; el arranque sincroniza también su aviso local.
+
+En nativo, una conexión SQLite aislada evita que escrituras ajenas en segundo plano
+se unan a la transacción. Se preparan fotos con IDs nuevos y una copia ZIP íntegra
+del estado anterior en `documentDirectory/health-backup`. Un commit cambia las
+tablas de Salud y el meta `health_backup_recovery_v1`, que apunta a ese ZIP. Un
+fallo revierte los registros y limpia las copias nuevas; tras el commit se retiran
+las anteriores. Un fallo de limpieza puede dejar archivos huérfanos. No cambia la
+versión 11 de las tablas de dominio ni se sustituye el catálogo completo.
+
+La web normal migra los cuatro valores históricos de AsyncStorage al almacén
+`health-values` dentro de la base de fotos existente, ahora versión 2. Se conservan
+`reviews` y `photos` y se añade `maintenance` para recuperación. Los valores legados
+se copian una vez y se mantienen como referencia; el catálogo general continúa
+en memoria. La restauración de registros, imágenes y ZIP previo usa un solo commit
+IndexedDB. La demo mantiene SQLite OPFS y usa un journal IndexedDB previo al cambio
+SQL: si se interrumpe entre almacenes, revierte SQL antes de leer o escribir Salud.
+
+La copia anterior se puede revisar/restaurar o exportar. Cada restauración sustituye
+esta referencia, permitiendo alternar los dos últimos estados. Una restauración se
+bloquea si no se puede guardar íntegramente el estado actual, sin borrar datos
+ilegibles para continuar. El formato no repara una base de datos físicamente corrupta.
