@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Clapperboard, Mic, Music2, Trash2 } from "lucide-react-native";
@@ -309,7 +310,7 @@ function InventorySection({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,

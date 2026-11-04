@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import type { ReactNode } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 import { ArrowDownCircle, Check, CircleCheck, Trash2 } from "lucide-react-native";
 import { t } from "@/lib/i18n/runtime";
 import { colors, fonts, type } from "@/lib/theme";
@@ -121,10 +122,10 @@ export function ConfirmDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(8, 7, 6, 0.72)",
+    backgroundColor: colors.backdrop,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 28,
@@ -151,13 +152,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   iconDanger: {
-    backgroundColor: "rgba(201, 137, 128, 0.14)",
+    backgroundColor: colors.dangerWash,
   },
   iconAccent: {
-    backgroundColor: "rgba(228, 213, 184, 0.12)",
+    backgroundColor: colors.accentWash,
   },
   iconOk: {
-    backgroundColor: "rgba(143, 184, 154, 0.16)",
+    backgroundColor: colors.okWash,
   },
   title: {
     fontFamily: fonts.serif,

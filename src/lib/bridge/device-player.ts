@@ -17,7 +17,9 @@ type DeviceControls = {
 };
 
 let controls: DeviceControls | null = null;
-let videoControls: DeviceControls | null = null;
+type DeviceVideoControls = Omit<DeviceControls, "play">;
+
+let videoControls: DeviceVideoControls | null = null;
 let deviceDriven = false;
 let videoMode = false;
 let ended = false;
@@ -26,7 +28,7 @@ export function bindDevicePlayer(next: DeviceControls | null) {
   controls = next;
 }
 
-export function bindDeviceVideo(next: DeviceControls | null) {
+export function bindDeviceVideo(next: DeviceVideoControls | null) {
   videoControls = next;
 }
 

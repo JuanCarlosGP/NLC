@@ -187,4 +187,48 @@ CREATE TABLE IF NOT EXISTS wealth_goals (
   updated_at INTEGER NOT NULL,
   archived INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS health_weight_entries (
+  entry_date TEXT PRIMARY KEY NOT NULL CHECK (length(entry_date) = 10),
+  weight_kg REAL NOT NULL CHECK (weight_kg >= 20 AND weight_kg <= 400),
+  note TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS health_training_sessions (
+  id TEXT PRIMARY KEY NOT NULL,
+  session_date TEXT NOT NULL CHECK (length(session_date) = 10),
+  updated_at INTEGER NOT NULL,
+  payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS health_training_date ON health_training_sessions(session_date);
+CREATE TABLE IF NOT EXISTS health_training_rest (
+  id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+  payload TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS health_medication_plans (
+  id TEXT PRIMARY KEY NOT NULL,
+  updated_at INTEGER NOT NULL,
+  payload TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS health_medication_logs (
+  id TEXT PRIMARY KEY NOT NULL,
+  plan_id TEXT NOT NULL REFERENCES health_medication_plans(id),
+  entry_date TEXT NOT NULL CHECK (length(entry_date) = 10),
+  payload TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS health_medication_log_date ON health_medication_logs(entry_date);
+CREATE TABLE IF NOT EXISTS health_medication_settings (
+  id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
+  alerts_enabled INTEGER NOT NULL DEFAULT 0 CHECK (alerts_enabled IN (0, 1))
+);
+CREATE TABLE IF NOT EXISTS health_body_reviews (
+  id TEXT PRIMARY KEY NOT NULL,
+  entry_date TEXT NOT NULL UNIQUE CHECK (length(entry_date) = 10),
+  payload TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS health_nutrition_days (
+  entry_date TEXT PRIMARY KEY NOT NULL CHECK (length(entry_date) = 10),
+  payload TEXT NOT NULL
+);
 `

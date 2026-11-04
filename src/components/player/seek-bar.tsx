@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, Pressable, Text, View } from "react-native";
 import { colors, fonts } from "@/lib/theme";
 
 function formatTime(seconds: number): string {
@@ -56,7 +57,7 @@ export function SeekBar({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   wrap: { gap: 8 },
   hit: { height: 28, justifyContent: "center" },
   track: {

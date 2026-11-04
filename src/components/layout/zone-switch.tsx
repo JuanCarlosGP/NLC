@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
-import { Clapperboard, Mic, Music2, SquareCheck, Wallet } from "lucide-react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Pressable, Switch, Text, View } from "react-native";
+import { Clapperboard, HeartPulse, Mic, Music2, SquareCheck, Wallet } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { APP_ZONES, useZone, type AppZone, type EnabledZones } from "@/lib/zone/zone-context";
@@ -13,6 +14,7 @@ const ICONS: Record<AppZone, typeof Music2> = {
   video: Clapperboard,
   focus: SquareCheck,
   wealth: Wallet,
+  health: HeartPulse,
 };
 
 export function zoneVisibilitySummary(enabled: EnabledZones, t: (path: string) => string): string {
@@ -104,7 +106,7 @@ export function ZoneVisibilitySheet({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   switch: {
     flexDirection: "row",
     alignItems: "center",

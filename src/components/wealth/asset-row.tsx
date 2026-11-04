@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Pressable, Text, View } from "react-native";
 import { t } from "@/lib/i18n/runtime";
 import { colors, fonts } from "@/lib/theme";
 import { formatEuro, formatPct } from "@/lib/wealth/money";
@@ -49,7 +50,7 @@ export const assetListStyle = {
   gap: 2,
 } as const;
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     flexDirection: "row",
     alignItems: "center",

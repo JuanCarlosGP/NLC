@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -289,7 +290,7 @@ function resolveOnceAt(day: "today" | "tomorrow", hour: number, minute: number):
   return startOfDay(when.getTime());
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,

@@ -1,4 +1,5 @@
-import { StyleSheet, Text, type StyleProp, type TextStyle } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Text, type StyleProp, type TextStyle } from "react-native";
 import { fonts } from "@/lib/theme";
 
 type Props = {
@@ -175,7 +176,7 @@ function renderInline(text: string, color: string) {
   });
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   body: {
     fontFamily: fonts.sans,
     fontSize: 14,

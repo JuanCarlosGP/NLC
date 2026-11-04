@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
@@ -601,7 +602,7 @@ function AssetComposerBody({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingBottom: 28, gap: 12 },
   input: {

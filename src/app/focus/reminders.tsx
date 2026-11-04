@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import { Bell, Plus } from "lucide-react-native";
 import { ReminderComposerSheet } from "@/components/productivity/reminder-composer-sheet";
 import { ReminderRow, reminderListStyle } from "@/components/productivity/reminder-row";
@@ -56,7 +57,7 @@ export default function RemindersScreen() {
           </View>
         </View>
         {Platform.OS === "web" ? (
-          <Text style={type.body}>{t("focus.reminderHint")}</Text>
+          <Text style={type.body}>{t(Platform.OS === "web" ? "focus.reminderWebHint" : "focus.reminderHint")}</Text>
         ) : null}
         {sorted.length ? (
           <View style={reminderListStyle}>
@@ -90,7 +91,7 @@ export default function RemindersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: { gap: 6, paddingTop: 8 },
   heading: {
     flexDirection: "row",

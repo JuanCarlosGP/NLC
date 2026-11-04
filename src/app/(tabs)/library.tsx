@@ -1,5 +1,6 @@
+import { createStyles, responsiveBasis } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowUpDown, LayoutGrid, List, Plus } from "lucide-react-native";
 import { AlbumRow } from "@/components/library/album-row";
@@ -9,6 +10,7 @@ import { ImportSheet } from "@/components/library/import-sheet";
 import { LibrarySortSheet, librarySortLabel, type LibrarySort } from "@/components/library/library-sort-sheet";
 import { LibraryTile } from "@/components/library/library-tile";
 import { TrackRow } from "@/components/library/track-row";
+import { WeightScreen } from "@/components/health/weight-screen";
 import { FocusBoard } from "@/components/productivity/focus-board";
 import { WealthCatalog } from "@/components/wealth/wealth-catalog";
 import { Screen } from "@/components/ui/screen";
@@ -100,6 +102,12 @@ function Cell({ children }: { children: ReactNode }) {
 }
 
 export default function LibraryScreen() {
+  const { zone } = useZone();
+  if (zone === "health") return <WeightScreen />;
+  return <ExistingLibraryScreen />;
+}
+
+function ExistingLibraryScreen() {
   const router = useRouter();
   const { t } = useI18n();
   const { zone } = useZone();
@@ -775,7 +783,7 @@ function VideoLibrary({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -842,7 +850,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -6,
   },
   cell: {
-    width: "33.333%",
+    width: responsiveBasis("33.333%", "media-cell"),
     paddingHorizontal: 6,
     paddingBottom: 18,
   },

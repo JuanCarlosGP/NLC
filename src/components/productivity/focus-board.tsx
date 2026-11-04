@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { TaskComposerSheet } from "@/components/productivity/task-composer-sheet";
@@ -125,7 +126,7 @@ export function FocusBoard() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: {
     flexDirection: "row",
     alignItems: "center",

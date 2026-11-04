@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useI18n } from "@/lib/i18n/context";
@@ -163,7 +164,7 @@ function TaskComposerBody({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,

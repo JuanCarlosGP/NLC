@@ -1,4 +1,5 @@
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Platform, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Play } from "lucide-react-native";
 import { useVideoContinue } from "@/hooks/use-video-continue";
@@ -8,7 +9,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
-const RIPPLE = { color: "rgba(240, 235, 227, 0.12)" };
+const RIPPLE = { color: colors.ripple };
 
 function progressRatio(entry: VideoWatchEntry): number {
   if (entry.durationSec <= 0) return 0;
@@ -106,7 +107,7 @@ export function ContinueWatching() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   block: { gap: 14 },
   series: { gap: 10 },
   seriesTitle: {

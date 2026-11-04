@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { TrackRow } from "@/components/library/track-row";
 import { Cover } from "@/components/ui/cover";
@@ -89,7 +90,7 @@ export default function AlbumScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   error: { ...type.body, color: colors.danger },
   header: { gap: 8, paddingBottom: 8 },
   actions: { flexDirection: "row", gap: 10 },

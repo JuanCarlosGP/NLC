@@ -1,9 +1,10 @@
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Platform, Pressable, Text, View } from "react-native";
 import { ChevronRight, Play } from "lucide-react-native";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, layout } from "@/lib/theme";
 
-const RIPPLE = { color: "rgba(240, 235, 227, 0.12)" };
+const RIPPLE = { color: colors.ripple };
 
 export function SeriesRow({
   index,
@@ -70,7 +71,7 @@ export const seriesListStyle = {
   marginHorizontal: -layout.screenPad,
 };
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     minHeight: 56,
     flexDirection: "row",

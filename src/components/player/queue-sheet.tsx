@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Text, View } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { TrackRow } from "@/components/library/track-row";
@@ -47,7 +48,7 @@ function QueueBody() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,

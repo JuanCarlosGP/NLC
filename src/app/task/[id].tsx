@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Star } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
@@ -222,7 +223,7 @@ export default function TaskScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: { gap: 6, paddingTop: 8 },
   art: {
     width: 96,

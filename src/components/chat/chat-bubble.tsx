@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { memo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { ChatMdText } from "@/components/chat/chat-md-text";
@@ -46,7 +47,7 @@ export function ChatTypingMarker() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     width: "100%",
     marginBottom: 10,

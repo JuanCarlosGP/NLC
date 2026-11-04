@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { ChevronLeft, ChevronRight, File, Folder } from "lucide-react-native";
@@ -17,7 +18,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { webInteractiveStyle } from "@/lib/interactive";
 import { colors, fonts, type } from "@/lib/theme";
 
-const RIPPLE = { color: "rgba(240, 235, 227, 0.12)" };
+const RIPPLE = { color: colors.ripple };
 const LIST_CAP = 120;
 
 function configuredLibraries(
@@ -267,7 +268,7 @@ export function NasExplorerSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -373,6 +374,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(14, 13, 12, 0.28)",
+    backgroundColor: colors.glassSoft,
   },
 });

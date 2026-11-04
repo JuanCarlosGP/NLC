@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { memo, useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { MoreVertical } from "lucide-react-native";
 import { Cover } from "@/components/ui/cover";
@@ -87,7 +88,7 @@ export const TrackRow = memo(function TrackRow({
   );
 });
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     flexDirection: "row",
     alignItems: "center",

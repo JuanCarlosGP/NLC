@@ -1,5 +1,7 @@
+import { IntegrationCard } from "@/components/integrations/shared";
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ArrowUpDown, Plus, Search } from "lucide-react-native";
 import { LadybugMark } from "@/components/brand/ladybug-mark";
@@ -90,6 +92,8 @@ export function WealthHome() {
           <LadybugMark />
           <ZoneSwitch />
         </View>
+
+        <IntegrationCard provider="mercury" />
 
         <View style={styles.tabs}>
           {homeTabs.map((item) => {
@@ -390,7 +394,7 @@ function QuickCard({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   hero: {
     flexDirection: "row",
     alignItems: "center",
@@ -541,6 +545,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   action: {
+    minHeight: 44,
     flex: 1,
     flexDirection: "row",
     alignItems: "center",

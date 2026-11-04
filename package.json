@@ -42,7 +42,19 @@
     "update:preview": "npx eas-cli update --channel preview && node scripts/notify-ota.mjs preview",
     "update:production": "npx eas-cli update --channel production && node scripts/notify-ota.mjs production",
     "apk:release": "node scripts/release-apk.mjs",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "test:health": "node scripts/test-health-weight.cjs",
+    "demo:nas": "python3 scripts/local-demo-nas.py",
+    "demo:web": "EXPO_PUBLIC_NLC_DEMO=1 EXPO_OFFLINE=1 EXPO_NO_TELEMETRY=1 expo start --web --localhost --port 8084",
+    "test:behavior": "node scripts/test-local-behavior.cjs",
+    "test:training": "node scripts/test-training.cjs",
+    "test:medication": "node scripts/test-medication.cjs",
+    "test:body-photos": "node scripts/test-body-photos.cjs",
+    "test:nutrition": "node scripts/test-nutrition.cjs",
+    "test:training-analytics": "node scripts/test-training-analytics.cjs",
+    "test:health-backup": "node scripts/test-health-backup.cjs",
+    "integrations": "node --env-file-if-exists=.env.integrations.local scripts/integrations/server.mjs",
+    "test:integrations": "node --test scripts/test-integrations.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
@@ -57,15 +69,19 @@
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.9",
     "expo-crypto": "~15.0.9",
+    "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.24",
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",
+    "expo-image-manipulator": "~14.0.8",
+    "expo-image-picker": "~17.0.11",
     "expo-intent-launcher": "~13.0.8",
     "expo-linking": "~8.0.8",
     "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.13",
     "expo-screen-orientation": "~9.0.9",
     "expo-secure-store": "~15.0.8",
+    "expo-sharing": "~14.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.8",
@@ -73,6 +89,7 @@
     "expo-updates": "~29.0.20",
     "expo-video": "~3.0.16",
     "expo-web-browser": "~15.0.11",
+    "fflate": "^0.8.3",
     "lucide-react-native": "^1.23.0",
     "nlc-lan-bridge": "file:modules/nlc-lan-bridge",
     "react": "19.1.0",
@@ -88,6 +105,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "fake-indexeddb": "^6.2.4",
     "typescript": "~5.9.2"
   }
 }

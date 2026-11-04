@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useState } from "react";
-import { AppState, Platform, StyleSheet, Switch, Text, View } from "react-native";
+import { AppState, Platform, Switch, Text, View } from "react-native";
 import { getLanAddress, isLanBridgeAvailable } from "nlc-lan-bridge";
 import { loadWebTuiEnabled, saveWebTuiEnabled, startPhoneWebTui, stopPhoneWebTui, webTuiUrl } from "@/lib/bridge/web-tui";
 import { useI18n } from "@/lib/i18n/context";
@@ -101,7 +102,7 @@ export function DesktopWebTui() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     flexDirection: "row",
     alignItems: "center",

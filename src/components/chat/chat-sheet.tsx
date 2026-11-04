@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -345,11 +346,11 @@ function ChatSheetBody() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   panel: { flex: 1, minHeight: 0 },
   dialogBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(8, 7, 6, 0.72)",
+    backgroundColor: colors.backdrop,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,

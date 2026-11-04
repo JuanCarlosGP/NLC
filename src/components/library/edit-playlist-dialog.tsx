@@ -1,10 +1,10 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -258,7 +258,7 @@ export function EditPlaylistDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(6, 7, 10, 0.72)",
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(228, 213, 184, 0.12)",
+    backgroundColor: colors.accentWash,
   },
   title: {
     fontFamily: fonts.serif,

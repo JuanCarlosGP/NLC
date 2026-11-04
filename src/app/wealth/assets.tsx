@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { AssetComposerSheet } from "@/components/wealth/account-composer-sheet";
@@ -57,7 +58,7 @@ export default function WealthAssetsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: {
     flexDirection: "row",
     alignItems: "center",

@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import { Gesture, GestureDetector, type GestureType } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
@@ -342,7 +343,7 @@ function SortableRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   rowWrap: {
     backgroundColor: colors.void,
   },

@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SeriesRow, seriesListStyle } from "@/components/video/series-row";
 import { useSettings } from "@/lib/settings/settings-context";
@@ -87,7 +88,7 @@ export function VideoBrowse({ path }: { path: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: { gap: 6, paddingBottom: 4 },
   error: { ...type.body, color: colors.danger },
 });

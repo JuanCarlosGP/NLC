@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef, useState } from "react";
-import { Image, Platform, StyleSheet, View, type ImageStyle } from "react-native";
+import { Image, Platform, View, type ImageStyle } from "react-native";
 
 const SHEET = require("../../../assets/ladybug-sheet-hd.png");
 const COLS = 8;
@@ -103,7 +104,7 @@ export function LadybugMark() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   hit: {
     width: WIN_W,
     height: WIN_H + 2,

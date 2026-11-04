@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { TxComposerSheet } from "@/components/wealth/tx-composer-sheet";
@@ -66,7 +67,7 @@ export function WealthLedger({ title }: { title?: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: {
     flexDirection: "row",
     alignItems: "center",

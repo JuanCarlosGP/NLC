@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
@@ -32,7 +33,7 @@ export function TintWash({
   );
 }
 
-export const tintWashStyles = StyleSheet.create({
+export const tintWashStyles = createStyles({
   fill: {
     ...StyleSheet.absoluteFillObject,
   },

@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { t } from "@/lib/i18n/runtime";
 import { colors, fonts } from "@/lib/theme";
 
@@ -41,7 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   fill: {
     flex: 1,
     backgroundColor: colors.void,

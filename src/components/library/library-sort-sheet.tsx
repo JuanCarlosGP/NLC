@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Pressable, Text } from "react-native";
 import { Check } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -59,7 +60,7 @@ export function LibrarySortSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,

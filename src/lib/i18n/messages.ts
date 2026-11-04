@@ -1,4 +1,13 @@
+import { integrationsEn, integrationsEs } from "@/lib/i18n/catalog-integrations";
+import { appearanceEn, appearanceEs } from "@/lib/i18n/catalog-appearance";
+import { healthBackupEn, healthBackupEs } from "@/lib/i18n/catalog-health-backup";
+import { trainingAnalyticsEn, trainingAnalyticsEs } from "@/lib/i18n/catalog-training-analytics";
+import { nutritionEn, nutritionEs } from "@/lib/i18n/catalog-nutrition";
+import { bodyEn, bodyEs } from "@/lib/i18n/catalog-body";
+import { medicationEn, medicationEs } from "@/lib/i18n/catalog-medication";
+import { trainingEn, trainingEs } from "@/lib/i18n/catalog-training";
 import { commonEn, commonEs } from "@/lib/i18n/catalog-common";
+import { healthEn, healthEs } from "@/lib/i18n/catalog-health";
 import { lifeEn, lifeEs } from "@/lib/i18n/catalog-life";
 import { mediaEn, mediaEs } from "@/lib/i18n/catalog-media";
 import { settingsEn, settingsEs } from "@/lib/i18n/catalog-settings";
@@ -25,6 +34,7 @@ const coreEn = {
     video: "Video",
     focus: "Tasks",
     wealth: "Wealth",
+    health: "Health",
     allVisible: "All visible",
     none: "None",
   },
@@ -40,7 +50,7 @@ const coreEn = {
     entering: "Entering…",
     stepOf: "{current} of {total}",
     kicker: "Personal library",
-    welcomeBody1: "Your library lives on your NAS. NLC puts it on the phone.",
+    welcomeBody1: "Your NAS library, in NLC.",
     welcomeBody2: "Connect the NAS. Then you pick the folders.",
     needTitle: "What you need",
     needIntro: "This is what you will set up:",
@@ -49,12 +59,12 @@ const coreEn = {
     needAuth: "Username and password",
     needAuthHint: "The WebDAV account, not your email.",
     needFolders: "Folders",
-    needFoldersHint: "One library share. Podcasts and Canciones go inside. Video can be another share.",
+    needFoldersHint: "A library with Podcasts and Canciones. Video can be separate.",
     needPrivacy: "Local and private",
-    needPrivacyHint: "No third-party services. Your library does not leave your NAS or this phone.",
-    needFooter: "You will find them in the NAS panel. Folders come in the next step.",
+    needPrivacyHint: "Your library stays on the NAS and this device.",
+    needFooter: "Find these details in your NAS panel.",
     connectTitle: "Connect",
-    connectBody: "Connection only. Folders come next. The password stays on the phone.",
+    connectBody: "Connect the NAS. The password stays on this device.",
     host: "Host",
     hostHint: "IP or hostname of the NAS.",
     port: "Port",
@@ -63,7 +73,7 @@ const coreEn = {
     https: "HTTPS",
     foldersTitle: "Folders",
     foldersBody:
-      "The folder you pick is the library. Inside it: {podcasts} and {songs}. Playlists, tasks and wealth JSON live at that root. {video} can be a different share.",
+      "Library: {podcasts} and {songs}. Playlists and data are saved here. {video} can be separate.",
     root: "Root",
     rootA11y: "Folder root",
     browse: "Browse folder",
@@ -89,7 +99,7 @@ const coreEn = {
     listFail: "The folder could not be read.",
     readyTitle: "Ready",
     readyBody: "This is the connection:",
-    readyHint: "If a folder is missing, you can point to it later in Settings.",
+    readyHint: "You can change folders later in Settings.",
     musicPath: "Music · {path}",
     podcastsPath: "Podcasts · {path}",
     videoPath: "Video · {path}",
@@ -136,6 +146,7 @@ const coreEs = {
     video: "Vídeo",
     focus: "Tareas",
     wealth: "Patrimonio",
+    health: "Salud",
     allVisible: "Todos visibles",
     none: "Ninguno",
   },
@@ -151,7 +162,7 @@ const coreEs = {
     entering: "Entrando…",
     stepOf: "{current} de {total}",
     kicker: "Biblioteca personal",
-    welcomeBody1: "Tu biblioteca vive en tu NAS. NLC la pone en el teléfono.",
+    welcomeBody1: "Tu biblioteca del NAS, en NLC.",
     welcomeBody2: "Conecta el NAS. Luego eliges las carpetas.",
     needTitle: "Qué necesitas",
     needIntro: "Esto es lo que vas a configurar:",
@@ -160,12 +171,12 @@ const coreEs = {
     needAuth: "Usuario y contraseña",
     needAuthHint: "La cuenta WebDAV, no la del correo.",
     needFolders: "Carpetas",
-    needFoldersHint: "Un share de biblioteca. Dentro, Podcasts y Canciones. El vídeo puede ser otro share.",
+    needFoldersHint: "Biblioteca con Podcasts y Canciones. El vídeo puede ir aparte.",
     needPrivacy: "Local y privado",
-    needPrivacyHint: "No hay servicios de terceros. Tu biblioteca no sale de tu NAS ni de este teléfono.",
-    needFooter: "Los ves en el panel del NAS. Las carpetas van en el paso siguiente.",
+    needPrivacyHint: "Tu biblioteca queda en el NAS y este dispositivo.",
+    needFooter: "Consulta estos datos en el panel del NAS.",
     connectTitle: "Conectar",
-    connectBody: "Solo la conexión. Las carpetas van en el siguiente paso. La contraseña queda en el teléfono.",
+    connectBody: "Conecta el NAS. La contraseña se guarda en este dispositivo.",
     host: "Host",
     hostHint: "IP o hostname del NAS.",
     port: "Puerto",
@@ -174,7 +185,7 @@ const coreEs = {
     https: "HTTPS",
     foldersTitle: "Carpetas",
     foldersBody:
-      "La carpeta que elijas es la biblioteca. Dentro: {podcasts} y {songs}. Playlists, tareas y patrimonio van en JSON en esa raíz. {video} puede ser otro share.",
+      "Biblioteca: {podcasts} y {songs}. Las listas y los datos se guardan aquí. {video} puede ir aparte.",
     root: "Raíz",
     rootA11y: "Raíz de las carpetas",
     browse: "Revisar carpeta",
@@ -200,7 +211,7 @@ const coreEs = {
     listFail: "No se pudo leer la carpeta.",
     readyTitle: "Listo",
     readyBody: "Esta es la conexión:",
-    readyHint: "Si falta alguna carpeta, la puedes apuntar después en Ajustes.",
+    readyHint: "Puedes cambiar las carpetas después en Ajustes.",
     musicPath: "Música · {path}",
     podcastsPath: "Podcasts · {path}",
     videoPath: "Vídeo · {path}",
@@ -232,6 +243,15 @@ export const messages = {
     ...settingsEn,
     ...mediaEn,
     ...lifeEn,
+    ...healthEn,
+    ...trainingEn,
+    ...medicationEn,
+    ...bodyEn,
+    ...nutritionEn,
+    ...trainingAnalyticsEn,
+    ...healthBackupEn,
+    ...appearanceEn,
+    ...integrationsEn,
   },
   es: {
     ...commonEs,
@@ -239,6 +259,15 @@ export const messages = {
     ...settingsEs,
     ...mediaEs,
     ...lifeEs,
+    ...healthEs,
+    ...trainingEs,
+    ...medicationEs,
+    ...bodyEs,
+    ...nutritionEs,
+    ...trainingAnalyticsEs,
+    ...healthBackupEs,
+    ...appearanceEs,
+    ...integrationsEs,
   },
 } as const;
 

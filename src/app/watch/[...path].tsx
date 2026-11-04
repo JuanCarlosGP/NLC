@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -492,7 +493,7 @@ export default function WatchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   root: {
     flex: 1,
     backgroundColor: "#000",

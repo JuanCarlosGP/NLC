@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { PanResponder, Platform, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { PanResponder, Platform, Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import { colors, fonts } from "@/lib/theme";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
@@ -234,7 +235,7 @@ export function WealthChart({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   wrap: { gap: 8, width: "100%" },
   frame: {
     overflow: "hidden",

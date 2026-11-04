@@ -523,7 +523,7 @@ export function formatChartScrub(at: number, range: WealthRange): string {
 
 export function formatChartAxis(at: number, range: WealthRange, now = Date.now()): string {
   if (range === "1d") return localeTime(at);
-  if (startOfLocalDay(at) === startOfLocalDay(now)) return t("common.today");
+  if (startOfLocalDay(at) === startOfLocalDay(now)) return t("dates.today");
   if (range === "1w") return localeStamp(at, { weekday: "short", day: "numeric", month: "short" });
   const sameYear = new Date(at).getFullYear() === new Date(now).getFullYear();
   return localeStamp(at, {
@@ -617,7 +617,9 @@ export function goalProgress(
   }
   let onTrack: boolean | null = null;
   if (goal.deadlineAt != null && !reached) {
-    onTrack = etaAt != null ? etaAt <= goal.deadlineAt : goal.deadlineAt >= now;
+    onTrack = etaAt != null
+      ? etaAt <= goal.deadlineAt
+      : goal.deadlineAt < now || (pacePerMonth != null && pacePerMonth <= 0.5) ? false : null;
   }
   const scopeLabel = goalScopeLabel(goal, accounts, assets);
   return { goal, current, remaining, pct, reached, pacePerMonth, etaAt, onTrack, scopeLabel };

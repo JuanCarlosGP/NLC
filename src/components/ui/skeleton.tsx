@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef } from "react";
-import { Animated, StyleSheet, type ViewStyle } from "react-native";
+import { Animated, type ViewStyle } from "react-native";
 import { colors } from "@/lib/theme";
 
 export function Bone({ style }: { style?: ViewStyle }) {
@@ -19,7 +20,7 @@ export function Bone({ style }: { style?: ViewStyle }) {
   return <Animated.View style={[styles.bone, style, { opacity }]} />;
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   bone: {
     backgroundColor: colors.rule,
     borderRadius: 4,
