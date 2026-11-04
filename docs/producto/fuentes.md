@@ -4,6 +4,8 @@
 
 El paso 2 del onboarding permite elegir **En este teléfono** o **NAS**. El recorrido local pasa directamente a las carpetas de Música, Audio/Podcasts, Vídeo, Tareas, Finanzas y Salud; no solicita servidor ni credenciales. Las carpetas se pueden omitir y configurar después.
 
+En **Tus carpetas → Carpeta general** se puede elegir un directorio del teléfono o de la tarjeta SD. NLC crea o reutiliza dentro `Music`, `Podcasts`, `Video`, `Tasks`, `Wealth` y `Health`, y configura las seis fuentes con un único permiso. Las carpetas individuales siguen disponibles. La selección no mueve archivos de ubicaciones anteriores ni restaura datos de Salud. Si hay un archivo que impide crear una subcarpeta, no se aplica la configuración parcial.
+
 Cada servicio tiene su propia selección Teléfono / NAS / NAS + teléfono en Ajustes. Las instalaciones anteriores conservan la combinación de fuentes que tenían. El servidor WebDAV sigue siendo compartido y las rutas son independientes por servicio; vídeo conserva su conexión propia.
 
 Música, audio y vídeo leen los archivos de sus carpetas. Tareas y Finanzas trabajan en SQLite en el teléfono y conservan sus espejos `nlc-tasks.json` y `nlc-wealth.json` en las carpetas configuradas. **Salud siempre guarda los registros y las fotos en el teléfono**: Fuente configura la carpeta de sus copias y, opcionalmente, una ruta del NAS para guardar/abrir una copia manual. WHOOP también se abre desde esa sección. Elegir una carpeta de Salud no restaura datos automáticamente.

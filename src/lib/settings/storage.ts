@@ -14,6 +14,8 @@ const ONBOARDING_META_KEY = "onboarding_v1";
 export type ServiceId = "music" | "podcast" | "video" | "focus" | "wealth" | "health";
 export type ServiceSourceMode = "local" | "nas" | "both";
 export type NasSettings = {
+  localRootFolderUri?: string;
+  localRootFolderName?: string;
   serviceSources?: Partial<Record<ServiceId, ServiceSourceMode>>;
   healthSharePath?: string;
   healthLocalFolderUri?: string;

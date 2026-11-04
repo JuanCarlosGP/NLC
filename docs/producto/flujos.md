@@ -9,6 +9,10 @@
 
 Si eliges NAS, el asistente muestra **Qué necesitas**, Conectar, Carpetas y el resumen. Volver a ver el asistente o saltarlo conserva la configuración y los datos existentes.
 
+## Una carpeta para los seis servicios
+
+En el recorrido **En este teléfono → Tus carpetas**, pulsar **Carpeta general**, elegir una ubicación y conceder acceso. NLC prepara las seis subcarpetas y muestra las rutas en las tarjetas de cada servicio. Se pueden modificar individualmente antes de continuar. Volver a elegir la misma carpeta reutiliza los directorios; no mueve ni borra los archivos existentes.
+
 ## Exportar e importar un servicio
 
 1. Elegir el servicio y entrar en **Ajustes → App → Exportar / importar servicio**.
