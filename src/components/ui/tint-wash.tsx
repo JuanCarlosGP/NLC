@@ -1,4 +1,5 @@
-import { createStyles } from "@/lib/appearance/density";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { createStyles, isNativePixel } from "@/lib/appearance/density";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
@@ -15,6 +16,8 @@ export function TintWash({
   style?: StyleProp<ViewStyle>;
   fromOpacity?: number;
 }) {
+  useThemeId();
+  if (isNativePixel()) return null;
   const gid = `wash-${id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   return (
     <View pointerEvents="none" style={style}>
@@ -33,8 +36,8 @@ export function TintWash({
   );
 }
 
-export const tintWashStyles = createStyles({
+export const tintWashStyles = createStyles(() => ({
   fill: {
     ...StyleSheet.absoluteFillObject,
   },
-});
+}));

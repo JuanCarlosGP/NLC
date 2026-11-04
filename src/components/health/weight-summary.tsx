@@ -1,5 +1,7 @@
-import { createStyles, densityData } from "@/lib/appearance/density";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { createStyles, densityData, isNativePixel } from "@/lib/appearance/density";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Plus, Trash2 } from "lucide-react-native";
 import { weightSummary, type WeightEntry } from "@/lib/health/weight/model";
 import { useWeight } from "@/lib/health/weight/weight-context";
@@ -8,6 +10,7 @@ import { colors, fonts, type } from "@/lib/theme";
 import { weightDate, weightNumber } from "./weight-format";
 
 export function AddWeightButton({ onPress, disabled = false }: { onPress(): void; disabled?: boolean }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress}
@@ -19,6 +22,7 @@ export function AddWeightButton({ onPress, disabled = false }: { onPress(): void
 }
 
 export function WeightLoadState() {
+  useThemeId();
   const { ready, loadFailed, refresh } = useWeight();
   const { t } = useI18n();
   if (!ready) return <Text style={type.meta}>{t("common.loading")}</Text>;
@@ -34,6 +38,7 @@ export function WeightLoadState() {
 }
 
 export function WeightSummary({ entries }: { entries: WeightEntry[] }) {
+  useThemeId();
   const { t, locale } = useI18n();
   const { latest, average7d, changeKg, count } = weightSummary(entries);
   const stats = [
@@ -55,6 +60,7 @@ export function WeightSummary({ entries }: { entries: WeightEntry[] }) {
 }
 
 export function WeightRow({ entry, onEdit, onDelete }: { entry: WeightEntry; onEdit(): void; onDelete?(): void }) {
+  useThemeId();
   const { t, locale } = useI18n();
   const date = weightDate(entry.entryDate, locale);
   return (
@@ -73,20 +79,21 @@ export function WeightRow({ entry, onEdit, onDelete }: { entry: WeightEntry; onE
 }
 
 export function WeightEmpty() {
+  useThemeId();
   const { t } = useI18n();
   return <View style={styles.empty}><Text style={type.sectionTitle}>{t("health.emptyTitle")}</Text><Text style={type.body}>{t("health.emptyBody")}</Text></View>;
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   add: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14 },
   addLabel: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.accentText },
   stats: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   stat: { flexGrow: 1, flexBasis: "45%", backgroundColor: colors.sheet, borderWidth: 1, borderColor: colors.rule, borderRadius: 12, padding: 16, gap: 8 },
-  value: { fontFamily: fonts.serif, fontSize: 32, color: colors.ink }, unit: { ...type.meta, fontFamily: fonts.sans },
+  value: { fontFamily: fonts.serif, fontSize: 32, ...(isNativePixel() ? { lineHeight: 38 } : {}), color: colors.ink }, unit: { ...type.meta, fontFamily: fonts.sans },
   row: { flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.rule },
   entry: { flex: 1, flexDirection: "row", alignItems: "center", paddingVertical: 16, gap: 12 },
   dateNote: { flex: 1, gap: 4 }, date: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-  kg: { fontFamily: fonts.sansMedium, fontSize: 17, color: colors.ink }, remove: { padding: 14 },
+  kg: { fontFamily: fonts.sansMedium, fontSize: 17, color: colors.ink }, remove: { padding: 14, minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center" },
   empty: { borderWidth: 1, borderColor: colors.rule, backgroundColor: colors.sheet, borderRadius: 14, padding: 22, gap: 8 },
   error: { gap: 8 }, retry: { alignSelf: "flex-start", paddingVertical: 8 }, link: { ...type.body, color: colors.accent },
-});
+}));

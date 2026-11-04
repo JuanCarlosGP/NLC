@@ -1,10 +1,13 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { Link, Stack } from "expo-router";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useI18n } from "@/lib/i18n/context";
 import { colors, type } from "@/lib/theme";
 
 export default function NotFoundScreen() {
+  useThemeId();
   const { t } = useI18n();
   return (
     <>
@@ -19,7 +22,7 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   wrap: {
     flex: 1,
     backgroundColor: colors.void,
@@ -28,4 +31,4 @@ const styles = createStyles({
     gap: 12,
   },
   link: { paddingVertical: 8 },
-});
+}));

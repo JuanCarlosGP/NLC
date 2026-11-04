@@ -1,9 +1,11 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef } from "react";
 import { Animated, type ViewStyle } from "react-native";
 import { colors } from "@/lib/theme";
 
 export function Bone({ style }: { style?: ViewStyle }) {
+  useThemeId();
   const opacity = useRef(new Animated.Value(0.42)).current;
 
   useEffect(() => {
@@ -20,9 +22,9 @@ export function Bone({ style }: { style?: ViewStyle }) {
   return <Animated.View style={[styles.bone, style, { opacity }]} />;
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   bone: {
     backgroundColor: colors.rule,
     borderRadius: 4,
   },
-});
+}));

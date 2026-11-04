@@ -1,8 +1,9 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Platform, Pressable, Switch, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, Switch, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { colors, fonts, type } from "@/lib/theme";
 
-const RIPPLE = { color: colors.ripple };
 
 export function Field({
   label,
@@ -27,6 +28,7 @@ export function Field({
   error?: string;
   accessibilityLabel?: string;
 }) {
+  useThemeId();
   return (
     <View style={styles.field}>
       <Text style={type.label}>{label}</Text>
@@ -65,13 +67,14 @@ export function SwitchRow({
   onValueChange: (value: boolean) => void;
   accessibilityLabel?: string;
 }) {
+  useThemeId();
   const name = accessibilityLabel ?? label;
   return (
     <Pressable
       accessibilityRole="switch"
       accessibilityLabel={name}
       accessibilityState={{ checked: value }}
-      android_ripple={RIPPLE}
+      android_ripple={{ color: colors.ripple }}
       onPress={() => onValueChange(!value)}
       style={({ pressed }) => [styles.switchRow, { opacity: pressed ? 0.82 : 1 }]}
     >
@@ -90,7 +93,7 @@ export function SwitchRow({
   );
 }
 
-export const sourceFieldStyles = createStyles({
+export const sourceFieldStyles = createStyles(() => ({
   field: { gap: 6 },
   input: {
     borderWidth: 1,
@@ -132,6 +135,6 @@ export const sourceFieldStyles = createStyles({
   switchMeta: { flex: 1, gap: 2 },
   switchLabel: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
   switchHint: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
-});
+}));
 
 const styles = sourceFieldStyles;

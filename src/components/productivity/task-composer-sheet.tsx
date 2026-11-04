@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useI18n } from "@/lib/i18n/context";
@@ -21,6 +23,7 @@ export function TaskComposerSheet({
   defaultProjectId?: string | null;
   defaultDue?: "none" | "today" | "tomorrow";
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet
@@ -50,6 +53,7 @@ function TaskComposerBody({
   defaultDue: "none" | "today" | "tomorrow";
   onDone: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { createTask } = useProductivity();
   const projects = useActiveProjects();
@@ -164,7 +168,7 @@ function TaskComposerBody({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -230,4 +234,4 @@ const styles = createStyles({
     fontSize: 15,
     color: colors.accentText,
   },
-});
+}));

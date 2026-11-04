@@ -1,15 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState } from "react";
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Info } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
@@ -66,6 +59,7 @@ export function LocalFolderSheet({
   feedback: SettingsFeedback | null;
   variant?: "music" | "podcast" | "video" | "wealth" | "focus";
 }) {
+  useThemeId();
   const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -210,6 +204,7 @@ function LocalFolderHelpDialog({
   onClose: () => void;
   variant?: "music" | "podcast" | "video" | "wealth" | "focus";
 }) {
+  useThemeId();
   const { t } = useI18n();
   const stepKeys =
     variant === "video"
@@ -280,7 +275,7 @@ function LocalFolderHelpDialog({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,
@@ -435,4 +430,4 @@ const styles = createStyles({
     fontSize: 15,
     color: colors.accentText,
   },
-});
+}));

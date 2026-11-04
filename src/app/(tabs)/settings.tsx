@@ -1,7 +1,9 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { AppearancePicker } from "@/components/settings/appearance-picker";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter, type Href } from "expo-router";
 import { ChevronRight } from "lucide-react-native";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -39,6 +41,7 @@ import { USE_NATIVE_DRIVER } from "@/lib/use-native-driver";
 import { useZone, isMediaZone } from "@/lib/zone/zone-context";
 
 export default function SettingsScreen() {
+  useThemeId();
   const router = useRouter();
   const update = useAppUpdate();
   const nas = useNasSettings();
@@ -682,6 +685,7 @@ function SettingsGroup({
   hintColor?: string;
   children: ReactNode;
 }) {
+  useThemeId();
   return (
     <View style={styles.group}>
       <Text style={styles.groupLabel}>{label}</Text>
@@ -708,6 +712,7 @@ function SettingsRow({
   chevron?: boolean;
   onPress?: () => void;
 }) {
+  useThemeId();
   const body = (
     <>
       <View style={styles.rowMeta}>
@@ -741,6 +746,7 @@ function SettingsRow({
 }
 
 function StatusDot({ on }: { on: boolean }) {
+  useThemeId();
   const { t } = useI18n();
   const pulse = useRef(new Animated.Value(0)).current;
 
@@ -779,7 +785,7 @@ function StatusDot({ on }: { on: boolean }) {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   heading: {
     flexDirection: "row",
     alignItems: "center",
@@ -868,4 +874,4 @@ const styles = createStyles({
     ...type.meta,
     paddingHorizontal: 2,
   },
-});
+}));

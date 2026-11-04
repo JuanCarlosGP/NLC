@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n/runtime";
 import { colors, fonts } from "@/lib/theme";
 import { formatEuro, formatPct } from "@/lib/wealth/money";
@@ -16,6 +18,7 @@ export function AssetRow({
   onPress: () => void;
   showAccount?: boolean;
 }) {
+  useThemeId();
   const { liveAccounts } = useWealth();
   const up = position.pnl >= 0;
   const accountName =
@@ -46,11 +49,12 @@ export function AssetRow({
   );
 }
 
-export const assetListStyle = {
+const assetListStyleSheet = createStyles(() => ({ item: {
   gap: 2,
-} as const;
+} }));
+export function assetListStyle() { return assetListStyleSheet.item; }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -93,4 +97,4 @@ const styles = createStyles({
   },
   up: { color: colors.ok },
   down: { color: colors.danger },
-});
+}));

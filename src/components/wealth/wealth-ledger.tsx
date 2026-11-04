@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { TxComposerSheet } from "@/components/wealth/tx-composer-sheet";
@@ -12,6 +14,7 @@ import { useWealth } from "@/lib/wealth/wealth-context";
 import { TX_KIND_LABEL, TX_KINDS, type WealthTxKind } from "@/lib/wealth/types";
 
 export function WealthLedger({ title }: { title?: string }) {
+  useThemeId();
   const { t } = useI18n();
   const { txs } = useWealth();
   const [filter, setFilter] = useState<WealthTxKind | null>(null);
@@ -53,7 +56,7 @@ export function WealthLedger({ title }: { title?: string }) {
           })}
         </View>
         {visible.length ? (
-          <View style={txListStyle}>
+          <View style={txListStyle()}>
             {visible.map((tx) => (
               <TxRow key={tx.id} tx={tx} />
             ))}
@@ -67,7 +70,7 @@ export function WealthLedger({ title }: { title?: string }) {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -88,4 +91,4 @@ const styles = createStyles({
   chipOn: { backgroundColor: colors.ink, borderColor: colors.ink },
   chipLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.inkSoft },
   chipLabelOn: { color: colors.void },
-});
+}));

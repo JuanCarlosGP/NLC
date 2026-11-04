@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { PanResponder, Platform, Text, View, useWindowDimensions } from "react-native";
+import { PanResponder, Platform, View, useWindowDimensions } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import { colors, fonts } from "@/lib/theme";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
@@ -101,6 +103,7 @@ export function WealthChart({
   height?: number;
   fromZero?: boolean;
 }) {
+  useThemeId();
   const { width: windowWidth } = useWindowDimensions();
   const [boxW, setBoxW] = useState(0);
   const width = Math.max(220, boxW || windowWidth - 72);
@@ -235,7 +238,7 @@ export function WealthChart({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   wrap: { gap: 8, width: "100%" },
   frame: {
     overflow: "hidden",
@@ -264,4 +267,4 @@ const styles = createStyles({
   },
   metaLive: { color: colors.inkSoft },
   metaPin: { color: colors.ink },
-});
+}));

@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Screen } from "@/components/ui/screen";
 import { localDemoEnabled } from "@/lib/dev/local-demo";
 import { demoSummary, seedLocalDemo } from "@/lib/dev/seed-demo";
@@ -10,6 +12,7 @@ import { useZone } from "@/lib/zone/zone-context";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function LocalDemoScreen() {
+  useThemeId();
   const { setLocale } = useI18n();
   const { reloadSource } = useSettings();
   const { setZone } = useZone();
@@ -45,9 +48,9 @@ export default function LocalDemoScreen() {
   </Screen>;
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   button: { backgroundColor: colors.accent, borderRadius: 10, padding: 16, alignItems: "center" },
   buttonText: { fontFamily: fonts.sansMedium, color: colors.accentText, fontSize: 15 },
   summary: { padding: 16, borderWidth: 1, borderColor: colors.rule, borderRadius: 12, gap: 5 },
   error: { ...type.body, color: colors.danger },
-});
+}));

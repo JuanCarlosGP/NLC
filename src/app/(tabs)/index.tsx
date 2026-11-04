@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowUpDown, LayoutGrid, List } from "lucide-react-native";
 import { HealthHome } from "@/components/health/health-home";
@@ -40,12 +42,14 @@ function isGenericPodcastBucket(name: string): boolean {
 }
 
 export default function HomeScreen() {
+  useThemeId();
   const { zone } = useZone();
   if (zone === "health") return <HealthHome />;
   return <ExistingHomeScreen />;
 }
 
 function ExistingHomeScreen() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { recents, musicAlbums, podcastAlbums, loading, error, refresh } = useHome();
@@ -320,6 +324,7 @@ function ExistingHomeScreen() {
 }
 
 function HomeTrackTile({ track, onPress }: { track: Track; onPress: () => void }) {
+  useThemeId();
   const cover = useTrackArtwork(track);
   const { openTrackActions } = useTrackActions();
   return (
@@ -334,7 +339,7 @@ function HomeTrackTile({ track, onPress }: { track: Track; onPress: () => void }
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   hero: {
     flexDirection: "row",
     alignItems: "center",
@@ -379,4 +384,4 @@ const styles = createStyles({
     flexWrap: "wrap",
     gap: 8,
   },
-});
+}));

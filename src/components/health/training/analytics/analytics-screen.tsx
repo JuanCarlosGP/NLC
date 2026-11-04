@@ -1,7 +1,9 @@
-import { densityData, space } from "@/lib/appearance/density";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { densityData, space, radius } from "@/lib/appearance/density";
 import { InlineHelp } from "@/components/ui/inline-help";
 import { useEffect, useMemo, useState } from "react";
-import { AppState, Pressable, Text, View } from "react-native";
+import { AppState, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronDown, Trophy } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
@@ -16,6 +18,7 @@ import { ProgressChart } from "./progress-chart";
 
 const RECORD_LABELS: Record<MarkKind, string> = { load: "recordLoad", volume: "recordVolume", setVolume: "recordSetVolume", reps: "recordReps", estimated: "recordEstimated" };
 function Records({ exercise }: { exercise: ExerciseAnalytics }) {
+  useThemeId();
   const { t, locale } = useI18n(); const router = useRouter();
   const num = (value: number) => roundTraining(value).toLocaleString(locale, { maximumFractionDigits: 2 });
   function details(mark: TrainingMark) {
@@ -43,6 +46,7 @@ function Records({ exercise }: { exercise: ExerciseAnalytics }) {
   </View>;
 }
 export function TrainingAnalyticsScreen() {
+  useThemeId();
   const router = useRouter(); const params = useLocalSearchParams<{ exercise?: string }>(); const { t, locale } = useI18n(); const { sessions, ready, loadFailed, status } = useTraining();
   const requested = typeof params.exercise === "string" ? exerciseKey(params.exercise) : "";
   const [today, setToday] = useState(localDateKey()); const [selected, setSelected] = useState(requested); const [picker, setPicker] = useState(false); const [period, setPeriod] = useState<TrainingPeriod>("90"); const [metric, setMetric] = useState<ProgressMetric>("load"); const [limit, setLimit] = useState(20);
@@ -77,7 +81,7 @@ export function TrainingAnalyticsScreen() {
           <View style={styles.row}>{(["load", "volume", "reps", "estimated"] as const).map((value) => <Button key={value} primary={metric === value} title={t(`trainingAnalytics.${value}`)} onPress={() => setMetric(value)} />)}</View>
           <ProgressChart key={`${exercise.key}:${period}:${metric}:${points.length}`} points={points} metric={metric} />
           <View style={styles.card}><Text style={type.sectionTitle}>{t("trainingAnalytics.weekly")}</Text>
-            {weekly.map((row) => <View key={row.week} style={{ gap: space(6) }}><View style={styles.spread}><Text style={type.meta}>{t("trainingAnalytics.weekOf", { date: date(row.week) })}</Text><Text style={type.body}>{row.volume === null ? "—" : `${num(row.volume)} ${t("trainingAnalytics.kgReps")}`}</Text></View><View style={{ height: 6, borderRadius: 3, backgroundColor: colors.sheetRaised, overflow: "hidden" }}><View style={{ height: 6, width: `${100 * (row.volume ?? 0) / maxWeekly}%`, backgroundColor: colors.accent, borderRadius: 3 }} /></View></View>)}
+            {weekly.map((row) => <View key={row.week} style={{ gap: space(6) }}><View style={styles.spread}><Text style={type.meta}>{t("trainingAnalytics.weekOf", { date: date(row.week) })}</Text><Text style={type.body}>{row.volume === null ? "—" : `${num(row.volume)} ${t("trainingAnalytics.kgReps")}`}</Text></View><View style={{ height: 6, borderRadius: radius(3), backgroundColor: colors.sheetRaised, overflow: "hidden" }}><View style={{ height: 6, width: `${100 * (row.volume ?? 0) / maxWeekly}%`, backgroundColor: colors.accent, borderRadius: radius(3) }} /></View></View>)}
           </View>
         </>}
         <Records exercise={exercise} />

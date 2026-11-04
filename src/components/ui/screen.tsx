@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles, insetSpace, pageFrame, space } from "@/lib/appearance/density";
 import { type ReactElement, type ReactNode, type Ref } from "react";
 import { type RefreshControlProps, type ScrollViewProps, ScrollView, View } from "react-native";
@@ -22,6 +23,7 @@ export function Screen({
   keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
   scrollRef?: Ref<ScrollView>;
 }) {
+  useThemeId();
   const insets = useSafeAreaInsets();
   const { current } = usePlayer();
   const { miniPlayerDismissed } = usePlayerUi();
@@ -74,7 +76,7 @@ export function Screen({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   fill: {
     flex: 1,
     backgroundColor: colors.void,
@@ -83,4 +85,4 @@ const styles = createStyles({
     paddingHorizontal: layout.screenPad,
     gap: 18,
   },
-});
+}));

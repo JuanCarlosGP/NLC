@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SeriesRow, seriesListStyle } from "@/components/video/series-row";
 import { useSettings } from "@/lib/settings/settings-context";
@@ -11,6 +13,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { colors, type } from "@/lib/theme";
 
 export function VideoBrowse({ path }: { path: string }) {
+  useThemeId();
   const { t } = useI18n();
   const router = useRouter();
   const { openVideoActions } = useVideoActions();
@@ -52,7 +55,7 @@ export function VideoBrowse({ path }: { path: string }) {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={seriesListStyle}>
+      <View style={seriesListStyle()}>
         {folders.map((folder) => (
           <SeriesRow
             key={folder.id}
@@ -88,7 +91,7 @@ export function VideoBrowse({ path }: { path: string }) {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: { gap: 6, paddingBottom: 4 },
   error: { ...type.body, color: colors.danger },
-});
+}));

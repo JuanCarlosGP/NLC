@@ -1,9 +1,11 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { Screen } from "@/components/ui/screen";
 import { VideoBrowse } from "@/components/video/video-browse";
 import { useSettings } from "@/lib/settings/settings-context";
 import { onePieceRoot } from "@/lib/video/onepiece";
 
 export default function OnePieceScreen() {
+  useThemeId();
   const { settings } = useSettings();
   return (
     <Screen>

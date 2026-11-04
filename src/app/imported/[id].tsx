@@ -1,6 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useEffect } from "react";
-import { Text } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ImportedEntityView } from "@/components/library/imported-entity";
@@ -10,6 +11,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { layout, type } from "@/lib/theme";
 
 export default function ImportedPlaylistScreen() {
+  useThemeId();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();

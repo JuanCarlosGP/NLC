@@ -1,6 +1,8 @@
-import { space } from "@/lib/appearance/density";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { space, radius, textSize } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Pill, ArrowUpRight } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
@@ -17,12 +19,14 @@ import { PlanComposer } from "./plan-composer";
 import { DoseComposer } from "./dose-composer";
 
 export function MedicationHomeCard() {
+  useThemeId();
   const router = useRouter(); const { t } = useI18n(); const { data, ready, loadFailed } = useMedication();
   const summary = doseSummary(slotsForDay(data, localDateKey()));
   return <Pressable accessibilityRole="button" onPress={() => router.push("/health/medication")} style={[styles.card, styles.spread]}>
     <Pill size={24} color={colors.accent} strokeWidth={1.6} /><View style={{ flex: 1, gap: space(5) }}><Text style={type.sectionTitle}>{t("medication.title")}</Text><Text style={type.meta}>{ready && !loadFailed ? t("medication.summary", summary) : t(ready ? "medication.loadError" : "common.loading")}</Text></View><ArrowUpRight size={20} color={colors.inkSoft} /></Pressable>;
 }
 function MedicationAlerts() {
+  useThemeId();
   const { t } = useI18n(); const { data, alerts, alertError, setAlerts } = useMedication(); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   async function toggle() {
     if (busy) return; setBusy(true); setError(null);
@@ -39,6 +43,7 @@ function MedicationAlerts() {
   </View>;
 }
 function DoseRow({ slot, future, onEdit }: { slot: DoseSlot; future: boolean; onEdit(): void }) {
+  useThemeId();
   const { t } = useI18n(); const { record } = useMedication(); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   const status = slot.log?.status ?? "pending";
   async function undo() {
@@ -58,6 +63,7 @@ function DoseRow({ slot, future, onEdit }: { slot: DoseSlot; future: boolean; on
   </View>;
 }
 export function MedicationScreen() {
+  useThemeId();
   const { t, locale } = useI18n(); const { date: requestedDate } = useLocalSearchParams<{ date?: string }>(); const { data, ready, loadFailed, savePlan } = useMedication();
   const [today, setToday] = useState(localDateKey()); const [selected, setSelected] = useState(isDateKey(requestedDate ?? "") ? requestedDate! : today);
   const [month, setMonth] = useState(selected.slice(0, 7)); const [tab, setTab] = useState<"doses" | "calendar" | "plans">("doses");
@@ -97,11 +103,11 @@ export function MedicationScreen() {
             <Text style={[type.sectionTitle, { flex: 1, textAlign: "center" }]}>{new Date(`${month}-01T12:00:00Z`).toLocaleDateString(locale, { month: "long", year: "numeric", timeZone: "UTC" })}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel={t("medication.nextMonth")} onPress={() => moveMonth(1)} style={styles.button}><Text style={styles.buttonText}>›</Text></Pressable></View>
           <View style={{ flexDirection: "row" }}>{Array.from({ length: 7 }, (_, i) => <Text key={i} style={[type.meta, { width: "14.285714%", textAlign: "center" }]}>{new Date(Date.UTC(2026, 10, 2 + i, 12)).toLocaleDateString(locale, { weekday: "narrow", timeZone: "UTC" })}</Text>)}</View>
-          <View style={{ flexDirection: "row", flexWrap: "wrap" }}>{calendar.map(({ day, summary: count }, index) => <View key={day ?? `blank-${index}`} style={{ width: "14.285714%", padding: 2 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap" }}>{calendar.map(({ day, summary: count }, index) => <View key={day ?? `blank-${index}`} style={{ width: "14.285714%", padding: space(2) }}>
             {day && count ? <Pressable accessibilityRole="button" accessibilityLabel={t("medication.dayLabel", { date: day, ...count })} accessibilityState={{ selected: day === selected }} onPress={() => setSelected(day)}
-              style={{ minHeight: 56, gap: 3, borderWidth: 1, borderColor: day === today ? colors.accent : colors.rule, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: day === selected ? colors.accent : "transparent" }}>
+              style={{ minHeight: 56, gap: space(3), borderWidth: 1, borderColor: day === today ? colors.accent : colors.rule, borderRadius: radius(8), alignItems: "center", justifyContent: "center", backgroundColor: day === selected ? colors.accent : "transparent" }}>
               <Text style={{ color: day === selected ? colors.accentText : colors.ink, fontFamily: fonts.sansMedium }}>{Number(day.slice(8))}</Text>
-              <Text style={[type.meta, { fontSize: 11, color: day === selected ? colors.accentText : count.skipped ? colors.warn : count.total && count.taken === count.total ? colors.ok : colors.muted }]}>{count.total ? `${count.taken}/${count.total}` : "·"}</Text>
+              <Text style={[type.meta, { fontSize: textSize(11), color: day === selected ? colors.accentText : count.skipped ? colors.warn : count.total && count.taken === count.total ? colors.ok : colors.muted }]}>{count.total ? `${count.taken}/${count.total}` : "·"}</Text>
             </Pressable> : null}</View>)}</View>
           <Text style={type.meta}>{t("medication.calendarHint")}</Text>
         </View> : null}

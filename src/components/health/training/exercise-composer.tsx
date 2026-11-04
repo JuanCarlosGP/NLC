@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useI18n } from "@/lib/i18n/context";
@@ -8,6 +10,7 @@ import { type } from "@/lib/theme";
 import { Button, Field } from "./ui";
 
 export function ExerciseComposer({ open, names, onClose, onAdd, initialName }: { open: boolean; names: string[]; onClose(): void; onAdd(name: string): void; initialName?: string }) {
+  useThemeId();
   const { t } = useI18n(); const [name, setName] = useState("");
   useEffect(() => { if (open) setName(initialName ?? ""); }, [open, initialName]);
   function add(value: string) { if (value.trim()) { onAdd(value.trim()); onClose(); } }

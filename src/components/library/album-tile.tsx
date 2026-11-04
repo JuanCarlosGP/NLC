@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { memo } from "react";
 import { LibraryTile } from "@/components/library/library-tile";
 import { useCoverUrl } from "@/hooks/use-cover-url";
@@ -16,6 +17,7 @@ export const AlbumTile = memo(function AlbumTile({
   onPress: () => void;
   onLongPress?: () => void;
 }) {
+  useThemeId();
   const nasCover = useCoverUrl(coverUri ? null : album.coverId);
   return (
     <LibraryTile
@@ -42,6 +44,7 @@ export const ArtistTile = memo(function ArtistTile({
   coverId?: string | null;
   onPress: () => void;
 }) {
+  useThemeId();
   const cover = useCoverUrl(coverId);
   return (
     <LibraryTile id={id} title={name} subtitle={subtitle} uri={cover} round onPress={onPress} />

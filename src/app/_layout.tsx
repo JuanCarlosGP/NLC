@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { IntegrationsProvider } from "@/lib/integrations/integrations-context";
 import { createStyles } from "@/lib/appearance/density";
 import { AppearanceProvider } from "@/lib/appearance/context";
@@ -67,10 +68,11 @@ const fonts = {
   Figtree_600SemiBold,
   Figtree_700Bold,
   InstrumentSerif_400Regular,
-  ...(Platform.OS === "web" ? { GeistPixelSquare: require("../../assets/fonts/geist/GeistPixel-Square.otf") } : {}),
+  GeistPixelSquare: require("../../assets/fonts/geist/GeistPixel-Square.otf"),
 };
 
 export default function RootLayout() {
+  useThemeId();
   const [loaded] = useFonts(fonts);
   const [timedOut, setTimedOut] = useState(false);
   const ready = loaded || timedOut;
@@ -215,6 +217,7 @@ export default function RootLayout() {
 }
 
 function OnboardingGate({ children }: { children: ReactNode }) {
+  useThemeId();
   const { ready, onboardingNeeded } = useSettings();
   const { ready: i18nReady } = useI18n();
   if (!ready || !i18nReady) {
@@ -233,6 +236,7 @@ function OnboardingGate({ children }: { children: ReactNode }) {
 }
 
 function DockChrome({ children }: { children: ReactNode }) {
+  useThemeId();
   const insets = useSafeAreaInsets();
   return (
     <DockProvider enabled bottomInset={insets.bottom}>
@@ -241,7 +245,7 @@ function DockChrome({ children }: { children: ReactNode }) {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   boot: {
     flex: 1,
     backgroundColor: colors.void,
@@ -252,4 +256,4 @@ const styles = createStyles({
     elevation: 200,
     backgroundColor: colors.void,
   },
-});
+}));

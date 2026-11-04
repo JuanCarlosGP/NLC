@@ -1,10 +1,13 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { colors, type } from "@/lib/theme";
 
 export function InlineHelp({ label, children }: { label: string; children: ReactNode }) {
+  useThemeId();
   const [open, setOpen] = useState(false);
   const Chevron = open ? ChevronUp : ChevronDown;
 
@@ -22,8 +25,8 @@ export function InlineHelp({ label, children }: { label: string; children: React
   </View>;
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   wrap: { gap: 8 },
   trigger: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, minHeight: 44 },
   content: { gap: 10, paddingBottom: 6 },
-});
+}));

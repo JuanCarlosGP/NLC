@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Text, type StyleProp, type TextStyle } from "react-native";
+import { type StyleProp, type TextStyle } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { fonts } from "@/lib/theme";
 
 type Props = {
@@ -10,6 +12,7 @@ type Props = {
 
 /** Render ligero de markdown de chat: negrita, cursiva, código, listas y párrafos. */
 export function ChatMdText({ content, color, style }: Props) {
+  useThemeId();
   const blocks = splitBlocks(content.trim());
   if (blocks.length === 0) {
     return <Text style={[styles.body, { color }, style]}>{content}</Text>;
@@ -176,7 +179,7 @@ function renderInline(text: string, color: string) {
   });
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   body: {
     fontFamily: fonts.sans,
     fontSize: 14,
@@ -197,4 +200,4 @@ const styles = createStyles({
     fontFamily: fonts.sans,
     fontSize: 13,
   },
-});
+}));

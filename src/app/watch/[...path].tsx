@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useVideoPlayer, VideoView } from "expo-video";
@@ -81,6 +83,7 @@ function WatchChrome({
   paddingLeft: number;
   paddingRight: number;
 }) {
+  useThemeId();
   const opacity = useSharedValue(visible ? 1 : 0);
 
   useEffect(() => {
@@ -116,6 +119,7 @@ function EpisodePlayer({
   onEnded: () => void;
   onPlayingChange: (playing: boolean) => void;
 }) {
+  useThemeId();
   const player = useVideoPlayer(source, (instance) => {
     instance.loop = false;
     instance.timeUpdateEventInterval = 2;
@@ -234,6 +238,7 @@ function EpisodePlayer({
 }
 
 export default function WatchScreen() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
@@ -493,7 +498,7 @@ export default function WatchScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   root: {
     flex: 1,
     backgroundColor: "#000",
@@ -552,4 +557,4 @@ const styles = createStyles({
     color: colors.danger,
     textAlign: "center",
   },
-});
+}));

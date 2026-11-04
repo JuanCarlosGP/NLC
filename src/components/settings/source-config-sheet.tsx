@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { Field, SwitchRow } from "@/components/settings/source-fields";
@@ -33,6 +35,7 @@ export function SourceConfigSheet({
   save: () => Promise<void>;
   variant?: "music" | "podcast" | "video" | "wealth" | "focus";
 }) {
+  useThemeId();
   const { t } = useI18n();
   const shared = settings.sourceKind !== "mock";
   const folderPlaceholder =
@@ -201,7 +204,7 @@ export function SourceConfigSheet({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,
@@ -262,4 +265,4 @@ const styles = createStyles({
   btnGhostText: { fontFamily: fonts.sansSemiBold, color: colors.ink },
   btnSolidText: { fontFamily: fonts.sansSemiBold, color: colors.accentText },
   feedback: { paddingHorizontal: 2 },
-});
+}));

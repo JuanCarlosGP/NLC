@@ -1,5 +1,8 @@
+import { space } from "@/lib/appearance/density";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/ui/screen";
 import { InlineHelp } from "@/components/ui/inline-help";
@@ -9,7 +12,8 @@ import { useIntegrations } from "@/lib/integrations/integrations-context";
 import { activityMinutes, type WhoopActivity } from "@/lib/integrations/model";
 import { colors, type } from "@/lib/theme";
 import { ConnectionPanel, PageHeader, Metric, Stat, Stats, dateLabel, display, duration, styles } from "./shared";
-export function WhoopActivityRow({activity}:{activity:WhoopActivity}){const{t,locale}=useI18n();return <View style={styles.card}>
+export function WhoopActivityRow({activity}:{activity:WhoopActivity}){
+  useThemeId();const{t,locale}=useI18n();return <View style={styles.card}>
   <View style={styles.spread}><Text style={[type.sectionTitle,{flex:1}]}>{activity.name}</Text><Text style={type.meta}>WHOOP</Text></View>
   <Text style={type.meta}>{dateLabel(activity.date,locale)} · {duration(activityMinutes(activity))}</Text>
   <View style={styles.row}><Text style={type.body}>{t("integrations.strain")} {display(activity.strain,"",1)}</Text><Text style={type.meta}>{display(activity.calories," kcal")}</Text></View>
@@ -18,8 +22,10 @@ export function WhoopActivityRow({activity}:{activity:WhoopActivity}){const{t,lo
     <Text style={type.meta}>{t("integrations.zones")}</Text>{activity.zoneMinutes.map((value,i)=><Metric key={i} label={`Z${i}`} value={display(value," min")}/>)}
   </View></InlineHelp>
 </View>;}
-export function WhoopCalendarActivities({date}:{date:string}){const ctx=useIntegrations();const{t}=useI18n();const router=useRouter();const data=ctx.copies.whoop[ctx.selection.whoop];if(data?.provider!=="whoop")return null;const rows=data.activities.filter(row=>row.date===date);return rows.length?<View style={styles.section}><View style={styles.spread}><Text style={type.sectionTitle}>{t("integrations.activities")}</Text>{data.mode==="demo"?<Text style={type.meta}>{t("integrations.demo")}</Text>:null}</View>{rows.map(row=><WhoopActivityRow key={row.id} activity={row}/>)}<Button title="WHOOP" onPress={()=>router.push("/health/whoop")}/></View>:null;}
+export function WhoopCalendarActivities({date}:{date:string}){
+  useThemeId();const ctx=useIntegrations();const{t}=useI18n();const router=useRouter();const data=ctx.copies.whoop[ctx.selection.whoop];if(data?.provider!=="whoop")return null;const rows=data.activities.filter(row=>row.date===date);return rows.length?<View style={styles.section}><View style={styles.spread}><Text style={type.sectionTitle}>{t("integrations.activities")}</Text>{data.mode==="demo"?<Text style={type.meta}>{t("integrations.demo")}</Text>:null}</View>{rows.map(row=><WhoopActivityRow key={row.id} activity={row}/>)}<Button title="WHOOP" onPress={()=>router.push("/health/whoop")}/></View>:null;}
 export function WhoopScreen(){
+  useThemeId();
   const ctx=useIntegrations();const{t,locale}=useI18n();const snapshot=ctx.copies.whoop[ctx.selection.whoop];const data=snapshot?.provider==="whoop"?snapshot:null;
   const [selected,setSelected]=useState("");const [draft,setDraft]=useState("");
   const sourceRef=useRef("");
@@ -33,7 +39,7 @@ export function WhoopScreen(){
       {data.name?<Text style={type.meta}>{data.name}</Text>:null}
       <Field label={t("integrations.date")} value={draft} placeholder="AAAA-MM-DD" onChangeText={value=>{setDraft(value);if(/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(`${value}T12:00:00Z`))&&new Date(`${value}T12:00:00Z`).toISOString().slice(0,10)===value)setSelected(value);}}/>
       {!valid&&draft?<Text accessibilityRole="alert" style={styles.error}>{t("integrations.errors.date")}</Text>:null}
-      <View style={styles.spread}><Pressable accessibilityRole="button" accessibilityLabel={t("integrations.previous")} onPress={()=>move(-1)} style={[styles.card,{minHeight:44,minWidth:44,alignItems:"center",justifyContent:"center",padding:0}]}><Text style={type.body}>‹</Text></Pressable><Text style={type.body}>{selected?dateLabel(selected,locale):"—"}</Text><Pressable accessibilityRole="button" accessibilityLabel={t("integrations.next")} onPress={()=>move(1)} style={[styles.card,{minHeight:44,minWidth:44,alignItems:"center",justifyContent:"center",padding:0}]}><Text style={type.body}>›</Text></Pressable></View>
+      <View style={styles.spread}><Pressable accessibilityRole="button" accessibilityLabel={t("integrations.previous")} onPress={()=>move(-1)} style={[styles.card,{minHeight:44,minWidth:44,alignItems:"center",justifyContent:"center",padding:space(0)}]}><Text style={type.body}>‹</Text></Pressable><Text style={type.body}>{selected?dateLabel(selected,locale):"—"}</Text><Pressable accessibilityRole="button" accessibilityLabel={t("integrations.next")} onPress={()=>move(1)} style={[styles.card,{minHeight:44,minWidth:44,alignItems:"center",justifyContent:"center",padding:space(0)}]}><Text style={type.body}>›</Text></Pressable></View>
       {!day&&!sleeps.length&&!activities.length?<Text style={type.meta}>{t("integrations.noDay")}</Text>:null}
       <Stats><Stat label={t("integrations.recovery")} value={display(day?.recovery," %")}/><Stat label={t("integrations.strain")} value={display(day?.strain,"",1)}/><Stat label={t("integrations.sleep")} value={duration(main?.asleepMinutes)}/><Stat label={t("integrations.hrv")} value={display(day?.hrv," ms",1)}/></Stats>
       <InlineHelp label={t("integrations.details")}><View style={styles.section}><Metric label={t("integrations.resting")} value={display(day?.restingHeartRate," bpm")}/><Metric label={t("integrations.calories")} value={display(day?.calories," kcal")}/><Metric label={t("integrations.oxygen")} value={display(day?.spo2," %",1)}/><Metric label={t("integrations.temperature")} value={display(day?.temperature," °C",1)}/></View></InlineHelp>

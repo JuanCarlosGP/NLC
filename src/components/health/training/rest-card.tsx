@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space, textSize } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { AppState, Text, View } from "react-native";
+import { AppState, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useTraining } from "@/lib/health/training/training-context";
 import { clock, remainingRest } from "@/lib/health/training/model";
 import { restAlertPermission, restAlertsSupported, syncRestAlert } from "@/lib/health/training/notifications";
@@ -9,6 +11,7 @@ import { colors, fonts, type } from "@/lib/theme";
 import { Button, styles } from "./ui";
 
 export function RestCard() {
+  useThemeId();
   const { rest, setRest } = useTraining(); const { t } = useI18n();
   const [now, setNow] = useState(Date.now()); const [permission, setPermission] = useState(false); const [error, setError] = useState(false); const [denied, setDenied] = useState(false);
   useEffect(() => {

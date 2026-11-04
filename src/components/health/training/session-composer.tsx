@@ -1,6 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Text } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -11,6 +12,7 @@ import { type } from "@/lib/theme";
 import { Button, Field, errorKey, styles } from "./ui";
 
 export function SessionComposer({ open, onClose, date }: { open: boolean; onClose(): void; date?: string }) {
+  useThemeId();
   const router = useRouter(); const { t } = useI18n(); const { create } = useTraining();
   const [name, setName] = useState(""); const [day, setDay] = useState(date ?? localDateKey()); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   useEffect(() => { if (open) { setName(""); setDay(date ?? localDateKey()); setError(null); } }, [open, date]);

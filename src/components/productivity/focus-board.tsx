@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { TaskComposerSheet } from "@/components/productivity/task-composer-sheet";
@@ -15,6 +17,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, layout, type } from "@/lib/theme";
 
 export function FocusBoard() {
+  useThemeId();
   const { t } = useI18n();
   const router = useRouter();
   const projects = useActiveProjects();
@@ -126,7 +129,7 @@ export function FocusBoard() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -215,4 +218,4 @@ const styles = createStyles({
     paddingHorizontal: 4,
     paddingVertical: 8,
   },
-});
+}));

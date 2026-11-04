@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles, responsiveBasis } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowUpDown, LayoutGrid, List, Plus } from "lucide-react-native";
 import { AlbumRow } from "@/components/library/album-row";
@@ -94,20 +96,24 @@ function sortMix(items: MixItem[], sort: LibrarySort): MixItem[] {
 }
 
 function Grid({ children }: { children: ReactNode }) {
+  useThemeId();
   return <View style={styles.grid}>{children}</View>;
 }
 
 function Cell({ children }: { children: ReactNode }) {
+  useThemeId();
   return <View style={styles.cell}>{children}</View>;
 }
 
 export default function LibraryScreen() {
+  useThemeId();
   const { zone } = useZone();
   if (zone === "health") return <WeightScreen />;
   return <ExistingLibraryScreen />;
 }
 
 function ExistingLibraryScreen() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { zone } = useZone();
@@ -342,6 +348,7 @@ function ExistingLibraryScreen() {
   }
 
   function Collection({ children }: { children: ReactNode }) {
+  useThemeId();
     return grid ? <Grid>{children}</Grid> : <View>{children}</View>;
   }
 
@@ -605,6 +612,7 @@ function VideoLibrary({
   onToggleView: () => void;
   browseReady: boolean;
 }) {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { settings, password, ready } = useSettings();
@@ -726,9 +734,10 @@ function VideoLibrary({
     items: VideoShow[];
     inset?: boolean;
   }) {
+  useThemeId();
     if (!items.length) return null;
     if (grid) return <View style={styles.grid}>{items.map(renderShow)}</View>;
-    return <View style={inset ? seriesListStyle : undefined}>{items.map(renderShow)}</View>;
+    return <View style={inset ? seriesListStyle() : undefined}>{items.map(renderShow)}</View>;
   }
 
   return (
@@ -783,7 +792,7 @@ function VideoLibrary({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -866,4 +875,4 @@ const styles = createStyles({
     marginBottom: 8,
   },
   moreText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.ink },
-});
+}));

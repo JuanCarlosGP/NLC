@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { memo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { ChatMdText } from "@/components/chat/chat-md-text";
 import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts } from "@/lib/theme";
@@ -12,6 +14,7 @@ export const ChatBubble = memo(function ChatBubble({
   role: "user" | "assistant";
   content: string;
 }) {
+  useThemeId();
   const mine = role === "user";
   const textColor = mine ? colors.accentText : colors.ink;
 
@@ -37,6 +40,7 @@ export const ChatBubble = memo(function ChatBubble({
 });
 
 export function ChatTypingMarker() {
+  useThemeId();
   const { t } = useI18n();
   return (
     <View style={[styles.row, styles.rowAssistant]}>
@@ -47,7 +51,7 @@ export function ChatTypingMarker() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   row: {
     width: "100%",
     marginBottom: 10,
@@ -78,4 +82,4 @@ const styles = createStyles({
     fontSize: 13,
     color: colors.muted,
   },
-});
+}));

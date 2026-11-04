@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -26,6 +28,7 @@ import {
 } from "@/lib/wealth/types";
 
 export function TxActionsSheet() {
+  useThemeId();
   const { open, tx, setOpen } = useTxActions();
   return <TxComposerSheet open={open} onOpenChange={setOpen} tx={tx} />;
 }
@@ -47,6 +50,7 @@ export function TxComposerSheet({
   defaultCounterId?: string;
   tx?: WealthTx | null;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet
@@ -85,6 +89,7 @@ function TxComposerBody({
   tx: WealthTx | null;
   onDone: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { createTx, updateTx, deleteTx, assets } = useWealth();
   const accounts = useLiveAccounts();
@@ -451,7 +456,7 @@ function TxComposerBody({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -510,4 +515,4 @@ const styles = createStyles({
   },
   remove: { alignItems: "center", paddingVertical: 8 },
   removeText: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.danger },
-});
+}));

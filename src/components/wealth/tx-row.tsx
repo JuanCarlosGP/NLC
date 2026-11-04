@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { dateLocale, t } from "@/lib/i18n/runtime";
 import { colors, fonts } from "@/lib/theme";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
@@ -45,6 +47,7 @@ export function TxRow({
   accountId?: string;
   onPress?: () => void;
 }) {
+  useThemeId();
   const { accounts } = useWealth();
   const { openTxActions } = useTxActions();
   const signed = signedAmount(tx, accountId);
@@ -82,9 +85,10 @@ export function TxRow({
   );
 }
 
-export const txListStyle = { gap: 2 } as const;
+const txListStyleSheet = createStyles(() => ({ item: { gap: 2 } }));
+export function txListStyle() { return txListStyleSheet.item; }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -109,4 +113,4 @@ const styles = createStyles({
   in: { color: colors.ok },
   out: { color: colors.danger },
   flat: { color: colors.ink },
-});
+}));

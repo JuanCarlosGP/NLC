@@ -1,18 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  AccessibilityInfo,
-  ActivityIndicator,
-  BackHandler,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { AccessibilityInfo, ActivityIndicator, BackHandler, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import Animated, {
   Easing,
   interpolate,
@@ -44,7 +34,6 @@ import { colors, fonts, layout, type } from "@/lib/theme";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { webInteractiveStyle } from "@/lib/interactive";
 
-const RIPPLE = { color: colors.ripple };
 const STEPS = 5;
 const ICON_HIT = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 const IN_MS = 320;
@@ -178,6 +167,7 @@ function Reveal({
   reduce: boolean;
   children: ReactNode;
 }) {
+  useThemeId();
   const progress = useSharedValue(reduce ? 1 : 0);
 
   useEffect(() => {
@@ -195,6 +185,7 @@ function Reveal({
 }
 
 function StepPips({ step, reduce }: { step: number; reduce: boolean }) {
+  useThemeId();
   const { t } = useI18n();
   const label = t("onboarding.stepOf", { current: step + 1, total: STEPS });
   return (
@@ -214,6 +205,7 @@ function StepPips({ step, reduce }: { step: number; reduce: boolean }) {
 }
 
 function Pip({ on, reduce }: { on: boolean; reduce: boolean }) {
+  useThemeId();
   const fill = useSharedValue(on ? 1 : 0);
 
   useEffect(() => {
@@ -248,6 +240,7 @@ function PrimaryButton({
   busy: boolean;
   onPress: () => void;
 }) {
+  useThemeId();
   const scale = useSharedValue(1);
   const pressStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -258,7 +251,7 @@ function PrimaryButton({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
-        android_ripple={RIPPLE}
+        android_ripple={{ color: colors.ripple }}
         disabled={disabled}
         onPress={onPress}
         onPressIn={() => {
@@ -284,6 +277,7 @@ function PrimaryButton({
 }
 
 function LanguageToggle() {
+  useThemeId();
   const { locale, setLocale, t } = useI18n();
   return (
     <View style={styles.langRow} accessibilityLabel={t("language.title")}>
@@ -295,7 +289,7 @@ function LanguageToggle() {
             accessibilityRole="button"
             accessibilityLabel={item.label}
             accessibilityState={{ selected: on }}
-            android_ripple={RIPPLE}
+            android_ripple={{ color: colors.ripple }}
             onPress={() => {
               if (on) return;
               triggerUiHaptic();
@@ -317,6 +311,7 @@ function LanguageToggle() {
 }
 
 export function Onboarding() {
+  useThemeId();
   const insets = useSafeAreaInsets();
   const reduceMotion = usePrefersReducedMotion();
   const { settings, skipOnboarding, completeOnboarding } = useSettings();
@@ -608,7 +603,7 @@ export function Onboarding() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t("onboarding.testConnection")}
-                android_ripple={RIPPLE}
+                android_ripple={{ color: colors.ripple }}
                 disabled={!canTest}
                 onPress={() => void testConnection()}
                 style={({ pressed }) => [
@@ -679,7 +674,7 @@ export function Onboarding() {
             accessibilityRole="button"
             accessibilityLabel={t("onboarding.back")}
             hitSlop={ICON_HIT}
-            android_ripple={RIPPLE}
+            android_ripple={{ color: colors.ripple }}
             onPress={() => {
               if (busy || entering || step === 0) return;
               triggerUiHaptic();
@@ -695,7 +690,7 @@ export function Onboarding() {
           accessibilityRole="button"
           accessibilityLabel={t("onboarding.skip")}
           hitSlop={ICON_HIT}
-          android_ripple={RIPPLE}
+          android_ripple={{ color: colors.ripple }}
           onPress={skip}
           style={({ pressed }) => [styles.headerBtn, webInteractiveStyle(), { opacity: pressed ? 0.7 : 1 }]}
         >
@@ -739,6 +734,7 @@ export function Onboarding() {
 }
 
 function WelcomeHero({ reduce }: { reduce: boolean }) {
+  useThemeId();
   const mark = useSharedValue(reduce ? 1 : 0);
 
   useEffect(() => {
@@ -760,6 +756,7 @@ function WelcomeHero({ reduce }: { reduce: boolean }) {
 }
 
 function TitleRule({ reduce }: { reduce: boolean }) {
+  useThemeId();
   const fill = useSharedValue(reduce ? 1 : 0);
 
   useEffect(() => {
@@ -775,6 +772,7 @@ function TitleRule({ reduce }: { reduce: boolean }) {
 }
 
 function WelcomeStep({ reduce }: { reduce: boolean }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <View style={styles.welcome}>
@@ -797,6 +795,7 @@ function WelcomeStep({ reduce }: { reduce: boolean }) {
 }
 
 function NeedStep({ reduce }: { reduce: boolean }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <View style={styles.block}>
@@ -860,6 +859,7 @@ function NeedItem({
   label: string;
   hint: string;
 }) {
+  useThemeId();
   return (
     <Reveal delay={delay} reduce={reduce}>
       <View style={styles.needItem}>
@@ -882,6 +882,7 @@ function ReadyStep({
   endpoint: string;
   paths: ReturnType<typeof libraryPaths>;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const seal = useSharedValue(reduce ? 1 : 0);
 
@@ -936,6 +937,7 @@ function ConnectStep({
   reduce: boolean;
   onEdit: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const patch = (partial: Partial<Draft>) => {
     onEdit();
@@ -1016,6 +1018,7 @@ function FoldersStep({
   busy: boolean;
   onCreate: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const patch = (partial: Partial<Draft>) => setDraft({ ...draft, ...partial });
   const root = draft.rootPath.trim() || "/";
@@ -1087,7 +1090,7 @@ function FoldersStep({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("onboarding.browse")}
-            android_ripple={RIPPLE}
+            android_ripple={{ color: colors.ripple }}
             disabled={!canInspect}
             onPress={() => void inspect()}
             style={({ pressed }) => [
@@ -1110,7 +1113,7 @@ function FoldersStep({
                   accessibilityRole="button"
                   accessibilityLabel={t("onboarding.upA11y")}
                   accessibilityState={{ disabled: root === "/" || listingBusy }}
-                  android_ripple={RIPPLE}
+                  android_ripple={{ color: colors.ripple }}
                   disabled={root === "/" || listingBusy}
                   onPress={() => chooseRoot(parentPath(root))}
                   style={({ pressed }) => [
@@ -1136,7 +1139,7 @@ function FoldersStep({
                         key={entry.path}
                         accessibilityRole="button"
                         accessibilityLabel={t("onboarding.useAsRoot", { name: entry.name })}
-                        android_ripple={RIPPLE}
+                        android_ripple={{ color: colors.ripple }}
                         disabled={listingBusy}
                         onPress={() => chooseRoot(entry.path)}
                         style={({ pressed }) => [
@@ -1206,7 +1209,7 @@ function FoldersStep({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("onboarding.create")}
-            android_ripple={RIPPLE}
+            android_ripple={{ color: colors.ripple }}
             disabled={!canCreate}
             onPress={onCreate}
             style={({ pressed }) => [
@@ -1230,7 +1233,7 @@ function FoldersStep({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   root: {
     flex: 1,
     backgroundColor: colors.void,
@@ -1581,4 +1584,4 @@ const styles = createStyles({
     fontSize: 16,
     color: colors.accentText,
   },
-});
+}));

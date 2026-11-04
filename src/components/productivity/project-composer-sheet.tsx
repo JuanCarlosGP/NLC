@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput } from "react-native";
+import { Pressable } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useI18n } from "@/lib/i18n/context";
@@ -15,6 +17,7 @@ export function ProjectComposerSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet
@@ -29,6 +32,7 @@ export function ProjectComposerSheet({
 }
 
 function ProjectComposerBody({ open, onDone }: { open: boolean; onDone: () => void }) {
+  useThemeId();
   const { t } = useI18n();
   const { createProject } = useProductivity();
   const [name, setName] = useState("");
@@ -80,7 +84,7 @@ function ProjectComposerBody({ open, onDone }: { open: boolean; onDone: () => vo
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -110,4 +114,4 @@ const styles = createStyles({
     fontSize: 15,
     color: colors.accentText,
   },
-});
+}));

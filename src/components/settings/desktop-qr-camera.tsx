@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -13,6 +15,7 @@ export function DesktopQrCamera({
   disabled?: boolean;
   onScan: (raw: string) => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const [permission, requestPermission] = useCameraPermissions();
   const [active, setActive] = useState(false);
@@ -67,7 +70,7 @@ export function DesktopQrCamera({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   button: {
     backgroundColor: colors.accent,
     borderRadius: 12,
@@ -78,4 +81,4 @@ const styles = createStyles({
   buttonLabel: { color: colors.accentText, fontFamily: fonts.sansSemiBold, fontSize: 15 },
   preview: { height: 280, borderRadius: 12, overflow: "hidden", backgroundColor: colors.sheet },
   camera: { flex: 1 },
-});
+}));

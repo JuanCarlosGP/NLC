@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { Dumbbell, ArrowUpRight } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
@@ -12,6 +14,7 @@ import { SessionComposer } from "./session-composer";
 import { RestCard } from "./rest-card";
 
 export function TrainingHomeCard() {
+  useThemeId();
   const router = useRouter(); const { t } = useI18n(); const { sessions } = useTraining();
   const open = sessions.filter((session) => session.finishedAt === null).length;
   return <Pressable accessibilityRole="button" onPress={() => router.push("/health/training")} style={[styles.card, styles.spread]}>
@@ -19,6 +22,7 @@ export function TrainingHomeCard() {
       <Text style={type.meta}>{sessions.length} {t("training.sessions").toLocaleLowerCase()}{open ? ` · ${open} ${t("training.active").toLocaleLowerCase()}` : ""}</Text></View><ArrowUpRight size={20} color={colors.inkSoft} /></Pressable>;
 }
 export function TrainingHome() {
+  useThemeId();
   const router = useRouter(); const { t, locale } = useI18n(); const { sessions, ready, loadFailed } = useTraining();
   const [open, setOpen] = useState(false); const [query, setQuery] = useState(""); const [limit, setLimit] = useState(20);
   const filtered = useMemo(() => {

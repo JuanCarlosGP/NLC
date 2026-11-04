@@ -1,10 +1,11 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { ChevronRight, Play } from "lucide-react-native";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, layout } from "@/lib/theme";
 
-const RIPPLE = { color: colors.ripple };
 
 export function SeriesRow({
   index,
@@ -21,10 +22,11 @@ export function SeriesRow({
   onPress: () => void;
   onLongPress?: () => void;
 }) {
+  useThemeId();
   return (
     <Pressable
       accessibilityRole="button"
-      android_ripple={RIPPLE}
+      android_ripple={{ color: colors.ripple }}
       delayLongPress={350}
       onPress={() => {
         triggerSelectionUiHaptic();
@@ -67,11 +69,12 @@ export function SeriesRow({
   );
 }
 
-export const seriesListStyle = {
+const seriesListStyleSheet = createStyles(() => ({ item: {
   marginHorizontal: -layout.screenPad,
-};
+} }));
+export function seriesListStyle() { return seriesListStyleSheet.item; }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   row: {
     minHeight: 56,
     flexDirection: "row",
@@ -101,4 +104,4 @@ const styles = createStyles({
   meta: { flex: 1, gap: 2 },
   title: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.ink },
   sub: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
-});
+}));

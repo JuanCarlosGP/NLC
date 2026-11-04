@@ -1,5 +1,7 @@
-import { createStyles } from "@/lib/appearance/density";
-import { Pressable, Switch, Text, View } from "react-native";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { isNativePixel, createStyles } from "@/lib/appearance/density";
+import { Pressable, Switch, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Clapperboard, HeartPulse, Mic, Music2, SquareCheck, Wallet } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -24,6 +26,7 @@ export function zoneVisibilitySummary(enabled: EnabledZones, t: (path: string) =
 }
 
 export function ZoneSwitch() {
+  useThemeId();
   const { zone, setZone, enabled } = useZone();
   const { t } = useI18n();
   const options = APP_ZONES.filter((item) => enabled[item.id]);
@@ -61,6 +64,7 @@ export function ZoneVisibilitySheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  useThemeId();
   const { enabled, setZoneEnabled } = useZone();
   const { t } = useI18n();
 
@@ -106,7 +110,7 @@ export function ZoneVisibilitySheet({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   switch: {
     flexDirection: "row",
     alignItems: "center",
@@ -117,8 +121,8 @@ const styles = createStyles({
     padding: 3,
   },
   btn: {
-    width: 28,
-    height: 28,
+    width: isNativePixel() ? 44 : 28,
+    height: isNativePixel() ? 44 : 28,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
@@ -163,4 +167,4 @@ const styles = createStyles({
     fontSize: 13,
     color: colors.muted,
   },
-});
+}));

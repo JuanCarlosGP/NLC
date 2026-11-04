@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Bell, Plus } from "lucide-react-native";
 import { ReminderComposerSheet } from "@/components/productivity/reminder-composer-sheet";
 import { ReminderRow, reminderListStyle } from "@/components/productivity/reminder-row";
@@ -12,6 +14,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, type } from "@/lib/theme";
 
 export default function RemindersScreen() {
+  useThemeId();
   const { t } = useI18n();
   const { reminders, updateReminder } = useReminders();
   const [composeOpen, setComposeOpen] = useState(false);
@@ -60,7 +63,7 @@ export default function RemindersScreen() {
           <Text style={type.body}>{t(Platform.OS === "web" ? "focus.reminderWebHint" : "focus.reminderHint")}</Text>
         ) : null}
         {sorted.length ? (
-          <View style={reminderListStyle}>
+          <View style={reminderListStyle()}>
             {sorted.map((reminder) => (
               <ReminderRow
                 key={reminder.id}
@@ -91,7 +94,7 @@ export default function RemindersScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: { gap: 6, paddingTop: 8 },
   heading: {
     flexDirection: "row",
@@ -116,4 +119,4 @@ const styles = createStyles({
     backgroundColor: "#3A3229",
     marginBottom: 8,
   },
-});
+}));

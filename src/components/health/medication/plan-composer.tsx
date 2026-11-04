@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useMedication } from "@/lib/health/medication/medication-context";
@@ -11,6 +13,7 @@ import { type } from "@/lib/theme";
 import { Button, Field, medicationErrorKey, styles } from "./ui";
 
 export function PlanComposer({ open, plan, onClose }: { open: boolean; plan: MedicationPlan | null; onClose(): void }) {
+  useThemeId();
   const { t } = useI18n(); const { savePlan } = useMedication();
   const [name, setName] = useState(""); const [dose, setDose] = useState(""); const [note, setNote] = useState(""); const [times, setTimes] = useState("");
   const [kind, setKind] = useState<MedicationKind>("medication"); const [frequency, setFrequency] = useState<MedicationFrequency>("daily");

@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useState } from "react";
-import { AppState, Platform, Switch, Text, View } from "react-native";
+import { AppState, Platform, Switch, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { getLanAddress, isLanBridgeAvailable } from "nlc-lan-bridge";
 import { loadWebTuiEnabled, saveWebTuiEnabled, startPhoneWebTui, stopPhoneWebTui, webTuiUrl } from "@/lib/bridge/web-tui";
 import { useI18n } from "@/lib/i18n/context";
@@ -8,6 +10,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts } from "@/lib/theme";
 
 export function DesktopWebTui() {
+  useThemeId();
   const { t } = useI18n();
   const [enabled, setEnabled] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
@@ -102,7 +105,7 @@ export function DesktopWebTui() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -137,4 +140,4 @@ const styles = createStyles({
     paddingHorizontal: 16,
     paddingBottom: 14,
   },
-});
+}));

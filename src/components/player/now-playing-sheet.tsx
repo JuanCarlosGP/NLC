@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Heart, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -20,6 +22,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
 export function NowPlayingSheet() {
+  useThemeId();
   const { nowPlayingOpen, setNowPlayingOpen } = usePlayerUi();
   const { t } = useI18n();
   const dock = useDock();
@@ -40,6 +43,7 @@ export function NowPlayingSheet() {
 }
 
 function NowPlayingBody() {
+  useThemeId();
   const { t } = useI18n();
   const {
     current,
@@ -226,7 +230,7 @@ function NowPlayingBody() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -287,4 +291,4 @@ const styles = createStyles({
     justifyContent: "center",
   },
   queue: { gap: 4, paddingTop: 4 },
-});
+}));

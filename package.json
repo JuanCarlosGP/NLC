@@ -1,6 +1,6 @@
 {
   "name": "nlc",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "private": true,
   "description": "Reproductor Android personal para la biblioteca de un NAS (música, podcasts, vídeo, foco y patrimonio).",
   "license": "SEE LICENSE IN LICENSE",
@@ -54,7 +54,8 @@
     "test:training-analytics": "node scripts/test-training-analytics.cjs",
     "test:health-backup": "node scripts/test-health-backup.cjs",
     "integrations": "node --env-file-if-exists=.env.integrations.local scripts/integrations/server.mjs",
-    "test:integrations": "node --test scripts/test-integrations.cjs"
+    "test:integrations": "node --test scripts/test-integrations.cjs",
+    "test:appearance": "node --test scripts/test-appearance.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",
@@ -106,6 +107,7 @@
   "devDependencies": {
     "@types/react": "~19.1.10",
     "fake-indexeddb": "^6.2.4",
+    "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"
   }
 }

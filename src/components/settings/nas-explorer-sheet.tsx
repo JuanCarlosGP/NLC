@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { ChevronLeft, ChevronRight, File, Folder } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -18,7 +20,6 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { webInteractiveStyle } from "@/lib/interactive";
 import { colors, fonts, type } from "@/lib/theme";
 
-const RIPPLE = { color: colors.ripple };
 const LIST_CAP = 120;
 
 function configuredLibraries(
@@ -72,6 +73,7 @@ export function NasExplorerSheet({
   settings: NasSettings;
   password: string;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const libraries = useMemo(() => configuredLibraries(settings, t), [settings, t]);
   const root = useMemo(() => commonParent(libraries.map((item) => item.path)), [libraries]);
@@ -155,7 +157,7 @@ export function NasExplorerSheet({
                   key={`${item.label}-${item.path}`}
                   accessibilityRole="button"
                   accessibilityLabel={t("explorer.openLib", { name: item.label })}
-                  android_ripple={RIPPLE}
+                  android_ripple={{ color: colors.ripple }}
                   disabled={!canBrowse || busy}
                   onPress={() => go(item.path)}
                   style={({ pressed }) => [
@@ -194,7 +196,7 @@ export function NasExplorerSheet({
                 accessibilityRole="button"
                 accessibilityLabel={t("explorer.upA11y")}
                 accessibilityState={{ disabled: path === "/" || busy }}
-                android_ripple={RIPPLE}
+                android_ripple={{ color: colors.ripple }}
                 disabled={path === "/" || busy}
                 onPress={() => go(parentDir(path))}
                 style={({ pressed }) => [
@@ -226,7 +228,7 @@ export function NasExplorerSheet({
                       key={entry.path}
                       accessibilityRole="button"
                       accessibilityLabel={t("explorer.openEntryA11y", { name: entry.name })}
-                      android_ripple={RIPPLE}
+                      android_ripple={{ color: colors.ripple }}
                       disabled={busy}
                       onPress={() => go(entry.path)}
                       style={({ pressed }) => [
@@ -268,7 +270,7 @@ export function NasExplorerSheet({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -376,4 +378,4 @@ const styles = createStyles({
     justifyContent: "center",
     backgroundColor: colors.glassSoft,
   },
-});
+}));

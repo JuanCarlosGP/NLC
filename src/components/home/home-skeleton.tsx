@@ -1,9 +1,11 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { StyleSheet, View } from "react-native";
 import { Bone } from "@/components/ui/skeleton";
 import { colors } from "@/lib/theme";
 
 export function HomeShortcutBone() {
+  useThemeId();
   return (
     <View style={styles.shortcut}>
       <Bone style={styles.shortcutCover} />
@@ -16,6 +18,7 @@ export function HomeShortcutBone() {
 }
 
 export function HomeListSkeleton({ grid }: { grid: boolean }) {
+  useThemeId();
   return (
     <View style={styles.block}>
       <View style={styles.sortBar}>
@@ -50,7 +53,7 @@ export function HomeListSkeleton({ grid }: { grid: boolean }) {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   block: { gap: 18 },
   shortcut: {
     flexGrow: 1,
@@ -107,4 +110,4 @@ const styles = createStyles({
   rowTitle: { height: 12, width: "62%" },
   rowSub: { height: 9, width: "38%" },
   rowTime: { width: 28, height: 9 },
-});
+}));

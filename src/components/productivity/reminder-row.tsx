@@ -1,12 +1,13 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Bell, BellOff } from "lucide-react-native";
 import { useI18n } from "@/lib/i18n/context";
 import { formatReminderWhen, type ProdReminder } from "@/lib/reminders/types";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, layout } from "@/lib/theme";
 
-const RIPPLE = { color: colors.ripple };
 
 export function ReminderRow({
   reminder,
@@ -17,11 +18,12 @@ export function ReminderRow({
   onPress: () => void;
   onToggle: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <Pressable
       accessibilityRole="button"
-      android_ripple={RIPPLE}
+      android_ripple={{ color: colors.ripple }}
       onPress={() => {
         triggerSelectionUiHaptic();
         onPress();
@@ -63,11 +65,12 @@ export function ReminderRow({
   );
 }
 
-export const reminderListStyle = {
+const reminderListStyleSheet = createStyles(() => ({ item: {
   marginHorizontal: -layout.screenPad,
-};
+} }));
+export function reminderListStyle() { return reminderListStyleSheet.item; }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   row: {
     minHeight: 56,
     flexDirection: "row",
@@ -131,4 +134,4 @@ const styles = createStyles({
     alignSelf: "flex-start",
     backgroundColor: colors.inkSoft,
   },
-});
+}));

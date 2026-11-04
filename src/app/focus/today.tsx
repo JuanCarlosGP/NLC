@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { useMemo, useState } from "react";
 import { CalendarDays } from "lucide-react-native";
 import { FocusListScreen } from "@/components/productivity/focus-list-screen";
@@ -9,6 +10,7 @@ import { INBOX_PROJECT_ID } from "@/lib/productivity/types";
 import { colors } from "@/lib/theme";
 
 export default function TodayScreen() {
+  useThemeId();
   const { t } = useI18n();
   const tasks = useVisibleTasks();
   const [composeOpen, setComposeOpen] = useState(false);

@@ -1,12 +1,13 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Star } from "lucide-react-native";
 import { formatDue, isOverdue } from "@/lib/productivity/dates";
 import type { ProdProject, ProdTask } from "@/lib/productivity/types";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, layout } from "@/lib/theme";
 
-const RIPPLE = { color: colors.ripple };
 
 export function TaskRow({
   task,
@@ -21,6 +22,7 @@ export function TaskRow({
   onPress: () => void;
   onLongPress?: () => void;
 }) {
+  useThemeId();
   const overdue = isOverdue(task.dueAt, task.status);
   const due = task.dueAt != null ? formatDue(task.dueAt) : null;
   const subtitle = [project?.name, due].filter(Boolean).join(" · ");
@@ -28,7 +30,7 @@ export function TaskRow({
   return (
     <Pressable
       accessibilityRole="button"
-      android_ripple={RIPPLE}
+      android_ripple={{ color: colors.ripple }}
       delayLongPress={350}
       onPress={() => {
         triggerSelectionUiHaptic();
@@ -63,11 +65,12 @@ export function TaskRow({
   );
 }
 
-export const taskListStyle = {
+const taskListStyleSheet = createStyles(() => ({ item: {
   marginHorizontal: -layout.screenPad,
-};
+} }));
+export function taskListStyle() { return taskListStyleSheet.item; }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   row: {
     minHeight: 56,
     flexDirection: "row",
@@ -98,4 +101,4 @@ const styles = createStyles({
   titleDone: { color: colors.muted, textDecorationLine: "line-through" },
   sub: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
   subOverdue: { color: colors.danger },
-});
+}));

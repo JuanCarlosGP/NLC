@@ -1,3 +1,4 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
 import { View } from "react-native";
@@ -11,6 +12,7 @@ import { projectDisplayName } from "@/lib/productivity/types";
 import { colors } from "@/lib/theme";
 
 export default function ProjectScreen() {
+  useThemeId();
   const { t } = useI18n();
   const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
   const id = libraryParamId(rawId);
@@ -61,10 +63,10 @@ export default function ProjectScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   dot: {
     width: 22,
     height: 22,
     borderRadius: 999,
   },
-});
+}));

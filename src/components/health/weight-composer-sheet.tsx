@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { localDateKey, WeightValidationError, type WeightEntry } from "@/lib/health/weight/model";
@@ -12,6 +14,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 export function WeightComposerSheet({ open, entry, onOpenChange }: {
   open: boolean; entry?: WeightEntry | null; onOpenChange(open: boolean): void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { entries, save } = useWeight();
   const [date, setDate] = useState(localDateKey());
@@ -77,7 +80,7 @@ export function WeightComposerSheet({ open, entry, onOpenChange }: {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 }, content: { paddingHorizontal: 22, paddingBottom: 28, gap: 12 },
   labelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   today: { fontFamily: fonts.sansMedium, color: colors.accent, padding: 6 },
@@ -85,6 +88,6 @@ const styles = createStyles({
     fontFamily: fonts.sans, fontSize: 16, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8 },
   weight: { fontFamily: fonts.serif, fontSize: 30 }, note: { minHeight: 72, textAlignVertical: "top" },
   hint: { ...type.meta, color: colors.warn }, error: { ...type.body, color: colors.danger },
-  submit: { alignItems: "center", justifyContent: "center", backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14 },
+  submit: { minHeight: 44, alignItems: "center", justifyContent: "center", backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14 },
   submitText: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.accentText },
-});
+}));

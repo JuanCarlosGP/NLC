@@ -1,4 +1,5 @@
-import { createStyles } from "@/lib/appearance/density";
+import { useThemeId } from "@/lib/appearance/use-theme-id";
+import { createStyles, isNativePixel } from "@/lib/appearance/density";
 import { useEffect, useRef } from "react";
 import { Animated, Platform, Pressable, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
@@ -16,7 +17,6 @@ import { useI18n } from "@/lib/i18n/context";
 import { useZone } from "@/lib/zone/zone-context";
 
 const HIDE_SPRING = { damping: 22, stiffness: 280, mass: 0.85 };
-const GLASS_FILL = colors.glass;
 
 function isHomeRoute(pathname: string): boolean {
   const normalized = pathname.replace(/\/$/, "") || "/";
@@ -36,6 +36,7 @@ function DockButton({
   onPress: () => void;
   children: React.ReactNode;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <Pressable
@@ -63,6 +64,7 @@ function DockButton({
 }
 
 function DockIcons() {
+  useThemeId();
   const router = useRouter();
   const pathname = usePathname();
   const { zone } = useZone();
@@ -141,6 +143,7 @@ function DockIcons() {
 }
 
 function glassChrome() {
+  if (isNativePixel()) return {};
   return Platform.OS === "web"
     ? ({
         backdropFilter: "blur(14px)",
@@ -151,6 +154,7 @@ function glassChrome() {
 }
 
 export function Dock() {
+  useThemeId();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const dock = useDock();
@@ -192,7 +196,7 @@ export function Dock() {
         style={[
           styles.pill,
           {
-            backgroundColor: GLASS_FILL,
+            backgroundColor: colors.glass,
             borderColor: colors.rule,
             transform: [{ translateY }, { scaleX }],
             ...glassChrome(),
@@ -205,7 +209,7 @@ export function Dock() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   host: {
     position: "absolute",
     left: 0,
@@ -246,4 +250,4 @@ const styles = createStyles({
     borderWidth: 2,
     borderColor: colors.void,
   },
-});
+}));

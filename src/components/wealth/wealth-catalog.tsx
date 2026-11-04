@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { useI18n } from "@/lib/i18n/context";
@@ -15,6 +17,7 @@ import { ACCOUNT_KIND_LABEL, accountDisplayName, type WealthAccount, type Wealth
 import { useLiveAccounts, useWealth } from "@/lib/wealth/wealth-context";
 
 export function WealthCatalog() {
+  useThemeId();
   const { t } = useI18n();
   const { assets, balanceOf, totalOf } = useWealth();
   const accounts = useLiveAccounts();
@@ -122,7 +125,7 @@ export function WealthCatalog() {
                     <Text style={styles.accountBal}>{formatEuro(total)}</Text>
                   </Pressable>
                   {open && hasBody ? (
-                    <View style={[assetListStyle, styles.nested]}>
+                    <View style={[assetListStyle(), styles.nested]}>
                       {showCash ? (
                         <CashRow amount={cash} onPress={() => openCash(account)} />
                       ) : null}
@@ -155,7 +158,7 @@ export function WealthCatalog() {
             </Pressable>
           </View>
           {unassigned.length ? (
-            <View style={assetListStyle}>
+            <View style={assetListStyle()}>
               {unassigned.map((position) => (
                 <AssetRow
                   key={position.asset.id}
@@ -204,6 +207,7 @@ export function WealthCatalog() {
 }
 
 function CashRow({ amount, onPress }: { amount: number; onPress: () => void }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <Pressable
@@ -224,7 +228,7 @@ function CashRow({ amount, onPress }: { amount: number; onPress: () => void }) {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   section: { gap: 4, paddingTop: 8 },
   sectionHead: {
     flexDirection: "row",
@@ -268,4 +272,4 @@ const styles = createStyles({
   cashName: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
   cashSub: { fontFamily: fonts.sans, fontSize: 13, color: colors.muted },
   cashValue: { fontFamily: fonts.sansMedium, fontSize: 15, color: colors.ink },
-});
+}));

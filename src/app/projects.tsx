@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { FolderKanban, Plus } from "lucide-react-native";
 import { ProjectComposerSheet } from "@/components/productivity/project-composer-sheet";
@@ -15,6 +17,7 @@ import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, type } from "@/lib/theme";
 
 export default function ProjectsScreen() {
+  useThemeId();
   const { t } = useI18n();
   const router = useRouter();
   const projects = useActiveProjects();
@@ -61,7 +64,7 @@ export default function ProjectsScreen() {
             </Pressable>
           </View>
         </View>
-        <View style={seriesListStyle}>
+        <View style={seriesListStyle()}>
           {projects.map((project) => (
             <SeriesRow
               key={project.id}
@@ -82,7 +85,7 @@ export default function ProjectsScreen() {
         {archived.length ? (
           <View>
             <Text style={type.sectionTitle}>{t("projects.archived")}</Text>
-            <View style={seriesListStyle}>
+            <View style={seriesListStyle()}>
               {archived.map((project) => (
                 <SeriesRow
                   key={project.id}
@@ -114,7 +117,7 @@ export default function ProjectsScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: { gap: 6, paddingTop: 8 },
   art: {
     width: 96,
@@ -139,4 +142,4 @@ const styles = createStyles({
     justifyContent: "center",
     marginTop: 18,
   },
-});
+}));

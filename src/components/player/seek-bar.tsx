@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutChangeEvent, Pressable, Text, View } from "react-native";
+import { LayoutChangeEvent, Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { colors, fonts } from "@/lib/theme";
 
 function formatTime(seconds: number): string {
@@ -20,6 +22,7 @@ export function SeekBar({
   duration: number;
   onSeek: (seconds: number) => void;
 }) {
+  useThemeId();
   const [width, setWidth] = useState(1);
   const [draft, setDraft] = useState<number | null>(null);
   const progress = duration > 0 ? Math.min(1, (draft ?? currentTime) / duration) : 0;
@@ -57,7 +60,7 @@ export function SeekBar({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   wrap: { gap: 8 },
   hit: { height: 28, justifyContent: "center" },
   track: {
@@ -72,4 +75,4 @@ const styles = createStyles({
   },
   times: { flexDirection: "row", justifyContent: "space-between" },
   time: { fontFamily: fonts.sans, fontSize: 12, color: colors.muted },
-});
+}));

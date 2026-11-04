@@ -1,5 +1,7 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { TrackRow } from "@/components/library/track-row";
 import { Cover } from "@/components/ui/cover";
@@ -14,6 +16,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts, type } from "@/lib/theme";
 
 export default function AlbumScreen() {
+  useThemeId();
   const { id: rawId } = useLocalSearchParams<{ id: string | string[] }>();
   const id = libraryParamId(rawId);
   const router = useRouter();
@@ -90,7 +93,7 @@ export default function AlbumScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   error: { ...type.body, color: colors.danger },
   header: { gap: 8, paddingBottom: 8 },
   actions: { flexDirection: "row", gap: 10 },
@@ -99,4 +102,4 @@ const styles = createStyles({
   ghost: { borderWidth: 1, borderColor: colors.rule, backgroundColor: colors.sheet },
   solidText: { fontFamily: fonts.sansSemiBold, color: colors.accentText },
   ghostText: { fontFamily: fonts.sansSemiBold, color: colors.ink },
-});
+}));

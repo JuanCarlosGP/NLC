@@ -1,8 +1,10 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { useIntegrations } from "@/lib/integrations/integrations-context";
 import { WhoopCalendarActivities } from "@/components/integrations/whoop-screen";
-import { space } from "@/lib/appearance/density";
+import { space, radius } from "@/lib/appearance/density";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Screen } from "@/components/ui/screen";
 import { useTraining } from "@/lib/health/training/training-context";
 import { monthDays, shiftMonth } from "@/lib/health/training/model";
@@ -13,6 +15,7 @@ import { Button, Header, SessionRow, TrainingLoadState, styles } from "./ui";
 import { SessionComposer } from "./session-composer";
 
 export function TrainingCalendar() {
+  useThemeId();
   const { t, locale } = useI18n(); const { sessions, ready, loadFailed } = useTraining();
   const integrations = useIntegrations(); const whoop = integrations.copies.whoop[integrations.selection.whoop]; const activities = whoop?.provider === "whoop" ? whoop.activities : [];
   const today = localDateKey(); const [selected, setSelected] = useState(today); const [month, setMonth] = useState(today.slice(0, 7)); const [open, setOpen] = useState(false);
@@ -31,11 +34,11 @@ export function TrainingCalendar() {
           {monthDays(month).map((day, index) => {
             const count = day ? sessions.filter((session) => session.date === day).length : 0;
             const activityCount = day ? activities.filter(activity => activity.date === day).length : 0;
-            return <View key={day ?? `empty-${index}`} style={{ width: "14.285714%", padding: 2 }}>
+            return <View key={day ?? `empty-${index}`} style={{ width: "14.285714%", padding: space(2) }}>
               {day ? <Pressable accessibilityRole="button" accessibilityLabel={`${t("training.dayLabel", { date: day, count })}${activityCount ? ` · ${t("integrations.calendarCount", {count:activityCount})}` : ""}`} accessibilityState={{ selected: day === selected }} onPress={() => setSelected(day)}
-                style={{ minHeight: 45, paddingVertical: 7, alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: 1, borderColor: day === today ? colors.accent : "transparent", backgroundColor: day === selected ? colors.accent : "transparent", gap: space(4) }}>
+                style={{ minHeight: 45, paddingVertical: space(7), alignItems: "center", justifyContent: "center", borderRadius: radius(9), borderWidth: 1, borderColor: day === today ? colors.accent : "transparent", backgroundColor: day === selected ? colors.accent : "transparent", gap: space(4) }}>
                 <Text style={{ fontFamily: fonts.sansMedium, color: day === selected ? colors.accentText : colors.ink }}>{Number(day.slice(8))}</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}><View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: count ? day === selected ? colors.accentText : colors.accent : "transparent" }} /><View style={{ width: 6, height: 2, backgroundColor: activityCount ? day === selected ? colors.accentText : colors.accent : "transparent" }} /></View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: space(3) }}><View style={{ width: 4, height: 4, borderRadius: radius(2), backgroundColor: count ? day === selected ? colors.accentText : colors.accent : "transparent" }} /><View style={{ width: 6, height: 2, backgroundColor: activityCount ? day === selected ? colors.accentText : colors.accent : "transparent" }} /></View>
               </Pressable> : null}
             </View>;
           })}

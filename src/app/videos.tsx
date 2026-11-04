@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Clapperboard } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
@@ -14,6 +16,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { colors, type } from "@/lib/theme";
 
 export default function VideosScreen() {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { settings, password, ready } = useSettings();
@@ -89,7 +92,7 @@ export default function VideosScreen() {
       {series.length ? (
         <View>
           <Text style={type.sectionTitle}>{t("videos.series")}</Text>
-          <View style={seriesListStyle}>
+          <View style={seriesListStyle()}>
             {series.map((show) => (
               <SeriesRow
                 key={show.id}
@@ -111,7 +114,7 @@ export default function VideosScreen() {
       {movies.length ? (
         <View>
           <Text style={type.sectionTitle}>{t("videos.movies")}</Text>
-          <View style={seriesListStyle}>
+          <View style={seriesListStyle()}>
             {movies.map((show) => (
               <SeriesRow
                 key={show.id}
@@ -134,7 +137,7 @@ export default function VideosScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: { gap: 6, paddingTop: 8 },
   art: {
     width: 96,
@@ -146,4 +149,4 @@ const styles = createStyles({
     marginBottom: 8,
   },
   error: { ...type.body, color: colors.danger },
-});
+}));

@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import {
   Check,
@@ -44,6 +46,7 @@ import { colors, fonts } from "@/lib/theme";
 type ViewMode = "menu" | "playlists" | "source";
 
 export function TrackActionsSheet() {
+  useThemeId();
   const { open, target, setOpen } = useTrackActions();
   const { t } = useI18n();
   return (
@@ -65,6 +68,7 @@ function TrackActionsBody({
   target: TrackActionsTarget;
   onClose: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { track, playlistId } = target;
   const router = useRouter();
@@ -546,6 +550,7 @@ function ActionRow({
   disabled?: boolean;
   onPress?: () => void;
 }) {
+  useThemeId();
   return (
     <Pressable
       accessibilityRole={onPress ? "button" : undefined}
@@ -559,7 +564,7 @@ function ActionRow({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -685,4 +690,4 @@ const styles = createStyles({
     fontSize: 14,
     color: colors.accentText,
   },
-});
+}));

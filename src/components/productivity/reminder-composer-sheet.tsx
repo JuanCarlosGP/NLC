@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text, TextInput } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -35,6 +37,7 @@ export function ReminderComposerSheet({
   onOpenChange: (open: boolean) => void;
   reminder?: ProdReminder | null;
 }) {
+  useThemeId();
   const { t } = useI18n();
   return (
     <BottomSheet
@@ -57,6 +60,7 @@ function ReminderComposerBody({
   reminder: ProdReminder | null;
   onDone: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { createReminder, updateReminder, deleteReminder } = useReminders();
   const [title, setTitle] = useState("");
@@ -290,7 +294,7 @@ function resolveOnceAt(day: "today" | "tomorrow", hour: number, minute: number):
   return startOfDay(when.getTime());
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -398,4 +402,4 @@ const styles = createStyles({
     fontSize: 14,
     color: colors.danger,
   },
-});
+}));

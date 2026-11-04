@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState, type ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
 import { Heart, ListEnd, ListMusic, ListPlus, Pencil, Play, RefreshCw, Trash2 } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
@@ -18,6 +20,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts } from "@/lib/theme";
 
 export function PlaylistActionsSheet() {
+  useThemeId();
   const { open, playlist, setOpen } = usePlaylistActions();
   const { t } = useI18n();
   return (
@@ -41,6 +44,7 @@ function PlaylistActionsBody({
   playlist: ImportedPlaylist;
   onClose: () => void;
 }) {
+  useThemeId();
   const router = useRouter();
   const { t } = useI18n();
   const { playTracks, enqueueTracks } = usePlayer();
@@ -221,6 +225,7 @@ function ActionRow({
   disabled?: boolean;
   onPress?: () => void;
 }) {
+  useThemeId();
   return (
     <Pressable
       accessibilityRole={onPress ? "button" : undefined}
@@ -234,7 +239,7 @@ function ActionRow({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,
@@ -282,4 +287,4 @@ const styles = createStyles({
   labelDanger: {
     color: colors.danger,
   },
-});
+}));

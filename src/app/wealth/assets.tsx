@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { Plus } from "lucide-react-native";
 import { Screen } from "@/components/ui/screen";
 import { AssetComposerSheet } from "@/components/wealth/account-composer-sheet";
@@ -12,6 +14,7 @@ import type { WealthAsset } from "@/lib/wealth/types";
 import { useWealth } from "@/lib/wealth/wealth-context";
 
 export default function WealthAssetsScreen() {
+  useThemeId();
   const { t } = useI18n();
   const { positions } = useWealth();
   const [open, setOpen] = useState(false);
@@ -37,7 +40,7 @@ export default function WealthAssetsScreen() {
           </Pressable>
         </View>
         {positions.length ? (
-          <View style={assetListStyle}>
+          <View style={assetListStyle()}>
             {positions.map((position) => (
               <AssetRow key={position.asset.id} position={position} onPress={() => openAsset(position.asset)} />
             ))}
@@ -58,7 +61,7 @@ export default function WealthAssetsScreen() {
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -67,4 +70,4 @@ const styles = createStyles({
   },
   title: { flex: 1 },
   iconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-});
+}));

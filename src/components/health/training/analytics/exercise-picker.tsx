@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space } from "@/lib/appearance/density";
 import { useState } from "react";
-import { Pressable, Text } from "react-native";
+import { Pressable } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import type { ExerciseAnalytics } from "@/lib/health/training/analytics";
@@ -8,6 +10,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { colors, type } from "@/lib/theme";
 import { Button, Field, styles } from "../ui";
 export function AnalyticsExercisePicker({ open, selected, exercises, onClose, onSelect }: { open: boolean; selected: string; exercises: ExerciseAnalytics[]; onClose(): void; onSelect(key: string): void }) {
+  useThemeId();
   const { t, locale } = useI18n(); const [query, setQuery] = useState(""); const [limit, setLimit] = useState(40);
   const filtered = exercises.filter((exercise) => exercise.name.toLocaleLowerCase(locale).includes(query.trim().toLocaleLowerCase(locale)));
   return <BottomSheet open={open} onOpenChange={(value) => { if (!value) onClose(); }} accessibilityCloseLabel={t("trainingAnalytics.close")} viewportRatio={0.75}>

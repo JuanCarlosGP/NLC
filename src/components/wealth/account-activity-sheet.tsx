@@ -1,6 +1,8 @@
+import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState, type ReactNode } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { Text } from "@/components/ui/themed-text";
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -25,6 +27,7 @@ export function AccountActivitySheet({
   onOpenChange: (open: boolean) => void;
   onEditAsset?: (asset: WealthAsset | null) => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const [txOpen, setTxOpen] = useState(false);
   const [txKind, setTxKind] = useState<WealthTxKind>("income");
@@ -92,6 +95,7 @@ function AccountActivityBody({
   onAddTx: (kind: WealthTxKind) => void;
   onEditCash: () => void;
 }) {
+  useThemeId();
   const { t } = useI18n();
   const { assets, txs, balanceOf, holdingsOf, totalOf } = useWealth();
   const cash = balanceOf(account.id);
@@ -164,7 +168,7 @@ function AccountActivityBody({
         )}
       </View>
       {holdings.length ? (
-        <View style={assetListStyle}>
+        <View style={assetListStyle()}>
           {holdings.map((position) => (
             <AssetRow
               key={position.asset.id}
@@ -179,7 +183,7 @@ function AccountActivityBody({
         </View>
       ) : null}
       {items.length ? (
-        <View style={txListStyle}>
+        <View style={txListStyle()}>
           {items.map((tx) => (
             <TxRow key={tx.id} tx={tx} accountId={account.id} />
           ))}
@@ -198,6 +202,7 @@ function Action({
   icon: ReactNode;
   onPress: () => void;
 }) {
+  useThemeId();
   return (
     <Pressable
       accessibilityRole="button"
@@ -211,7 +216,7 @@ function Action({
   );
 }
 
-const styles = createStyles({
+const styles = createStyles(() => ({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,
@@ -257,4 +262,4 @@ const styles = createStyles({
     color: colors.void,
   },
   actionSpacer: { flex: 1 },
-});
+}));
