@@ -223,3 +223,47 @@ test('the Android hook uses SecureStore and native streaming fetch; cached data 
     await renderer.act(async () => { app.unmount(); }); app = null; assert.equal(listeners.size, 0);
   } finally { if (app) await renderer.act(async () => app.unmount()); Module._load = original; }
 });
+
+test('the native panel clears a failed manual-sync message when automatic sync recovers', async () => {
+  const React = require('react'); const renderer = require('react-test-renderer'); global.IS_REACT_ACT_ENVIRONMENT = true;
+  const context = { ready: true, copies: { mercury: { live: null, demo: null } }, selection: { mercury: 'live' }, error: null,
+    mobileMercury: { state: { ready: true, configured: true, busy: false, error: null, pending: null, retryAt: 0 },
+      sync: async () => { context.mobileMercury.state.error = 'network'; throw new MercuryError('network'); } } };
+  const children = ({ children, ...props }) => React.createElement('view', props, children);
+  const mocks = {
+    'react-native': { View: children, Linking: { openURL: async () => {} } },
+    '@/components/ui/themed-text': { Text: props => React.createElement('label', props, props.children) },
+    '@/components/layout/bottom-sheet': { BottomSheet: ({ open, children }) => open ? children : null },
+    '@/components/layout/sheet-scroll-view': { SheetScrollView: children },
+    '@/components/ui/confirm-dialog': { ConfirmDialog: () => null },
+    '@/components/ui/inline-help': { InlineHelp: children },
+    '@/components/health/training/ui': { Button: props => React.createElement('action', props), Field: () => null },
+    '@/lib/appearance/density': { createStyles: source => source() },
+    '@/lib/appearance/use-theme-id': { useThemeId: () => 'geist-pixel' },
+    '@/lib/i18n/context': { useI18n: () => ({ locale: 'es', t: key => key }) },
+    '@/lib/integrations/integrations-context': { useIntegrations: () => context },
+    '@/lib/integrations/io': {},
+    '@/lib/theme': { colors: {}, type: { body: {}, meta: {} } },
+  };
+  const original = Module._load;
+  Module._load = function (request, parent, isMain) {
+    if (Object.hasOwn(mocks, request)) return mocks[request];
+    if (request.startsWith('@/')) request = path.join(__dirname, '../src', request.slice(2));
+    return original.call(this, request, parent, isMain);
+  };
+  let app;
+  try {
+    const { MobileMercuryPanel } = require('../src/components/integrations/mobile-mercury-panel.tsx');
+    await renderer.act(async () => { app = renderer.create(React.createElement(MobileMercuryPanel)); });
+    const sync = app.root.findAllByType('action').find(item => item.props.title === 'integrations.sync');
+    await renderer.act(async () => { sync.props.onPress(); await new Promise(setImmediate); });
+    await renderer.act(async () => { app.update(React.createElement(MobileMercuryPanel)); });
+    const hasNetworkError = () => app.root.findAllByType('label').some(item => item.props.children === 'mobileMercury.errors.network');
+    assert.equal(hasNetworkError(), true);
+    context.mobileMercury.state = { ...context.mobileMercury.state, error: null };
+    context.copies.mercury.live = live();
+    await renderer.act(async () => { app.update(React.createElement(MobileMercuryPanel)); });
+    assert.equal(hasNetworkError(), false);
+    await renderer.act(async () => app.unmount()); app = null;
+  } finally { if (app) await renderer.act(async () => app.unmount()); Module._load = original; }
+});
