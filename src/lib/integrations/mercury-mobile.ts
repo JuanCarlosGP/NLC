@@ -100,7 +100,7 @@ export function createMobileMercury(options: MobileMercuryOptions) {
         const safe = error instanceof MercuryError ? error : new MercuryError("invalid");
         if (safe.code === "cancelled") return "cancelled";
         failures++; autoBlocked = ["auth", "storage", "invalid", "currency", "pagination", "size"].includes(safe.code);
-        const retryAt = safe.code === "rateLimit" ? Math.max(now() + 60000, safe.retryAt) : now() + Math.min(15 * 60000, 30000 * 2 ** Math.min(failures - 1, 5));
+        const retryAt = autoBlocked ? 0 : safe.code === "rateLimit" ? Math.max(now() + 60000, safe.retryAt) : now() + Math.min(15 * 60000, 30000 * 2 ** Math.min(failures - 1, 5));
         update({ error: safe.code, retryAt }); throw safe;
       } finally {
         if (request === active) request = null;
