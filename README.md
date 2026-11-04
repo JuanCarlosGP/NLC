@@ -26,7 +26,8 @@ NLC no es un clon de Spotify. Importa metadatos de playlists y las empareja con 
 - Medicación y suplementos: pautas, horarios, tomas, calendario y avisos locales opcionales en Android
 - Foco: bandeja, proyectos, recordatorios
 - Patrimonio: cuentas, movimientos y objetivos
-- [WHOOP y Mercury](docs/integrations.md): servicio Linux local, sincronización de solo lectura y copias consultables sin conexión
+- [Mercury en Android](docs/integrations.md): conexión directa con token Read Only, sincronización automática en primer plano y copia sin conexión
+- [WHOOP y Mercury web](docs/integrations.md): servicio Linux local con sincronización de solo lectura
 - Tema Geist Pixel en la APK: negro, compacto, fuente incluida y selección sin conexión en Ajustes → App → Apariencia (también NLC clásico)
 - Actualizaciones JS por OTA; la APK nativa se publica en GitHub Releases
 

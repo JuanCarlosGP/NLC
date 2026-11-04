@@ -268,3 +268,13 @@ Implementación inicial (pendiente de QA en dispositivo):
   privado. Un archivo inválido, foto incompleta o fallo de escritura impide continuar.
 - Android elige carpeta mediante el sistema; iOS usa su hoja de archivos/compartir;
   web descarga el ZIP. No requiere NAS ni cuenta.
+
+## Mercury en Android
+
+- Patrimonio → Mercury permite configurar un token Read Only en un campo protegido,
+  guardado en SecureStore. No depende de un servidor Linux ni de direcciones LAN.
+- Se sincroniza al abrir o volver si la copia tiene más de 15 minutos y periódicamente
+  en primer plano, con reintentos espaciados al recuperar conexión.
+- Desconectar elimina el token y conserva la copia; cambiar de organización exige
+  confirmar antes de sustituir datos. Los fallos conservan la última copia completa.
+- Datos de ejemplo, copias JSON, filtros y consultas funcionan sin conexión.

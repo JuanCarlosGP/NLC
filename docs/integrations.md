@@ -1,8 +1,49 @@
-# WHOOP y Mercury (Linux local)
+# WHOOP y Mercury
 
-WHOOP está en Salud y Mercury en Patrimonio. El estilo y la densidad se heredan de NLC, incluido Geist Pixel. Las copias de datos se guardan en IndexedDB en web y SQLite en nativo. Leerlas, filtrar fechas, consultar actividades y exportar/importar JSON no requiere conexión. Una primera sincronización sí requiere Internet y el servicio local.
+WHOOP está en Salud y Mercury en Patrimonio. **Mercury se conecta directamente
+desde la APK Android**, sin servidor local. WHOOP y la versión web conservan el
+servicio de Linux descrito más abajo. Los datos se guardan en SQLite en Android
+e IndexedDB en web. La copia se consulta y exporta sin conexión; descargar datos
+nuevos requiere Internet y el acceso a cada proveedor.
 
-## Arranque
+## Mercury en la APK Android
+
+1. En Mercury, crear un token **Read Only** en Settings → API Tokens. No hace
+   falta una IP fija para un token de solo lectura.
+2. Abrir **Patrimonio → Mercury → Mi cuenta → Configurar Mercury**.
+3. Pegar el token en el campo protegido y pulsar **Guardar y sincronizar**.
+   El acceso se guarda exclusivamente en SecureStore del teléfono; no se manda
+   al servicio Linux ni se guarda en preferencias, SQLite o copias exportadas.
+
+La APK hace solo peticiones GET por HTTPS a la API de Mercury. No contiene
+operaciones de pago o transferencia. La identidad se basa en el ID estable de
+la organización; añadir una cuenta bancaria no cambia esa identidad. Una
+organización distinta necesita confirmación antes de sustituir la copia local.
+
+Con el token configurado, la app actualiza al abrir o volver a primer plano si
+la copia tiene más de 15 minutos o no existe. Revisa cada 30 segundos mientras
+está activa. Un fallo de red aplica espera creciente y vuelve a intentarlo;
+un límite de peticiones respeta `Retry-After`. Los errores de acceso o de datos
+requieren revisión o un intento manual. Cerrar la app detiene este trabajo: no
+se promete ejecución periódica con Android suspendido.
+
+La descarga recorre todas las páginas de cuentas, crédito, Treasury, categorías
+y movimientos. Solo se guarda tras completar y validar la descarga; los fallos
+conservan la copia previa. La copia contiene saldos firmados en USD y solo los
+campos mostrados, con los últimos cuatro dígitos de las cuentas. No incluye EIN,
+routing numbers, números completos, tokens ni respuestas crudas.
+
+**Desconectar Mercury** cancela la descarga y elimina el token, conservando la
+copia sin conexión. Borrar una copia mientras la conexión sigue activa avisa
+de que la sincronización la volverá a descargar. Los datos de ejemplo se generan
+en el móvil sin red y se guardan separados de la cuenta real. Importar y exportar
+JSON sigue funcionando sin servidor.
+
+No se dispone de credenciales reales durante el desarrollo; el acceso a una
+cuenta real requiere que su propietario configure el token. Los fallos y el
+protocolo se prueban con proveedores simulados, sin operaciones bancarias reales.
+
+## Arranque del servicio Linux (WHOOP y web)
 
 Requiere Node 22.23 o posterior (el resto de NLC conserva su requisito actual). Desde la raíz del repositorio:
 
@@ -42,7 +83,7 @@ WHOOP_REDIRECT_URI=https://127.0.0.1:8087/whoop/callback
 
 Y arrancar Expo con `EXPO_PUBLIC_NLC_INTEGRATIONS_URL=https://127.0.0.1:8087`. Registrar ese URI HTTPS exacto en WHOOP. El servicio sigue escuchando solo en loopback.
 
-## Mercury
+## Mercury en el servicio Linux (web)
 
 Crear un token **Read Only** en Mercury → Settings → API Tokens, guardarlo como `MERCURY_API_TOKEN` y reiniciar el servicio. En Patrimonio → Mercury → Mi cuenta, pulsar **Sincronizar**. No se ofrecen operaciones de pago ni de transferencia.
 
@@ -60,13 +101,14 @@ Estas copias son independientes del ZIP existente de Salud; ese formato no cambi
 
 `NLC_SYNC_MINUTES=15` (o más) sincroniza cada proveedor conectado mientras este proceso está abierto. Por defecto es manual. El cliente consulta el estado y actualiza una copia existente de la misma cuenta; una cuenta diferente necesita confirmación. Cerrar el proceso detiene la sincronización. Una limitación de peticiones conserva la copia anterior y se muestra sin reintentos agresivos.
 
-Esta entrega está configurada para el entorno Linux local. No abre puertos LAN, túneles, servicios públicos ni webhooks. Para conectar un móvil a un servidor persistente hará falta añadir autenticación entre dispositivo y servidor y configurar su despliegue; no se envían claves al móvil. No se han realizado nuevas pruebas en Android ni iOS.
+El servicio de esta sección está configurado para el entorno Linux local. No abre puertos LAN, túneles, servicios públicos ni webhooks. Para conectar WHOOP desde un móvil a un servidor persistente hará falta añadir autenticación entre dispositivo y servidor y configurar su despliegue; no se envían claves al móvil. Esta sección no valida una conexión real de WHOOP desde Android; iOS queda fuera de las pruebas.
 
 ## Verificación
 
 ```sh
 npm run typecheck
 npm run test:integrations
+npm run test:mercury-mobile
 ```
 
 Las pruebas usan proveedores simulados y datos sintéticos: OAuth y estado de navegador, rotación de tokens, paginación, cambios de estado, redacción de datos, ausencia de escrituras a los proveedores, fallos parciales, persistencia al reiniciar, separación de ejemplos y cuentas reales, rechazo de orígenes ajenos y restauración de JSON sin red. Una conexión real sigue requiriendo las credenciales y el consentimiento del propietario.
