@@ -1,3 +1,4 @@
+import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { createVideoDavClient } from "@/lib/video/dav";
 import {
   isLocalVideoPath,
@@ -10,15 +11,17 @@ import type { WebDavEntry } from "@/lib/nas/webdav";
 
 export function createVideoClient(settings: NasSettings, password: string) {
   const dav = createVideoDavClient(settings, password);
-  const localUri = settings.videoLocalFolderUri.trim();
+  const localUri = usesLocal(settings, "video") ? settings.videoLocalFolderUri.trim() : "";
 
   async function listDir(path: string): Promise<WebDavEntry[]> {
     if (localUri && isLocalVideoPath(path)) return listLocalVideoDir(localUri, path);
+    if (!usesNas(settings, "video")) return [];
     return dav.listDir(path);
   }
 
   function playable(path: string): PlayableSource | Promise<PlayableSource> {
     if (localUri && isLocalVideoPath(path)) return localVideoPlayable(localUri, path);
+    if (!usesNas(settings, "video")) throw new Error("localFileMissing");
     return dav.playable(path);
   }
 

@@ -33,7 +33,7 @@ export function SourceConfigSheet({
   busy: boolean;
   testConnection: () => Promise<void>;
   save: () => Promise<void>;
-  variant?: "music" | "podcast" | "video" | "wealth" | "focus";
+  variant?: "music" | "podcast" | "video" | "wealth" | "focus" | "health";
 }) {
   useThemeId();
   const { t } = useI18n();
@@ -41,7 +41,7 @@ export function SourceConfigSheet({
   const folderPlaceholder =
     variant === "video" ? "/Video" : variant === "podcast" ? "/Music/Podcasts" : "/Music";
   const title =
-    variant === "video"
+    variant === "health" ? t("zones.health") : variant === "video"
       ? t("sourceSheet.videoTitle")
       : variant === "podcast"
         ? t("sourceSheet.podcastTitle")
@@ -52,7 +52,7 @@ export function SourceConfigSheet({
             : t("sourceSheet.musicTitle");
   const summary = `${settings.useHttps ? "https" : "http"}://${settings.host}:${settings.port}`;
   const folderHint =
-    variant === "video"
+    variant === "health" ? t("localSetup.healthFolderHint") : variant === "video"
       ? t("sourceSheet.videoHint")
       : variant === "podcast"
         ? t("sourceSheet.podcastHint")

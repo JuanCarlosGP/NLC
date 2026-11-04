@@ -1,3 +1,5 @@
+import { LocalSetup } from "./local-setup";
+import { localFolder, phoneOnly, SERVICES } from "@/lib/settings/service-source";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -35,13 +37,13 @@ import { colors, fonts, layout, type } from "@/lib/theme";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { webInteractiveStyle } from "@/lib/interactive";
 
-const STEPS = 5;
+
 const ICON_HIT = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 const IN_MS = 320;
 const EASE = Easing.out(Easing.cubic);
 const SPRING = { damping: 18, stiffness: 240, mass: 0.8 };
 
-type Step = 0 | 1 | 2 | 3 | 4;
+type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 type FieldKey = "host" | "port" | "username" | "password" | "rootPath";
 
 type Draft = {
@@ -185,10 +187,10 @@ function Reveal({
   return <Animated.View style={style}>{children}</Animated.View>;
 }
 
-function StepPips({ step, reduce }: { step: number; reduce: boolean }) {
+function StepPips({ step, reduce, total }: { step: number; reduce: boolean; total: number }) {
   useThemeId();
   const { t } = useI18n();
-  const label = t("onboarding.stepOf", { current: step + 1, total: STEPS });
+  const label = t("onboarding.stepOf", { current: step + 1, total });
   return (
     <View
       accessibilityRole="text"
@@ -197,7 +199,7 @@ function StepPips({ step, reduce }: { step: number; reduce: boolean }) {
     >
       <Text style={styles.stepLabel}>{label}</Text>
       <View style={styles.pips}>
-        {Array.from({ length: STEPS }, (_, index) => (
+        {Array.from({ length: total }, (_, index) => (
           <Pip key={index} on={index <= step} reduce={reduce} />
         ))}
       </View>
@@ -315,9 +317,13 @@ export function Onboarding() {
   useThemeId();
   const insets = useSafeAreaInsets();
   const reduceMotion = usePrefersReducedMotion();
-  const { settings, skipOnboarding, completeOnboarding } = useSettings();
+  const { settings, password: storedPassword, skipOnboarding, completeOnboarding } = useSettings();
   const { t } = useI18n();
   const [step, setStep] = useState<Step>(0);
+  const [mode, setMode] = useState<"local" | "nas">("local");
+  const [localDraft, setLocalDraft] = useState(() => phoneOnly(settings));
+  const visibleSteps: Step[] = mode === "nas" ? [0, 1, 2, 3, 4, 6] : [0, 1, 5, 6];
+  const previous = () => visibleSteps[Math.max(0, visibleSteps.indexOf(step) - 1)];
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [tested, setTested] = useState(false);
@@ -389,13 +395,13 @@ export function Onboarding() {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (busy || entering) return true;
       if (step > 0) {
-        go((step - 1) as Step);
+        go(previous());
         return true;
       }
       return false;
     });
     return () => sub.remove();
-  }, [busy, entering, go, step]);
+  }, [busy, entering, go, step, mode]);
 
   async function testConnection() {
     if (busy) return;
@@ -441,8 +447,13 @@ export function Onboarding() {
     setEntering(true);
     try {
       const base = looksLikeFactoryNas(settings) ? UNSET_NAS_SETTINGS : settings;
-      const next = toNasSettings(base, draft);
-      await completeOnboarding(next, draft.password);
+      const next = mode === "local" ? phoneOnly(localDraft) : {
+        ...toNasSettings(base, draft),
+        serviceSources: { ...base.serviceSources, music: draft.wantMusic ? "nas" as const : "local" as const, podcast: draft.wantPodcasts ? "nas" as const : "local" as const, video: draft.wantVideo ? "nas" as const : "local" as const, focus: draft.wantWealth ? "nas" as const : "local" as const, wealth: draft.wantWealth ? "nas" as const : "local" as const, health: "nas" as const },
+        healthSharePath: base.healthSharePath || joinPath(draft.rootPath, "Salud"),
+      };
+      // Folder data is imported only through the reviewed import flow, never by replaying this wizard.
+      await completeOnboarding(next, mode === "local" ? storedPassword : draft.password);
     } catch {
       setEntering(false);
       setFeedback({
@@ -518,17 +529,21 @@ export function Onboarding() {
           busy: false,
         }
       : step === 1
+        ? { label: t("onboarding.continue"), accessibilityLabel: t("onboarding.continue"), onPress: () => { setFeedback(null); go(mode === "local" ? 5 : 2); }, disabled: false, busy: false }
+      : step === 5
+        ? { label: t("onboarding.continue"), accessibilityLabel: t("onboarding.continue"), onPress: () => go(6), disabled: busy, busy: false }
+      : step === 2
         ? {
             label: t("onboarding.continue"),
             accessibilityLabel: t("onboarding.continue"),
             onPress: () => {
               triggerUiHaptic();
-              go(2);
+              go(3);
             },
             disabled: false,
             busy: false,
           }
-        : step === 2
+        : step === 3
           ? tested
             ? {
                 label: t("onboarding.continue"),
@@ -536,7 +551,7 @@ export function Onboarding() {
                 onPress: () => {
                   triggerUiHaptic();
                   setFeedback(null);
-                  go(3);
+                  go(4);
                 },
                 disabled: !canContinueConnect,
                 busy: false,
@@ -548,14 +563,14 @@ export function Onboarding() {
                 disabled: !canTest,
                 busy,
               }
-          : step === 3
+          : step === 4
             ? {
                 label: t("onboarding.continue"),
                 accessibilityLabel: t("onboarding.continue"),
                 onPress: () => {
                   triggerUiHaptic();
                   setFeedback(null);
-                  go(4);
+                  go(6);
                 },
                 disabled: busy || !foldersTried,
                 busy: false,
@@ -571,8 +586,10 @@ export function Onboarding() {
   const body = (
     <Animated.View style={[styles.bodyFill, bodyStyle]}>
       {step === 0 ? <WelcomeStep reduce={reduceMotion} /> : null}
-      {step === 1 ? <NeedStep reduce={reduceMotion} /> : null}
-      {step === 2 ? (
+      {step === 1 ? <LocalSetup mode={mode} onModeChange={setMode} /> : null}
+      {step === 5 ? <LocalSetup settings={localDraft} onSettingsChange={setLocalDraft} onBusyChange={setBusy} /> : null}
+      {step === 2 ? <NeedStep reduce={reduceMotion} /> : null}
+      {step === 3 ? (
         <ConnectStep
           draft={draft}
           setDraft={setDraft}
@@ -584,7 +601,7 @@ export function Onboarding() {
           }}
         />
       ) : null}
-      {step === 3 ? (
+      {step === 4 ? (
         <FoldersStep
           draft={draft}
           setDraft={setDraft}
@@ -594,10 +611,14 @@ export function Onboarding() {
           onCreate={() => void createFolders()}
         />
       ) : null}
-      {step === 4 ? (
-        <ReadyStep reduce={reduceMotion} endpoint={nasBaseUrl(preview)} paths={paths} />
+      {step === 6 ? (
+        mode === "local" ? <View style={styles.block}>
+          <Text style={styles.title}>{t("localSetup.ready")}</Text>
+          <Text style={type.body}>{t("localSetup.readyBody")}</Text>
+          {SERVICES.map(id => <View key={id} style={{ marginTop: 10 }}><Text style={type.label}>{t(`zones.${id}`)}</Text><Text style={type.body}>{localFolder(localDraft, id).name || t("localSetup.internal")}</Text></View>)}
+        </View> : <ReadyStep reduce={reduceMotion} endpoint={nasBaseUrl(preview)} paths={paths} />
       ) : null}
-      {step === 2 ? (
+      {step === 3 ? (
         <>
           {tested ? (
             <Reveal delay={0} reduce={reduceMotion}>
@@ -625,7 +646,7 @@ export function Onboarding() {
           )}
         </>
       ) : null}
-      {step === 2 || step === 3 ? (
+      {step === 3 || step === 4 ? (
         <View style={styles.feedbackSlot}>
           {feedback ? (
             <Reveal delay={0} reduce={reduceMotion}>
@@ -679,14 +700,14 @@ export function Onboarding() {
             onPress={() => {
               if (busy || entering || step === 0) return;
               triggerUiHaptic();
-              go((step - 1) as Step);
+              go(previous());
             }}
             style={({ pressed }) => [styles.headerBtn, webInteractiveStyle(), { opacity: pressed ? 0.7 : 1 }]}
           >
             <ChevronLeft color={colors.ink} size={26} strokeWidth={1.85} />
           </Pressable>
         </Animated.View>
-        <StepPips step={step} reduce={reduceMotion} />
+        <StepPips step={visibleSteps.indexOf(step)} total={visibleSteps.length} reduce={reduceMotion} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t("onboarding.skip")}
@@ -699,7 +720,7 @@ export function Onboarding() {
         </Pressable>
       </View>
 
-      {step === 2 || step === 3 ? (
+      {step === 3 || step === 4 ? (
         <KeyboardAvoidingView
           style={styles.body}
           behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined}
@@ -725,7 +746,7 @@ export function Onboarding() {
         <PrimaryButton
           label={primary.label}
           accessibilityLabel={primary.accessibilityLabel}
-          disabled={primary.disabled}
+          disabled={primary.disabled || busy || entering}
           busy={primary.busy}
           onPress={primary.onPress}
         />

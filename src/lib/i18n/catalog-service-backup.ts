@@ -1,0 +1,88 @@
+export const serviceBackupEn = {
+  serviceBackup: {
+    folderSaved: "Folder saved.",
+    whoopHint: "Connection and cached data",
+    sourceReady: "Source connected.",
+    title: "Export and import",
+    export: "Export service",
+    import: "Import copy",
+    exportHint: "Data and all media files.",
+    importHint: "Open a ZIP copy of this service.",
+    scope: "Data for this service. No passwords or tokens.",
+    file: "file",
+    files: "files",
+    record: "record",
+    records: "records",
+    cancel: "Cancel",
+    working: "Importing…",
+    confirmTitle: "Import this copy?",
+    confirmBody:
+      "Adds records and updates matching ones. Other services stay as they are. For media, choose a destination folder. Existing files are preserved.",
+    saved: "Copy saved.",
+    imported: "Import complete.",
+    saveFolder: "Save to Health folder",
+    saveNas: "Save Health to NAS",
+    openNas: "Open Health copy from NAS",
+    legacyHealth: "Earlier Health backups",
+    nativeUpdate: "Install the latest APK to use complete service copies.",
+    sourceUnreadable:
+      "Could not read every source file. For a complete copy, connect the NAS or choose the local folder again.",
+    integrity: "The copy is incomplete or damaged. No data was imported.",
+    format: "This is not a valid copy of this service.",
+    size: "This copy exceeds the supported metadata or file-count limit.",
+    space: "There is not enough free space.",
+    storage:
+      "The operation could not be completed. Check free space and folder access.",
+    cancelled: "Cancelled.",
+    accountChanged:
+      "This copy belongs to another integration account. Disconnect it and clear its cached data before importing.",
+    destination: "Choose a destination folder in Source.",
+    openSettings: "Export / import service",
+    settingsHint: "Data and media files",
+  },
+} as const;
+export const serviceBackupEs = {
+  serviceBackup: {
+    folderSaved: "Carpeta guardada.",
+    whoopHint: "Conexión y datos guardados",
+    sourceReady: "Fuente conectada.",
+    title: "Exportar e importar",
+    export: "Exportar servicio",
+    import: "Importar copia",
+    exportHint: "Datos y todos los archivos multimedia.",
+    importHint: "Abrir una copia ZIP de este servicio.",
+    scope: "Datos de este servicio. Sin contraseñas ni tokens.",
+    file: "archivo",
+    files: "archivos",
+    record: "registro",
+    records: "registros",
+    cancel: "Cancelar",
+    working: "Importando…",
+    confirmTitle: "¿Importar esta copia?",
+    confirmBody:
+      "Añade y actualiza registros. Conserva los demás servicios y los archivos existentes.",
+    saved: "Copia guardada.",
+    imported: "Importación completada.",
+    saveFolder: "Guardar en carpeta de Salud",
+    saveNas: "Guardar Salud en el NAS",
+    openNas: "Abrir copia de Salud del NAS",
+    legacyHealth: "Copias anteriores de Salud",
+    nativeUpdate:
+      "Instala la última APK para usar las copias completas por servicio.",
+    sourceUnreadable:
+      "No se pudieron leer todos los archivos. Para una copia completa, conecta el NAS o vuelve a elegir la carpeta local.",
+    integrity:
+      "La copia está incompleta o dañada. No se ha importado información.",
+    format: "No es una copia válida de este servicio.",
+    size: "La copia supera el límite de registros o número de archivos admitido.",
+    space: "No hay suficiente espacio libre.",
+    storage:
+      "No se pudo completar la operación. Revisa el espacio libre y el acceso a la carpeta.",
+    cancelled: "Cancelado.",
+    accountChanged:
+      "La copia pertenece a otra cuenta de la integración. Desconéctala y borra sus datos guardados antes de importar.",
+    destination: "Elige una carpeta de destino en Fuente.",
+    openSettings: "Exportar / importar servicio",
+    settingsHint: "Datos y archivos multimedia",
+  },
+} as const;

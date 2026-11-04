@@ -1,5 +1,28 @@
 # Flujos
 
+## Primera apertura sin NAS
+
+1. Elegir idioma y tema en Bienvenida.
+2. Elegir **En este teléfono**.
+3. Seleccionar las carpetas que quieras usar. Puedes dejarlas para después.
+4. Entrar en NLC. Música, Audio/Podcasts y Vídeo usan los archivos elegidos; Tareas, Finanzas y Salud funcionan en el teléfono sin conexión.
+
+Si eliges NAS, el asistente muestra **Qué necesitas**, Conectar, Carpetas y el resumen. Volver a ver el asistente o saltarlo conserva la configuración y los datos existentes.
+
+## Exportar e importar un servicio
+
+1. Elegir el servicio y entrar en **Ajustes → App → Exportar / importar servicio**.
+2. Exportar crea un ZIP en la carpeta que elijas. Incluye los registros y los archivos multimedia de carpetas locales y WebDAV; para incluir los archivos del NAS hay que poder leerlo. No descarga las pistas de Spotify ni streams de Navidrome/OpenSubsonic. Las imágenes remotas que no sean archivos de la fuente conservan su URL pública.
+3. Importar comprueba formato, servicio, archivos y SHA-256 antes de mostrar la fecha y el contenido de la copia.
+4. Confirmar añade registros y actualiza los coincidentes. Los otros servicios se conservan. Para multimedia se elige una carpeta y los archivos se copian en una subcarpeta nueva `NLC-…`, sin sobrescribir los existentes. Reimportar actualiza las identidades de las pistas y sus referencias.
+5. Salud incluye todos sus módulos y fotos, además de las copias de WHOOP. Finanzas incluye cuentas, activos, movimientos, cotizaciones, objetivos y copias de Mercury. Las claves de las integraciones se configuran en cada teléfono.
+
+La importación es una combinación de datos, no borra por completo el servicio. Las copias anteriores de Salud conservan su pantalla y su restauración con copia de seguridad previa. En Salud también puedes guardar en su carpeta configurada o guardar/abrir `nlc-health.zip` en el NAS.
+
+Se necesita una APK nueva: el ZIP de archivos grandes se escribe y lee por bloques en Android. Límites: 50.000 archivos multimedia, 32 MiB de metadatos y 512 GiB de contenido extraído, sujetos al espacio libre; Salud mantiene la validación de sus fotos (10 MiB/foto y hasta 5.000 fotos). No implica una prueba con dispositivos físicos ni con archivos de 512 GiB.
+
+## Notas históricas de QA
+
 Recorridos de punta a punta. No es la tabla de cobertura: es "el usuario quiere X y pasa por estas pantallas".
 
 Estado: `vacío` · `borrador QA1` · `revisado QA2`

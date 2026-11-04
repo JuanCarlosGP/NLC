@@ -1,3 +1,4 @@
+import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { sortWeightEntries, type WeightEntry, type WeightInput } from "./model";
 import { weightStore } from "./storage";
@@ -29,6 +30,8 @@ export function WeightProvider({ children }: { children: ReactNode }) {
       if (requested === revision.current) setReady(true);
     }
   }, []);
+
+  useEffect(() => onServiceImport(service => { if (service === "health") void refresh().catch(() => {}); }), [refresh]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 

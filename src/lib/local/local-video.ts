@@ -22,9 +22,10 @@ type LocalNode = {
   uri: string;
   dir: boolean;
   children: LocalNode[];
+  incomplete?: boolean;
 };
 
-let cached: { folderUri: string; root: LocalNode } | null = null;
+let cached: { folderUri: string; root: LocalNode; scannedAt: number } | null = null;
 const webUrls = new Map<string, string>();
 
 function nameFromUri(uri: string): string {
@@ -75,6 +76,7 @@ async function walkNative(uri: string, rel: string, depth: number): Promise<Loca
   } catch {
     return node;
   }
+  if (children.some(child => nameFromUri(child).startsWith(".nlc-importing-"))) { node.incomplete = true; return node; }
   for (const child of children) {
     const childName = nameFromUri(child);
     if (SKIP.has(childName.toLowerCase()) || childName.startsWith(".")) continue;
@@ -85,7 +87,8 @@ async function walkNative(uri: string, rel: string, depth: number): Promise<Loca
     }
     try {
       await StorageAccessFramework.readDirectoryAsync(child);
-      node.children.push(await walkNative(child, childRel, depth + 1));
+      const nested = await walkNative(child, childRel, depth + 1);
+      if (!nested.incomplete) node.children.push(nested);
     } catch {
       // Not a folder we can open.
     }
@@ -121,7 +124,7 @@ async function walkWeb(
 }
 
 export async function loadLocalVideoTree(folderUri: string): Promise<LocalNode> {
-  if (cached?.folderUri === folderUri) return cached.root;
+  if (cached?.folderUri === folderUri && (Platform.OS === "web" || Date.now() - cached.scannedAt < 30_000)) return cached.root;
   webUrls.clear();
   let root: LocalNode;
   if (Platform.OS === "web") {
@@ -132,7 +135,7 @@ export async function loadLocalVideoTree(folderUri: string): Promise<LocalNode> 
   } else {
     root = await walkNative(folderUri, "", 0);
   }
-  cached = { folderUri, root };
+  cached = { folderUri, root, scannedAt: Date.now() };
   return root;
 }
 
@@ -169,21 +172,27 @@ function toShow(node: LocalNode, kind: LocalVideoShow["kind"], file = false): Lo
 
 export async function listLocalVideoShows(folderUri: string): Promise<LocalVideoShow[]> {
   const root = await loadLocalVideoTree(folderUri);
-  const seriesDir = root.children.find((child) => child.dir && child.name.toLowerCase() === "series");
-  const moviesDir = root.children.find((child) => child.dir && child.name.toLowerCase() === "movies");
+  const wrappers = new Set(["local", "nas", "offline", "artwork"]);
+  function sourceRoots(node: LocalNode): LocalNode[] {
+    return node.children.length && node.children.every(child => child.dir && wrappers.has(child.name))
+      ? node.children.filter(child => child.name !== "artwork").flatMap(sourceRoots) : [node];
+  }
+  const roots = sourceRoots(root);
   const items: LocalVideoShow[] = [];
-  if (seriesDir || moviesDir) {
-    for (const child of seriesDir?.children ?? []) {
-      if (child.dir) items.push(toShow(child, "series"));
-    }
-    for (const child of moviesDir?.children ?? []) {
-      if (child.dir) items.push(toShow(child, "movie"));
-      else if (VIDEO_EXT.has(extOf(child.name))) items.push(toShow(child, "movie", true));
-    }
-  } else {
-    for (const child of root.children) {
-      if (child.dir) items.push(toShow(child, "series"));
-      else if (VIDEO_EXT.has(extOf(child.name))) items.push(toShow(child, "movie", true));
+  for (const source of roots) {
+    const seriesDir = source.children.find(child => child.dir && child.name.toLowerCase() === "series");
+    const moviesDir = source.children.find(child => child.dir && child.name.toLowerCase() === "movies");
+    if (seriesDir || moviesDir) {
+      for (const child of seriesDir?.children ?? []) if (child.dir) items.push(toShow(child, "series"));
+      for (const child of moviesDir?.children ?? []) {
+        if (child.dir) items.push(toShow(child, "movie"));
+        else if (VIDEO_EXT.has(extOf(child.name))) items.push(toShow(child, "movie", true));
+      }
+    } else {
+      for (const child of source.children) {
+        if (child.dir) items.push(toShow(child, "series"));
+        else if (VIDEO_EXT.has(extOf(child.name))) items.push(toShow(child, "movie", true));
+      }
     }
   }
   return items.sort((a, b) => a.name.localeCompare(b.name, collateLocale()));

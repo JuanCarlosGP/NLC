@@ -51,17 +51,21 @@ async function walkNative(
   depth: number,
   prefix: string,
   skipPodcasts: boolean,
+  state: { complete: boolean },
 ): Promise<void> {
-  if (depth > 8 || files.length > 8000) return;
+  if (depth > 8 || files.length > 8000) { state.complete = false; return; }
   const { StorageAccessFramework } = FileSystem;
   let children: string[] = [];
   try {
     children = await StorageAccessFramework.readDirectoryAsync(uri);
   } catch {
+    state.complete = false;
+    if (depth === 0) throw new Error(t("nasExtra.localRead"));
     return;
   }
+  if (children.some(child => nameFromUri(child).startsWith(".nlc-importing-"))) { state.complete = false; return; }
   for (const child of children) {
-    if (files.length > 8000) return;
+    if (files.length > 8000) { state.complete = false; return; }
     const name = nameFromUri(child);
     if (skipPodcasts && !relative && isPodcastFolderName(name)) continue;
     const rel = relative ? `${relative}/${name}` : name;
@@ -69,7 +73,7 @@ async function walkNative(
     if (!knownFile) {
       try {
         await StorageAccessFramework.readDirectoryAsync(child);
-        await walkNative(child, rel, files, covers, sidecars, depth + 1, prefix, skipPodcasts);
+        await walkNative(child, rel, files, covers, sidecars, depth + 1, prefix, skipPodcasts, state);
         continue;
       } catch {
         // Not a folder we can open — skip unknown files.
@@ -109,14 +113,15 @@ async function walkWeb(
   depth: number,
   prefix: string,
   skipPodcasts: boolean,
+  state: { complete: boolean },
 ): Promise<void> {
-  if (depth > 8 || files.length > 8000) return;
+  if (depth > 8 || files.length > 8000) { state.complete = false; return; }
   for await (const entry of handle.values()) {
     const name = entry.name;
     if (skipPodcasts && !relative && isPodcastFolderName(name)) continue;
     const rel = relative ? `${relative}/${name}` : name;
     if (entry.kind === "directory") {
-      await walkWeb(entry, rel, files, covers, sidecars, urls, depth + 1, prefix, skipPodcasts);
+      await walkWeb(entry, rel, files, covers, sidecars, urls, depth + 1, prefix, skipPodcasts, state);
       continue;
     }
     const path = `${ROOT}/${rel}`;
@@ -140,15 +145,17 @@ export function createLocalSource(folderUri: string, options: LocalSourceOptions
   const webUrls = new Map<string, string>();
 
   async function scan(): Promise<WebDavIndex> {
-    if (index) return index;
+    if (index && Date.now() - index.scannedAt < 30_000) return index;
     const files: WebDavEntry[] = [];
+    const state = { complete: true };
     const covers = new Map<string, string>();
     const sidecars = new Map<string, string>();
     if (Platform.OS === "web") {
       const handle = getWebDirectoryHandle(folderUri);
-      if (handle) await walkWeb(handle, "", files, covers, sidecars, webUrls, 0, prefix, skipPodcasts);
+      if (!handle) throw new Error(t("nasExtra.localRead"));
+      await walkWeb(handle, "", files, covers, sidecars, webUrls, 0, prefix, skipPodcasts, state);
     } else if (folderUri) {
-      await walkNative(folderUri, "", files, covers, sidecars, 0, prefix, skipPodcasts);
+      await walkNative(folderUri, "", files, covers, sidecars, 0, prefix, skipPodcasts, state);
     }
     const next = files.length
       ? buildIndex(ROOT, files, covers, sidecars, asPodcast ? ROOT : "")
@@ -161,7 +168,7 @@ export function createLocalSource(folderUri: string, options: LocalSourceOptions
         bytes: file.size ?? 0,
       });
     }
-    await upsertLocalLibrary(next, locals, `${prefix}:`);
+    await upsertLocalLibrary(next, locals, `${prefix}:${folderUri}`, !state.complete);
     index = next;
     return next;
   }
@@ -239,6 +246,7 @@ export function createLocalSource(folderUri: string, options: LocalSourceOptions
     },
 
     async refresh(): Promise<void> {
+      index = null;
       await this.ping();
     },
   };

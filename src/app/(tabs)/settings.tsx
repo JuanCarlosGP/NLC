@@ -1,3 +1,7 @@
+import { ServiceSourcePicker } from "@/components/settings/service-source-picker";
+import { usesNas, usesLocal } from "@/lib/settings/service-source";
+import { healthSourceSettings, applyHealthSourceSettings } from "@/lib/settings/storage";
+import { probeWebDav } from "@/lib/nas/webdav-source";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { AppearancePicker } from "@/components/settings/appearance-picker";
@@ -69,21 +73,13 @@ export default function SettingsScreen() {
   const podcastSettings = podcastSourceSettings(settings);
   const wealthSettings = wealthSourceSettings(settings);
   const focusSettings = focusSourceSettings(settings);
+  const healthSettings = healthSourceSettings(settings);
   const shareReady = connected && settings.sourceKind === "webdav";
   const videoReady = videoConnected;
   const downloadSummary = download.settings.enabled
     ? `${download.settings.host}:${download.settings.port}`
     : t("common.disabled");
 
-  useEffect(() => {
-    if (settings.sourceKind === "webdav") return;
-    setSettings({
-      ...settings,
-      sourceKind: "webdav",
-      port: settings.port === "4533" ? "5005" : settings.port || "5005",
-      useHttps: false,
-    });
-  }, [setSettings, settings]);
 
   useEffect(() => {
     let cancelled = false;
@@ -181,16 +177,20 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.groups}>
+        <ServiceSourcePicker service={zone} />
         {zone === "health" ? (
-          <SettingsGroup label={t("health.storageTitle")}>
-            <SettingsRow title={t("health.title")} summary={t("health.storageBody")} chevron={false} />
-            <SettingsRow title={t("healthBackup.open")} summary={t("healthBackup.hint")} onPress={() => router.push("/health/backup")} />
+          <SettingsGroup label={t("settings.source")} hint={t("localSetup.healthFolderHint")}>
+            <SettingsRow title="WHOOP" summary={t("serviceBackup.whoopHint")} onPress={() => router.push("/health/whoop")} />
+            <View style={styles.divider} />
+            {usesNas(settings, zone) ? <SettingsRow title={t("settings.shareFolder")} summary={settings.healthSharePath || t("common.none")} onPress={() => setConfigOpen(true)} /> : null}
+            {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
+            {usesLocal(settings, zone) ? <SettingsRow title={t("settings.localFolder")} summary={settings.healthLocalFolderName || t("localSetup.internal")} ready={Boolean(settings.healthLocalFolderUri)} showStatus onPress={() => setLocalOpen(true)} /> : null}
           </SettingsGroup>
         ) : null}
         {zone === "focus" ? (
           <>
             <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
-              <SettingsRow
+              {usesNas(settings, zone) ? <SettingsRow
                 title={t("settings.shareFolder")}
                 summary={focusSummary}
                 ready={focusConnected}
@@ -199,9 +199,9 @@ export default function SettingsScreen() {
                   triggerUiHaptic();
                   setConfigOpen(true);
                 }}
-              />
-              <View style={styles.divider} />
-              <SettingsRow
+              /> : null}
+              {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
+              {usesLocal(settings, zone) ? <SettingsRow
                 title={t("settings.localFolder")}
                 summary={focusLocalSummary}
                 ready={Boolean(settings.focusLocalFolderUri)}
@@ -210,7 +210,7 @@ export default function SettingsScreen() {
                   triggerUiHaptic();
                   setLocalOpen(true);
                 }}
-              />
+              /> : null}
             </SettingsGroup>
             <SettingsGroup label={t("settings.data")} hint={t("settings.focusDataHint")}>
               <SettingsRow
@@ -243,7 +243,7 @@ export default function SettingsScreen() {
         {zone === "wealth" ? (
           <>
             <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
-              <SettingsRow
+              {usesNas(settings, zone) ? <SettingsRow
                 title={t("settings.shareFolder")}
                 summary={wealthSummary}
                 ready={wealthConnected}
@@ -252,9 +252,9 @@ export default function SettingsScreen() {
                   triggerUiHaptic();
                   setConfigOpen(true);
                 }}
-              />
-              <View style={styles.divider} />
-              <SettingsRow
+              /> : null}
+              {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
+              {usesLocal(settings, zone) ? <SettingsRow
                 title={t("settings.localFolder")}
                 summary={wealthLocalSummary}
                 ready={Boolean(settings.wealthLocalFolderUri)}
@@ -263,7 +263,7 @@ export default function SettingsScreen() {
                   triggerUiHaptic();
                   setLocalOpen(true);
                 }}
-              />
+              /> : null}
             </SettingsGroup>
             <SettingsGroup label={t("settings.data")} hint={t("settings.wealthDataHint")}>
             <SettingsRow
@@ -328,7 +328,7 @@ export default function SettingsScreen() {
 
         {zone === "music" ? (
           <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
-            <SettingsRow
+            {usesNas(settings, zone) ? <SettingsRow
               title={t("settings.shareFolder")}
               summary={musicSummary}
               ready={shareReady}
@@ -337,9 +337,9 @@ export default function SettingsScreen() {
                 triggerUiHaptic();
                 setConfigOpen(true);
               }}
-            />
-            <View style={styles.divider} />
-            <SettingsRow
+            /> : null}
+            {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
+            {usesLocal(settings, zone) ? <SettingsRow
               title={t("settings.localFolder")}
               summary={localSummary}
               ready={Boolean(settings.localFolderUri)}
@@ -348,14 +348,14 @@ export default function SettingsScreen() {
                 triggerUiHaptic();
                 setLocalOpen(true);
               }}
-            />
+            /> : null}
           </SettingsGroup>
         ) : null}
 
         {zone === "podcast" ? (
           <>
             <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
-              <SettingsRow
+              {usesNas(settings, zone) ? <SettingsRow
                 title={t("settings.shareFolder")}
                 summary={podcastSummary}
                 ready={shareReady}
@@ -364,9 +364,9 @@ export default function SettingsScreen() {
                   triggerUiHaptic();
                   setConfigOpen(true);
                 }}
-              />
-              <View style={styles.divider} />
-              <SettingsRow
+              /> : null}
+              {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
+              {usesLocal(settings, zone) ? <SettingsRow
                 title={t("settings.localFolder")}
                 summary={podcastLocalSummary}
                 ready={Boolean(settings.podcastLocalFolderUri || settings.localFolderUri)}
@@ -375,14 +375,14 @@ export default function SettingsScreen() {
                   triggerUiHaptic();
                   setLocalOpen(true);
                 }}
-              />
+              /> : null}
             </SettingsGroup>
           </>
         ) : null}
 
         {zone === "video" ? (
           <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
-            <SettingsRow
+            {usesNas(settings, zone) ? <SettingsRow
               title={t("settings.videoFolder")}
               summary={videoSummary}
               ready={videoReady}
@@ -391,9 +391,9 @@ export default function SettingsScreen() {
                 triggerUiHaptic();
                 setConfigOpen(true);
               }}
-            />
-            <View style={styles.divider} />
-            <SettingsRow
+            /> : null}
+            {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
+            {usesLocal(settings, zone) ? <SettingsRow
               title={t("settings.localFolder")}
               summary={videoLocalSummary}
               ready={Boolean(settings.videoLocalFolderUri)}
@@ -402,7 +402,7 @@ export default function SettingsScreen() {
                 triggerUiHaptic();
                 setLocalOpen(true);
               }}
-            />
+            /> : null}
           </SettingsGroup>
         ) : null}
 
@@ -536,16 +536,18 @@ export default function SettingsScreen() {
               setLocale(locale === "en" ? "es" : "en");
             }}
           />
+          <View style={styles.divider} />
+          <SettingsRow title={t("serviceBackup.openSettings")} summary={`${t(`zones.${zone}`)} · ${t("serviceBackup.settingsHint")}`} onPress={() => router.push({ pathname: "/service-backup", params: { service: zone } } as Href)} />
           <AppearancePicker />
           <View style={styles.divider} />
-          <SettingsRow
+          {usesNas(settings, zone) ? <SettingsRow
             title={t("settings.folders")}
             summary={t("settings.foldersHint")}
             onPress={() => {
               triggerUiHaptic();
               setExplorerOpen(true);
             }}
-          />
+          /> : null}
           <View style={styles.divider} />
           <SettingsRow
             title={t("settings.onboarding")}
@@ -561,8 +563,8 @@ export default function SettingsScreen() {
       <SourceConfigSheet
         open={configOpen}
         onOpenChange={setConfigOpen}
-        settings={
-          zone === "video"
+        settings={{ ...(
+          zone === "health" ? healthSettings : zone === "video"
             ? videoSettings
             : zone === "podcast"
               ? podcastSettings
@@ -571,10 +573,10 @@ export default function SettingsScreen() {
                 : zone === "focus"
                   ? focusSettings
                   : settings
-        }
+        ), sourceKind: "webdav" }}
         setSettings={(next) =>
           setSettings(
-            zone === "video"
+            zone === "health" ? applyHealthSourceSettings(settings, next) : zone === "video"
               ? applyVideoSourceSettings(settings, next)
               : zone === "podcast"
                 ? applyPodcastSourceSettings(settings, next)
@@ -590,7 +592,10 @@ export default function SettingsScreen() {
         feedback={nas.feedback}
         busy={nas.busy}
         testConnection={
-          zone === "video"
+          zone === "health" ? async () => {
+            const ok = await probeWebDav(healthSettings, password);
+            nas.setFeedback({ text: t(ok ? "serviceBackup.sourceReady" : "serviceBackup.sourceUnreadable"), color: ok ? colors.ok : colors.warn });
+          } : zone === "video"
             ? nas.testVideoConnection
             : zone === "podcast"
               ? nas.testPodcastConnection
@@ -601,7 +606,7 @@ export default function SettingsScreen() {
                   : nas.testConnection
         }
         save={
-          zone === "video"
+          zone === "health" ? async () => { await nas.persist(); const ok = await probeWebDav(healthSettings, password); nas.setFeedback({ text: t(ok ? "serviceBackup.sourceReady" : "serviceBackup.sourceUnreadable"), color: ok ? colors.ok : colors.warn }); } : zone === "video"
             ? async () => {
                 await nas.persist();
                 await nas.testVideoConnection();
@@ -613,7 +618,7 @@ export default function SettingsScreen() {
                 : nas.save
         }
         variant={
-          zone === "video"
+          zone === "health" ? "health" : zone === "video"
             ? "video"
             : zone === "podcast"
               ? "podcast"
@@ -632,7 +637,7 @@ export default function SettingsScreen() {
         busy={nas.busy}
         feedback={nas.feedback}
         variant={
-          zone === "video"
+          zone === "health" ? "health" : zone === "video"
             ? "video"
             : zone === "podcast"
               ? "podcast"

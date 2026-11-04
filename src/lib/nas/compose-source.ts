@@ -29,17 +29,17 @@ export function composeSources(primary: MusicSource, extra: MusicSource): MusicS
 
     async getArtists(): Promise<Artist[]> {
       await hydrate();
-      return getArtists();
+      return getArtists({ offlineOnly: primary.kind === "local" });
     },
 
     async getAlbums(): Promise<Album[]> {
       await hydrate();
-      return getAlbums();
+      return getAlbums({ offlineOnly: primary.kind === "local" });
     },
 
     async getAlbum(id: string): Promise<AlbumDetail> {
       await hydrate();
-      const album = await getAlbum(id);
+      const album = await getAlbum(id, primary.kind === "local");
       if (!album) throw new Error(t("nasExtra.albumMissing"));
       return album;
     },
@@ -50,7 +50,7 @@ export function composeSources(primary: MusicSource, extra: MusicSource): MusicS
 
     async search(q: string): Promise<SearchResults> {
       await hydrate();
-      return searchCatalog(q);
+      return searchCatalog(q, primary.kind === "local");
     },
 
     async streamUrl(trackId: string) {

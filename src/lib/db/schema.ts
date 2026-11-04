@@ -4,6 +4,14 @@ CREATE TABLE IF NOT EXISTS meta (
   value TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS service_media_origins (
+  service TEXT NOT NULL,
+  origin_id TEXT NOT NULL,
+  track_id TEXT NOT NULL,
+  PRIMARY KEY (service, origin_id)
+);
+CREATE INDEX IF NOT EXISTS service_media_origin_track ON service_media_origins(service, track_id);
+
 CREATE TABLE IF NOT EXISTS artists (
   id TEXT PRIMARY KEY NOT NULL,
   name TEXT NOT NULL,

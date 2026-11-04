@@ -1,5 +1,17 @@
 # Fuentes de contenido
 
+## Teléfono o NAS (versión actual)
+
+El paso 2 del onboarding permite elegir **En este teléfono** o **NAS**. El recorrido local pasa directamente a las carpetas de Música, Audio/Podcasts, Vídeo, Tareas, Finanzas y Salud; no solicita servidor ni credenciales. Las carpetas se pueden omitir y configurar después.
+
+Cada servicio tiene su propia selección Teléfono / NAS / NAS + teléfono en Ajustes. Las instalaciones anteriores conservan la combinación de fuentes que tenían. El servidor WebDAV sigue siendo compartido y las rutas son independientes por servicio; vídeo conserva su conexión propia.
+
+Música, audio y vídeo leen los archivos de sus carpetas. Tareas y Finanzas trabajan en SQLite en el teléfono y conservan sus espejos `nlc-tasks.json` y `nlc-wealth.json` en las carpetas configuradas. **Salud siempre guarda los registros y las fotos en el teléfono**: Fuente configura la carpeta de sus copias y, opcionalmente, una ruta del NAS para guardar/abrir una copia manual. WHOOP también se abre desde esa sección. Elegir una carpeta de Salud no restaura datos automáticamente.
+
+Las carpetas de Android se conceden con el selector del sistema; no se solicitan permisos generales de almacenamiento. Las copias no trasladan contraseñas, tokens ni permisos de acceso de otro dispositivo. Mercury sigue conectándose directamente desde Android.
+
+## Notas históricas de QA
+
 Qué habla con qué. Completar cuando se pruebe F10-F14.
 
 Entorno de esta pasada: Carpeta compartida activa. Navidrome y mock no se conmutaron.

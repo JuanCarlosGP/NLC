@@ -1,3 +1,5 @@
+import { localCatalogSource } from "./local-catalog-source";
+import { usesLocal, usesNas } from "@/lib/settings/service-source";
 import { createLocalSource } from "@/lib/local/local-source";
 import { composeSources } from "@/lib/nas/compose-source";
 import { createOpenSubsonicSource } from "@/lib/nas/open-subsonic";
@@ -8,21 +10,24 @@ import { t } from "@/lib/i18n/runtime";
 import type { NasSettings } from "@/lib/settings/storage";
 
 export function createMusicSource(settings: NasSettings, password: string): MusicSource {
-  const hasPodcastLocal = Boolean(settings.podcastLocalFolderUri);
-  const musicLocal = settings.localFolderUri
-    ? createLocalSource(settings.localFolderUri, { skipPodcasts: hasPodcastLocal })
+  const hasPodcastLocal = Boolean(usesLocal(settings, "podcast") && settings.podcastLocalFolderUri);
+  const musicLocal = usesLocal(settings, "music") && settings.localFolderUri
+    ? createLocalSource(settings.localFolderUri, { skipPodcasts: hasPodcastLocal || !usesLocal(settings, "podcast") })
     : null;
   const podcastLocal = hasPodcastLocal
     ? createLocalSource(settings.podcastLocalFolderUri, { asPodcast: true, idPrefix: "localpod" })
     : null;
-  let base: MusicSource = mockSource;
-  if (settings.sourceKind === "opensubsonic") {
+  let base: MusicSource = settings.sourceKind === "mock" ? mockSource : localCatalogSource;
+  if (usesNas(settings, "music") && settings.sourceKind === "opensubsonic") {
     base = createOpenSubsonicSource(settings, password);
-  } else if (settings.sourceKind === "webdav") {
-    base = createWebDavSource(settings, password);
+  } else if (settings.sourceKind !== "mock" && (usesNas(settings, "music") || usesNas(settings, "podcast")) && settings.host.trim()) {
+    base = createWebDavSource({ ...settings,
+      sharePath: usesNas(settings, "music") ? settings.sharePath : "",
+      podcastSharePath: usesNas(settings, "podcast") ? settings.podcastSharePath : "",
+    }, password);
   }
   if (musicLocal && settings.sourceKind !== "mock") base = composeSources(base, musicLocal);
-  else if (musicLocal && settings.sourceKind === "mock") base = musicLocal;
+  else if (musicLocal && settings.sourceKind === "mock") base = composeSources(localCatalogSource, musicLocal);
   if (podcastLocal) base = composeSources(base, podcastLocal);
   return base;
 }

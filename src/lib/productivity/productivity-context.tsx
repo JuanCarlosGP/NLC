@@ -1,3 +1,4 @@
+import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
 import {
@@ -83,6 +84,8 @@ export function ProductivityProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  useEffect(() => onServiceImport((service, next) => { if (service === "focus") void refresh().then(() => pushFocusToSources(next, passwordRef.current)).catch(() => {}); }), [refresh]);
+
   useEffect(() => onFocusStoreChanged(() => {
     void refresh();
   }), [refresh]);
@@ -102,7 +105,7 @@ export function ProductivityProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [password, refresh, settings.focusLocalFolderUri, settings.focusSharePath, settingsReady]);
+  }, [settings.serviceSources, password, refresh, settings.focusLocalFolderUri, settings.focusSharePath, settingsReady]);
 
   useEffect(() => subscribeAssistantMutations(() => {
     void refresh().then(() => void mirror());

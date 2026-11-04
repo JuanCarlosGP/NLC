@@ -154,6 +154,7 @@ export default function RootLayout() {
                       <Stack.Screen name="focus/reminders" />
                       <Stack.Screen name="projects" />
                       <Stack.Screen name="project/[id]" />
+                      <Stack.Screen name="service-backup" />
                       <Stack.Screen name="health/backup" />
                       <Stack.Screen name="health/nutrition" />
                       <Stack.Screen name="health/body-photos" />

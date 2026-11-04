@@ -1,3 +1,5 @@
+import { serviceBackupEn, serviceBackupEs } from "./catalog-service-backup";
+import { localSetupEn, localSetupEs } from "./catalog-local-setup";
 import { mobileMercuryEn, mobileMercuryEs } from "@/lib/i18n/catalog-mobile-mercury";
 import { integrationsEn, integrationsEs } from "@/lib/i18n/catalog-integrations";
 import { appearanceEn, appearanceEs } from "@/lib/i18n/catalog-appearance";
@@ -51,8 +53,8 @@ const coreEn = {
     entering: "Entering…",
     stepOf: "{current} of {total}",
     kicker: "Personal library",
-    welcomeBody1: "Your NAS library, in NLC.",
-    welcomeBody2: "Connect the NAS. Then you pick the folders.",
+    welcomeBody1: "Your media and everyday life, in NLC.",
+    welcomeBody2: "On your phone, with or without a NAS.",
     needTitle: "What you need",
     needIntro: "This is what you will set up:",
     needHost: "IP or hostname",
@@ -163,8 +165,8 @@ const coreEs = {
     entering: "Entrando…",
     stepOf: "{current} de {total}",
     kicker: "Biblioteca personal",
-    welcomeBody1: "Tu biblioteca del NAS, en NLC.",
-    welcomeBody2: "Conecta el NAS. Luego eliges las carpetas.",
+    welcomeBody1: "Tu biblioteca y tu día a día, en NLC.",
+    welcomeBody2: "En el teléfono, con o sin NAS.",
     needTitle: "Qué necesitas",
     needIntro: "Esto es lo que vas a configurar:",
     needHost: "IP o hostname",
@@ -254,6 +256,8 @@ export const messages = {
     ...appearanceEn,
     ...integrationsEn,
     ...mobileMercuryEn,
+    ...localSetupEn,
+    ...serviceBackupEn,
   },
   es: {
     ...commonEs,
@@ -271,6 +275,8 @@ export const messages = {
     ...appearanceEs,
     ...integrationsEs,
     ...mobileMercuryEs,
+    ...localSetupEs,
+    ...serviceBackupEs,
   },
 } as const;
 

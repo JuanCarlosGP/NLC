@@ -1,3 +1,4 @@
+import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
 import { loadFavorites, removeFavorite as persistRemove, toggleFavorite as persistToggle } from "@/lib/library/cache";
@@ -49,6 +50,8 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     const stored = await loadFavorites(settings.sourceKind);
     setFavorites(stored);
   }, [settings.sourceKind]);
+
+  useEffect(() => onServiceImport(service => { if (service === "music" || service === "podcast") void reloadFavorites().catch(() => {}); }), [reloadFavorites]);
 
   useEffect(() => subscribeAssistantMutations(() => { void reloadFavorites(); }), [reloadFavorites]);
 

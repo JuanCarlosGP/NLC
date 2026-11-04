@@ -1,3 +1,4 @@
+import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { t } from "@/lib/i18n/runtime";
 import { joinPath } from "@/lib/nas/webdav";
 import { getWebDavText, putWebDavText } from "@/lib/nas/webdav-source";
@@ -20,7 +21,7 @@ function playlistsDavPath(settings: NasSettings): string {
 
 function canWriteNas(settings: NasSettings, password: string): boolean {
   return (
-    settings.sourceKind === "webdav" &&
+    usesNas(settings, "music") && settings.sourceKind !== "mock" &&
     Boolean(password.trim()) &&
     Boolean(settings.host.trim()) &&
     Boolean(settings.sharePath.trim())
@@ -72,7 +73,7 @@ function pickNewer(a: PlaylistDump | null, b: PlaylistDump | null): PlaylistDump
 export async function pullPlaylistsFromSources(settings: NasSettings, password: string): Promise<boolean> {
   const local = await dumpPlaylists();
   const remoteNas = await readNasPlaylists(settings, password);
-  const remoteFolder = settings.localFolderUri
+  const remoteFolder = usesLocal(settings, "music") && settings.localFolderUri
     ? await readLocalPlaylistsFile(settings.localFolderUri)
     : null;
   const incoming = pickNewer(remoteNas, remoteFolder);
@@ -85,7 +86,7 @@ export async function pullPlaylistsFromSources(settings: NasSettings, password: 
 export async function pushPlaylistsToSources(settings: NasSettings, password: string): Promise<string | null> {
   const dump = { ...(await dumpPlaylists()), updatedAt: Date.now() };
   const writes: Promise<void>[] = [];
-  if (settings.localFolderUri) {
+  if (usesLocal(settings, "music") && settings.localFolderUri) {
     writes.push(writeLocalPlaylistsFile(settings.localFolderUri, dump));
   }
   if (canWriteNas(settings, password)) {

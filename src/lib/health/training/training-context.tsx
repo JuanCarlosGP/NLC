@@ -1,3 +1,4 @@
+import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 import { trainingStore } from "./storage";
@@ -39,6 +40,8 @@ export function TrainingProvider({ children }: { children: ReactNode }) {
     } catch { if (requested === revision.current) setLoadFailed(true); }
     finally { setReady(true); }
   }, [flush, queue, syncAlerts]);
+  useEffect(() => onServiceImport(service => { if (service === "health") void refresh().catch(() => {}); }), [refresh]);
+
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {
     const sub = AppState.addEventListener("change", () => { if (queue.dirty) void flush().catch(() => {}); });
