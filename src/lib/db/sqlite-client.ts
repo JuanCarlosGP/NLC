@@ -1,0 +1,118 @@
+import { openDatabaseAsync } from "expo-sqlite";
+import { Platform } from "react-native";
+import { SCHEMA_SQL } from "@/lib/db/schema";
+import type { CatalogDb } from "@/lib/db/types";
+
+import { localDemoEnabled } from "@/lib/dev/local-demo";
+
+const DB_NAME = localDemoEnabled ? "nlc-local-demo.db" : "nlc-catalog.db";
+const SCHEMA_VERSION = "11";
+
+let opened: Promise<CatalogDb> | null = null;
+
+function isPoisonedHandle(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes("NativeDatabase") && msg.includes("NullPointerException");
+}
+
+async function ensureWealthAssetAccountColumn(db: CatalogDb): Promise<void> {
+  const cols = await db.getAllAsync<{ name: string }>("PRAGMA table_info(wealth_assets)");
+  if (!cols.length || cols.some((col) => col.name === "account_id")) return;
+  try {
+    await db.execAsync("ALTER TABLE wealth_assets ADD COLUMN account_id TEXT");
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!msg.includes("duplicate column")) throw error;
+  }
+}
+
+async function execStatements(db: CatalogDb, sql: string): Promise<void> {
+  const parts = sql
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  for (const part of parts) {
+    await db.execAsync(`${part};`);
+  }
+}
+
+async function boot(db: CatalogDb): Promise<CatalogDb> {
+  // These PRAGMAs return a row. execAsync NPEs on some Android SQLite builds.
+  // The OPFS VFS used by Expo's web worker supports rollback journals, not WAL.
+  await db.getFirstAsync(Platform.OS === "web" ? "PRAGMA journal_mode = DELETE" : "PRAGMA journal_mode = WAL");
+  await db.getFirstAsync("PRAGMA foreign_keys = ON");
+
+  let current: string | undefined;
+  try {
+    current = (await db.getFirstAsync<{ value: string }>("SELECT value FROM meta WHERE key = 'schema'"))?.value;
+  } catch (error) {
+    if (isPoisonedHandle(error)) throw error;
+    current = undefined;
+  }
+
+  await execStatements(db, SCHEMA_SQL);
+  await ensureWealthAssetAccountColumn(db);
+  await db.execAsync("CREATE INDEX IF NOT EXISTS wealth_assets_account ON wealth_assets(account_id)");
+  if (current !== SCHEMA_VERSION) {
+    await db.runAsync("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema', ?)", SCHEMA_VERSION);
+  }
+
+  return db;
+}
+
+async function openCatalog(useNewConnection: boolean): Promise<CatalogDb> {
+  const db = await openDatabaseAsync(DB_NAME, { useNewConnection });
+  return boot(db);
+}
+
+export async function getDb(): Promise<CatalogDb> {
+  if (!opened) {
+    opened = (async () => {
+      try {
+        return await openCatalog(false);
+      } catch (error) {
+        // After an OTA the cached native handle can be dead. A fresh connection recovers it.
+        if (!isPoisonedHandle(error)) throw error;
+        return await openCatalog(true);
+      }
+    })().catch((error) => {
+      opened = null;
+      throw error;
+    });
+  }
+  return opened;
+}
+
+let txQueue: Promise<unknown> = Promise.resolve();
+
+export async function runInTransaction<T = void>(
+  db: CatalogDb,
+  task: () => Promise<T>,
+): Promise<T> {
+  const previous = txQueue;
+  let resolveCurrent!: () => void;
+  txQueue = new Promise<void>((resolve) => {
+    resolveCurrent = resolve;
+  });
+
+  await previous.catch(() => {});
+  let result!: T;
+  try {
+    await db.withTransactionAsync(async () => {
+      result = await task();
+    });
+    return result;
+  } finally {
+    resolveCurrent();
+  }
+}
+
+
+// A restore owns its connection so unrelated background writes cannot join its transaction.
+export async function openIsolatedHealthDb(): Promise<CatalogDb> {
+  await getDb();
+  const db = await openDatabaseAsync(DB_NAME, { useNewConnection: true });
+  await db.getFirstAsync("PRAGMA foreign_keys = ON");
+  await db.execAsync("PRAGMA busy_timeout = 5000");
+  return db;
+}

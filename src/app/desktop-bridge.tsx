@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { PermissionsAndroid, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { PermissionsAndroid, Platform, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Screen } from "@/components/ui/screen";
 import { Field } from "@/components/settings/source-fields";
@@ -153,7 +154,7 @@ export default function DesktopBridgeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   title: { marginBottom: 8 },
   hint: { color: colors.muted, fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, marginBottom: 20 },
   block: { gap: 12 },

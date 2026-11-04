@@ -17,8 +17,16 @@ NLC no es un clon de Spotify. Importa metadatos de playlists y las empareja con 
 - Podcasts y descargas yt-dlp en el NAS ([servicio Docker](nas/podcast-downloader/README.md))
 - Vídeo por WebDAV (p. ej. series organizadas por carpeta)
 - Importar playlists de Spotify y matchearlas contra la biblioteca local
+- Salud: peso, entrenamientos, medicación, suplementos, fotos de evolución y nutrición sin conexión
+- Entrenamientos: sesiones con ejercicios, series, kg, repeticiones, calentamientos, descansos, calendario y analíticas de progresión
+- Peso: registro por fecha, notas, evolución y resumen mensual
+- Backup de Salud: ZIP con registros y fotos, restauración confirmada y copia del estado anterior
+- Nutrición: calorías y macros diarios, calendario e importación local CSV de MacroFactor
+- Fotos de evolución: cuatro vistas por fecha, comparación entre fechas y copias locales
+- Medicación y suplementos: pautas, horarios, tomas, calendario y avisos locales opcionales en Android
 - Foco: bandeja, proyectos, recordatorios
 - Patrimonio: cuentas, movimientos y objetivos
+- [WHOOP y Mercury](docs/integrations.md): servicio Linux local, sincronización de solo lectura y copias consultables sin conexión
 - Actualizaciones JS por OTA; la APK nativa se publica en GitHub Releases
 
 ## Descarga
@@ -51,7 +59,34 @@ En Windows / PowerShell el flujo es el mismo. La fuente por defecto del repo apu
 
 ```bash
 npm run typecheck
+npm run test:health # Node 22.5+
 ```
+
+## Escenario completo de prueba local
+
+Con Python 3 y ffmpeg instalados, en dos terminales:
+
+```bash
+npm run demo:nas
+npm run demo:web
+```
+
+Abre `http://127.0.0.1:8084/dev/demo` y carga el escenario. La sesión usa
+`nlc-local-demo.db` (SQLite real en el navegador), medios sintéticos bajo
+`/tmp/nlc-demo-media` y un WebDAV simulado en `127.0.0.1:8086`.
+La carga se conserva al recargar y repetirla no reinicia tus cambios de prueba.
+No necesita credenciales reales ni descarga contenido de internet.
+
+Incluye música, podcasts, vídeo, playlists, tareas, avisos, cuentas, inversiones,
+movimientos, objetivos, peso, entrenamientos, medicación, fotos ilustradas y nutrición de prueba. El modo se activa explícitamente y solo funciona
+en desarrollo web; nunca carga estos datos en una APK.
+
+```bash
+npm run test:health
+npm run test:behavior
+```
+
+Ver [comprobaciones y límites de la prueba](docs/qa/local-demo.md).
 
 ## NAS y Navidrome
 
@@ -149,3 +184,12 @@ Eso incluye, entre otras cosas, no publicar NLC (ni un fork casi idéntico) en t
 Detalles en [`LICENSE`](LICENSE) y [`NOTICE`](NOTICE). Para uso comercial, contacta con [JuanCarlosGP](https://github.com/JuanCarlosGP).
 
 NLC no está afiliado a Spotify, Navidrome, Expo ni a ningún fabricante de NAS.
+
+El módulo de fotos añade componentes nativos de Expo: para usar el selector en el
+teléfono se necesita una APK nueva. Una OTA no instala esos componentes.
+
+El selector CSV de nutrición añade `expo-document-picker` y también requiere una
+APK nueva. Se puede pegar el CSV como alternativa. Formatos y validaciones en
+[QA de nutrición](docs/qa/nutrition.md).
+
+Backup y restauración de Salud: [uso, formato y verificación](docs/qa/health-backup.md).

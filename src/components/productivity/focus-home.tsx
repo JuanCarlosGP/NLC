@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { LadybugMark } from "@/components/brand/ladybug-mark";
 import { ZoneSwitch } from "@/components/layout/zone-switch";
@@ -116,7 +117,7 @@ export function FocusHome() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   hero: {
     flexDirection: "row",
     alignItems: "center",

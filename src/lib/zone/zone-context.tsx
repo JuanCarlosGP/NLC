@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type AppZone = "music" | "podcast" | "video" | "focus" | "wealth";
+export type AppZone = "music" | "podcast" | "video" | "focus" | "wealth" | "health";
 
 export const APP_ZONES: { id: AppZone }[] = [
   { id: "music" },
@@ -9,6 +9,7 @@ export const APP_ZONES: { id: AppZone }[] = [
   { id: "video" },
   { id: "focus" },
   { id: "wealth" },
+  { id: "health" },
 ];
 
 export type EnabledZones = Record<AppZone, boolean>;
@@ -19,9 +20,10 @@ export const DEFAULT_ENABLED_ZONES: EnabledZones = {
   video: true,
   focus: true,
   wealth: true,
+  health: true,
 };
 
-export function isMediaZone(zone: AppZone): boolean {
+export function isMediaZone(zone: AppZone): zone is "music" | "podcast" | "video" {
   return zone === "music" || zone === "podcast" || zone === "video";
 }
 
@@ -38,7 +40,7 @@ type ZoneContextValue = {
 const ZoneContext = createContext<ZoneContextValue | null>(null);
 
 function parseZone(raw: string | null): AppZone {
-  if (raw === "podcast" || raw === "video" || raw === "music" || raw === "focus" || raw === "wealth") return raw;
+  if (raw === "podcast" || raw === "video" || raw === "music" || raw === "focus" || raw === "wealth" || raw === "health") return raw;
   return "music";
 }
 

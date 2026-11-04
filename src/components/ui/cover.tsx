@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { colors, coverTint, fonts } from "@/lib/theme";
 
@@ -38,7 +39,7 @@ export function Cover({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   box: {
     overflow: "hidden",
     alignItems: "center",

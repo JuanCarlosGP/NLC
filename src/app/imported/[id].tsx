@@ -1,3 +1,4 @@
+import { space } from "@/lib/appearance/density";
 import { useEffect } from "react";
 import { Text } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -30,7 +31,7 @@ export default function ImportedPlaylistScreen() {
   if (!playlist) {
     return (
       <Screen scroll={false} flush>
-        <Text style={[type.meta, { paddingHorizontal: layout.screenPad, paddingTop: insets.top + 12 }]}>
+        <Text style={[type.meta, { paddingHorizontal: space(layout.screenPad), paddingTop: insets.top + 12 }]}>
           {t("imported.loading")}
         </Text>
       </Screen>

@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
@@ -233,7 +234,7 @@ function ActionRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,

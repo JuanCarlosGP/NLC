@@ -27,6 +27,24 @@ jobs:
 
       - run: npm run typecheck
 
+      - run: npm run test:integrations
+
+      - run: npm run test:health-backup
+
+      - run: npm run test:nutrition
+
+      - run: npm run test:body-photos
+
+      - run: npm run test:medication
+
+      - run: npm run test:training-analytics
+
+      - run: npm run test:training
+
+      - run: npm run test:health
+
+      - run: npm run test:behavior
+
   ota:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: typecheck

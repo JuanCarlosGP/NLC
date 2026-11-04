@@ -31,6 +31,10 @@ export async function relayLanRequest(
   if (contentType) headers.set("Content-Type", contentType);
   const overwrite = source.get("overwrite");
   if (overwrite) headers.set("Overwrite", overwrite);
+  for (const name of ["Range", "If-Range"]) {
+    const value = source.get(name);
+    if (value) headers.set(name, value);
+  }
 
   const upstream = await fetch(url, {
     method,
@@ -55,7 +59,11 @@ export async function relayLanGet(request: Request): Promise<Response | null> {
     const token = url.searchParams.get("a");
     if (auth) headers.set("Authorization", auth);
     else if (token) headers.set("Authorization", `Basic ${token}`);
-    return await relayLanRequest(target, "GET", headers);
+    for (const name of ["Range", "If-Range"]) {
+      const value = request.headers.get(name);
+      if (value) headers.set(name, value);
+    }
+    return await relayLanRequest(target, request.method === "HEAD" ? "HEAD" : "GET", headers);
   } catch (error) {
     return Response.json(
       { error: error instanceof Error ? error.message : t("nasExtra.nasProxyInvalid") },

@@ -1,11 +1,12 @@
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Platform, Pressable, Text, View } from "react-native";
 import { Bell, BellOff } from "lucide-react-native";
 import { useI18n } from "@/lib/i18n/context";
 import { formatReminderWhen, type ProdReminder } from "@/lib/reminders/types";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, layout } from "@/lib/theme";
 
-const RIPPLE = { color: "rgba(240, 235, 227, 0.12)" };
+const RIPPLE = { color: colors.ripple };
 
 export function ReminderRow({
   reminder,
@@ -66,7 +67,7 @@ export const reminderListStyle = {
   marginHorizontal: -layout.screenPad,
 };
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     minHeight: 56,
     flexDirection: "row",

@@ -1,5 +1,6 @@
-import { type ReactElement, type ReactNode } from "react";
-import { type RefreshControlProps, ScrollView, StyleSheet, View } from "react-native";
+import { createStyles, insetSpace, pageFrame, space } from "@/lib/appearance/density";
+import { type ReactElement, type ReactNode, type Ref } from "react";
+import { type RefreshControlProps, type ScrollViewProps, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { mergeDockOnScroll, useDock } from "@/lib/dock-context";
 import { usePlayer } from "@/lib/player/player-context";
@@ -11,11 +12,15 @@ export function Screen({
   scroll = true,
   flush = false,
   refreshControl,
+  keyboardShouldPersistTaps,
+  scrollRef,
 }: {
   children: ReactNode;
   scroll?: boolean;
   flush?: boolean;
   refreshControl?: ReactElement<RefreshControlProps>;
+  keyboardShouldPersistTaps?: ScrollViewProps["keyboardShouldPersistTaps"];
+  scrollRef?: Ref<ScrollView>;
 }) {
   const insets = useSafeAreaInsets();
   const { current } = usePlayer();
@@ -33,10 +38,11 @@ export function Screen({
       <View
         style={[
           styles.fill,
+          pageFrame,
           {
-            paddingTop: flush ? 0 : insets.top + 8,
+            paddingTop: flush ? 0 : insetSpace(insets.top, 8),
             paddingBottom: flush ? 0 : bottom,
-            paddingHorizontal: flush ? 0 : layout.screenPad,
+            paddingHorizontal: flush ? 0 : space(layout.screenPad),
           },
         ]}
       >
@@ -47,17 +53,20 @@ export function Screen({
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.fill}
       contentContainerStyle={[
         styles.content,
+        pageFrame,
         {
-          paddingTop: flush ? 0 : insets.top + 12,
+          paddingTop: flush ? 0 : insetSpace(insets.top, 12),
           paddingBottom: bottom,
-          paddingHorizontal: flush ? 0 : layout.screenPad,
+          paddingHorizontal: flush ? 0 : space(layout.screenPad),
         },
       ]}
       scrollEventThrottle={16}
       onScroll={mergeDockOnScroll(dock)}
+      keyboardShouldPersistTaps={keyboardShouldPersistTaps}
       refreshControl={refreshControl}
     >
       {children}
@@ -65,7 +74,7 @@ export function Screen({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   fill: {
     flex: 1,
     backgroundColor: colors.void,

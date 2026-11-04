@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { AlbumRow } from "@/components/library/album-row";
 import { Cover } from "@/components/ui/cover";
@@ -65,7 +66,7 @@ export default function ArtistScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   error: { ...type.body, color: colors.danger },
   header: { gap: 8, alignItems: "flex-start" },
   actions: { flexDirection: "row", gap: 10 },

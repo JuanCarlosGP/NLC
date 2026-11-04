@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { ArrowDown, ArrowUp, ArrowUpDown, Plus } from "lucide-react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -210,7 +211,7 @@ function Action({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,

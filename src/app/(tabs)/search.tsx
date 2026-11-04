@@ -1,9 +1,11 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { AlbumRow } from "@/components/library/album-row";
 import { ArtistRow } from "@/components/library/artist-row";
 import { TrackRow } from "@/components/library/track-row";
+import { WeightScreen } from "@/components/health/weight-screen";
 import { TaskRow, taskListStyle } from "@/components/productivity/task-row";
 import { AccountActivitySheet } from "@/components/wealth/account-activity-sheet";
 import { AssetComposerSheet } from "@/components/wealth/account-composer-sheet";
@@ -42,6 +44,7 @@ import { useZone } from "@/lib/zone/zone-context";
 
 export default function SearchScreen() {
   const { zone } = useZone();
+  if (zone === "health") return <WeightScreen searchOnly />;
   if (zone === "focus") return <FocusSearch />;
   if (zone === "wealth") return <WealthSearch />;
   if (zone === "video") return <VideoSearch />;
@@ -518,7 +521,7 @@ function FocusSearch() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   input: {
     borderWidth: 1,
     borderColor: colors.rule,

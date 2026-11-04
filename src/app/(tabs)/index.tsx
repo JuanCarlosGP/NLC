@@ -1,7 +1,9 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowUpDown, LayoutGrid, List } from "lucide-react-native";
+import { HealthHome } from "@/components/health/health-home";
 import { FocusHome } from "@/components/productivity/focus-home";
 import { WealthHome } from "@/components/wealth/wealth-home";
 import { LadybugMark } from "@/components/brand/ladybug-mark";
@@ -38,6 +40,12 @@ function isGenericPodcastBucket(name: string): boolean {
 }
 
 export default function HomeScreen() {
+  const { zone } = useZone();
+  if (zone === "health") return <HealthHome />;
+  return <ExistingHomeScreen />;
+}
+
+function ExistingHomeScreen() {
   const router = useRouter();
   const { t } = useI18n();
   const { recents, musicAlbums, podcastAlbums, loading, error, refresh } = useHome();
@@ -326,7 +334,7 @@ function HomeTrackTile({ track, onPress }: { track: Track; onPress: () => void }
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   hero: {
     flexDirection: "row",
     alignItems: "center",

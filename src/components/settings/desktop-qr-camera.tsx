@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
@@ -66,7 +67,7 @@ export function DesktopQrCamera({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   button: {
     backgroundColor: colors.accent,
     borderRadius: 12,

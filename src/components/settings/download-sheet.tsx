@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
 import {
   Modal,
@@ -437,7 +438,7 @@ function Field({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 22,
@@ -485,7 +486,7 @@ const styles = StyleSheet.create({
   helpRoot: { flex: 1 },
   helpBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(8, 7, 6, 0.72)",
+    backgroundColor: colors.backdrop,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,

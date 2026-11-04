@@ -1,7 +1,8 @@
-import { Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Platform, Pressable, Switch, Text, TextInput, View } from "react-native";
 import { colors, fonts, type } from "@/lib/theme";
 
-const RIPPLE = { color: "rgba(240, 235, 227, 0.12)" };
+const RIPPLE = { color: colors.ripple };
 
 export function Field({
   label,
@@ -89,7 +90,7 @@ export function SwitchRow({
   );
 }
 
-export const sourceFieldStyles = StyleSheet.create({
+export const sourceFieldStyles = createStyles({
   field: { gap: 6 },
   input: {
     borderWidth: 1,

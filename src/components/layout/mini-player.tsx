@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, PanResponder, Platform, Pressable, Text, View } from "react-native";
 import Reanimated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,7 +21,7 @@ function isWatchRoute(pathname: string): boolean {
   return pathname === "/watch" || pathname.startsWith("/watch/");
 }
 
-const GLASS_FILL = "rgba(14, 13, 12, 0.94)";
+const GLASS_FILL = colors.glass;
 const SWIPE_DISTANCE = 52;
 const SWIPE_VELOCITY = 650;
 const SWIPE_DOWN = 40;
@@ -287,7 +288,7 @@ export function MiniPlayer() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   host: {
     position: "absolute",
     left: 16,

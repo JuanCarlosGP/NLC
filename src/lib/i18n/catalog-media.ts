@@ -54,7 +54,7 @@ export const mediaEn = {
     emptyPlaylists: "No playlists yet.",
     emptyPlaylistsImport: "No playlists yet. Tap + to import a link.",
     emptyPodcastsSettings:
-      "No podcasts yet. Download one in Settings → Podcasts (yt-dlp) to Podcasts.",
+      "Download a podcast in Settings → Podcasts.",
     videoEmptyNas: "No series or movies on the NAS",
     seriesOne: "{count} series",
     seriesMany: "{count} series",
@@ -197,7 +197,7 @@ export const mediaEn = {
     nameEmpty: "Write a name.",
     coverBad: "That URL is not an image.",
     changeSource: "Change source",
-    sourceHint: "Paste a YouTube link. Only the audio file is replaced.",
+    sourceHint: "A YouTube link to replace the audio only.",
     sourceUrl: "YouTube URL",
     replaceAudio: "Replace audio",
     replacingAudio: "Downloading…",
@@ -303,7 +303,7 @@ export const mediaEn = {
     nothingOnNas: "Nothing on NAS",
     downloadPending: "Download {count} with yt-dlp",
     downloadMessage:
-      "{count} tracks will be queued on the NAS. You can leave the app; they keep downloading to Canciones.",
+      "{count} tracks will download to Canciones on the NAS.",
     nasTracksOnNas: "{count} tracks on the NAS.",
     nasTracksOnPhone: "{count} tracks on the phone.",
     nasExactMatch: "Exact duration match with the original playlist.",
@@ -494,7 +494,7 @@ export const mediaEs = {
     emptyPlaylists: "Aún no hay playlists.",
     emptyPlaylistsImport: "Aún no hay playlists. Pulsa + para importar un enlace.",
     emptyPodcastsSettings:
-      "Aún no hay podcasts. Descarga uno en Ajustes → Podcasts (yt-dlp) a Podcasts.",
+      "Descarga un podcast en Ajustes → Podcasts.",
     videoEmptyNas: "Sin series ni películas en el NAS",
     seriesOne: "{count} serie",
     seriesMany: "{count} series",
@@ -637,7 +637,7 @@ export const mediaEs = {
     nameEmpty: "Escribe un nombre.",
     coverBad: "Esa URL no es una imagen.",
     changeSource: "Cambiar origen",
-    sourceHint: "Pega un enlace de YouTube. Solo se sustituye el archivo de audio.",
+    sourceHint: "Un enlace de YouTube para sustituir solo el audio.",
     sourceUrl: "URL de YouTube",
     replaceAudio: "Sustituir audio",
     replacingAudio: "Descargando…",
@@ -743,7 +743,7 @@ export const mediaEs = {
     nothingOnNas: "Nada en NAS",
     downloadPending: "Descargar {count} con yt-dlp",
     downloadMessage:
-      "Se encolan {count} temas en el NAS. Puedes salir de la app; siguen bajando a Canciones.",
+      "Se descargarán {count} temas al NAS, en Canciones.",
     nasTracksOnNas: "{count} pistas en el NAS.",
     nasTracksOnPhone: "{count} pistas en el móvil.",
     nasExactMatch: "Coincidencia exacta en minutos con la playlist original.",

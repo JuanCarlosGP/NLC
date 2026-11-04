@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Heart } from "lucide-react-native";
 import { TrackRow } from "@/components/library/track-row";
@@ -192,7 +193,7 @@ function VideoFavorites() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: { gap: 6, paddingTop: 8 },
   art: {
     width: 96,

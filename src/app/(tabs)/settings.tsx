@@ -1,3 +1,5 @@
+import { createStyles } from "@/lib/appearance/density";
+import { AppearancePicker } from "@/components/settings/appearance-picker";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter, type Href } from "expo-router";
@@ -125,7 +127,7 @@ export default function SettingsScreen() {
     : t("common.none");
   const nasFeedback = feedback?.text;
   const downloadFeedback = download.feedback && !downloadOpen ? download.feedback.text : null;
-  const mediaZone = zone === "focus" || zone === "wealth" ? "music" : zone;
+  const mediaZone = isMediaZone(zone) ? zone : "music";
   const zoneReady = offline.readyTracks.filter((item) => item.kind === mediaZone).length;
   const offlineCountLabel = (n: number) =>
     mediaZone === "podcast"
@@ -176,6 +178,12 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.groups}>
+        {zone === "health" ? (
+          <SettingsGroup label={t("health.storageTitle")}>
+            <SettingsRow title={t("health.title")} summary={t("health.storageBody")} chevron={false} />
+            <SettingsRow title={t("healthBackup.open")} summary={t("healthBackup.hint")} onPress={() => router.push("/health/backup")} />
+          </SettingsGroup>
+        ) : null}
         {zone === "focus" ? (
           <>
             <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
@@ -430,7 +438,7 @@ export default function SettingsScreen() {
           </>
         ) : null}
 
-        <SettingsGroup label={t("settings.desktop")} hint={t("desktop.hint")}>
+        <SettingsGroup label={t("settings.desktop")}>
           <SettingsRow
             title={t("desktop.title")}
             summary={desktopSummary}
@@ -525,6 +533,7 @@ export default function SettingsScreen() {
               setLocale(locale === "en" ? "es" : "en");
             }}
           />
+          <AppearancePicker />
           <View style={styles.divider} />
           <SettingsRow
             title={t("settings.folders")}
@@ -632,7 +641,7 @@ export default function SettingsScreen() {
         }
       />
       <DownloadSheet open={downloadOpen} onOpenChange={setDownloadOpen} download={download} zone={zone} />
-      <OfflineSheet open={offlineOpen} onOpenChange={setOfflineOpen} lockedKind={zone === "focus" || zone === "wealth" ? "music" : zone} />
+      <OfflineSheet open={offlineOpen} onOpenChange={setOfflineOpen} lockedKind={mediaZone} />
       <ZoneVisibilitySheet open={zonesOpen} onOpenChange={setZonesOpen} />
       <NasExplorerSheet
         open={explorerOpen}
@@ -770,7 +779,7 @@ function StatusDot({ on }: { on: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   heading: {
     flexDirection: "row",
     alignItems: "center",

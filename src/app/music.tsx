@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Music2 } from "lucide-react-native";
 import { AlbumRow } from "@/components/library/album-row";
@@ -123,7 +124,7 @@ export default function MusicScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: { gap: 6, paddingTop: 8 },
   art: {
     width: 96,

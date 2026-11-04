@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AppState, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { AppState, Platform, Pressable, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useSharedValue } from "react-native-reanimated";
@@ -569,7 +570,7 @@ function IconButton({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   page: { flex: 1, backgroundColor: "transparent" },
   pageContent: { flexGrow: 1, paddingHorizontal: layout.screenPad },
   searchBox: {

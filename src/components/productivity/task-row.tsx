@@ -1,11 +1,12 @@
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Platform, Pressable, Text, View } from "react-native";
 import { Star } from "lucide-react-native";
 import { formatDue, isOverdue } from "@/lib/productivity/dates";
 import type { ProdProject, ProdTask } from "@/lib/productivity/types";
 import { triggerSelectionUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, layout } from "@/lib/theme";
 
-const RIPPLE = { color: "rgba(240, 235, 227, 0.12)" };
+const RIPPLE = { color: colors.ripple };
 
 export function TaskRow({
   task,
@@ -66,7 +67,7 @@ export const taskListStyle = {
   marginHorizontal: -layout.screenPad,
 };
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     minHeight: 56,
     flexDirection: "row",

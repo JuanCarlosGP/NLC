@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { type ReactNode } from "react";
-import { Platform, ScrollView, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, ScrollView, type StyleProp, type ViewStyle } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
 import { mergeSheetScrollProps, useBottomSheet } from "@/components/layout/sheet-context";
 import { mergeDockOnScroll, useDock } from "@/lib/dock-context";
@@ -41,6 +42,6 @@ export function SheetScrollView({
   return <GestureDetector gesture={sheet.nativeGesture}>{scroll}</GestureDetector>;
 }
 
-export const sheetScrollStyles = StyleSheet.create({
+export const sheetScrollStyles = createStyles({
   fill: { flex: 1 },
 });

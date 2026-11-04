@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { createStyles, responsiveBasis } from "@/lib/appearance/density";
+import { Pressable, Text, View } from "react-native";
 import { CalendarDays, Clapperboard, FolderKanban, Heart, Inbox, Bell, Mic, Music2 } from "lucide-react-native";
 import { Cover } from "@/components/ui/cover";
 import { useCoverUrl } from "@/hooks/use-cover-url";
@@ -116,11 +117,11 @@ export function ShortcutCard({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   card: {
     flexGrow: 1,
-    flexBasis: "47%",
-    maxWidth: "49%",
+    flexBasis: responsiveBasis("47%", "shortcut-basis"),
+    maxWidth: responsiveBasis("49%", "shortcut-max"),
     minHeight: 56,
     flexDirection: "row",
     alignItems: "center",

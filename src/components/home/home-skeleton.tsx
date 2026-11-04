@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { StyleSheet, View } from "react-native";
 import { Bone } from "@/components/ui/skeleton";
 import { colors } from "@/lib/theme";
@@ -49,7 +50,7 @@ export function HomeListSkeleton({ grid }: { grid: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   block: { gap: 18 },
   shortcut: {
     flexGrow: 1,

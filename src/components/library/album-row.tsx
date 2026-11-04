@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Cover } from "@/components/ui/cover";
@@ -41,7 +42,7 @@ export const AlbumRow = memo(function AlbumRow({
   );
 });
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     flexDirection: "row",
     alignItems: "center",

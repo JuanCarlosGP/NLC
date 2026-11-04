@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput } from "react-native";
+import { Pressable, Text, TextInput } from "react-native";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { useI18n } from "@/lib/i18n/context";
@@ -79,7 +80,7 @@ function ProjectComposerBody({ open, onDone }: { open: boolean; onDone: () => vo
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 20,

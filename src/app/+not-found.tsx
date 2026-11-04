@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { Link, Stack } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useI18n } from "@/lib/i18n/context";
 import { colors, type } from "@/lib/theme";
 
@@ -18,7 +19,7 @@ export default function NotFoundScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   wrap: {
     flex: 1,
     backgroundColor: colors.void,

@@ -1,3 +1,11 @@
+import { IntegrationsProvider } from "@/lib/integrations/integrations-context";
+import { createStyles } from "@/lib/appearance/density";
+import { AppearanceProvider } from "@/lib/appearance/context";
+import "@/lib/health/backup/service";
+import { NutritionProvider } from "@/lib/health/nutrition/nutrition-context";
+import { BodyPhotosProvider } from "@/lib/health/body-photos/body-context";
+import { MedicationProvider } from "@/lib/health/medication/medication-context";
+import { TrainingProvider } from "@/lib/health/training/training-context";
 import { type ReactNode, useEffect, useState } from "react";
 import { LogBox, Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -38,6 +46,7 @@ import { RemindersProvider } from "@/lib/reminders/reminders-context";
 import { WealthProvider } from "@/lib/wealth/wealth-context";
 import { TxActionsProvider } from "@/lib/wealth/tx-actions-context";
 import { TaskActionsProvider } from "@/lib/productivity/task-actions-context";
+import { WeightProvider } from "@/lib/health/weight/weight-context";
 import { ZoneProvider } from "@/lib/zone/zone-context";
 import { TaskActionsSheet } from "@/components/productivity/task-actions-sheet";
 import { TxActionsSheet } from "@/components/wealth/tx-composer-sheet";
@@ -58,6 +67,7 @@ const fonts = {
   Figtree_600SemiBold,
   Figtree_700Bold,
   InstrumentSerif_400Regular,
+  ...(Platform.OS === "web" ? { GeistPixelSquare: require("../../assets/fonts/geist/GeistPixel-Square.otf") } : {}),
 };
 
 export default function RootLayout() {
@@ -80,13 +90,20 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
+    <AppearanceProvider>
     <SafeAreaProvider>
       <SettingsProvider>
         <BridgeHost>
         <LocaleProvider>
         <OtaBootstrap />
         <OnboardingGate>
+        <IntegrationsProvider>
         <ZoneProvider>
+        <WeightProvider>
+        <TrainingProvider>
+        <MedicationProvider>
+        <BodyPhotosProvider>
+        <NutritionProvider>
         <ProductivityProvider>
         <WealthProvider>
         <RemindersProvider>
@@ -135,6 +152,17 @@ export default function RootLayout() {
                       <Stack.Screen name="focus/reminders" />
                       <Stack.Screen name="projects" />
                       <Stack.Screen name="project/[id]" />
+                      <Stack.Screen name="health/backup" />
+                      <Stack.Screen name="health/nutrition" />
+                      <Stack.Screen name="health/body-photos" />
+                      <Stack.Screen name="health/medication" />
+                      <Stack.Screen name="health/weight" />
+                      <Stack.Screen name="health/training/analytics" />
+                      <Stack.Screen name="health/training/index" />
+                      <Stack.Screen name="health/training/calendar" />
+                      <Stack.Screen name="health/training/session/[id]" />
+                      <Stack.Screen name="health/whoop" />
+                      <Stack.Screen name="wealth/mercury" />
                       <Stack.Screen name="wealth/activity" />
                       <Stack.Screen name="wealth/assets" />
                       <Stack.Screen name="wealth/accounts" />
@@ -169,12 +197,19 @@ export default function RootLayout() {
         </RemindersProvider>
         </WealthProvider>
         </ProductivityProvider>
+        </NutritionProvider>
+        </BodyPhotosProvider>
+        </MedicationProvider>
+        </TrainingProvider>
+        </WeightProvider>
         </ZoneProvider>
+        </IntegrationsProvider>
         </OnboardingGate>
         </LocaleProvider>
         </BridgeHost>
       </SettingsProvider>
     </SafeAreaProvider>
+    </AppearanceProvider>
     </ErrorBoundary>
   );
 }
@@ -206,7 +241,7 @@ function DockChrome({ children }: { children: ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   boot: {
     flex: 1,
     backgroundColor: colors.void,

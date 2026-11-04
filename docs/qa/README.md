@@ -43,3 +43,19 @@ Mapa de trabajo del equipo. No es un backlog de historias: NLC ya existe. Aquí 
 - Nadie se autoasigna trabajo de DEV.
 - Un hallazgo = un flujo reproducible. No mezclar tres bugs en el mismo mensaje.
 - La doble revisión es independiente: QA2 no copia el veredicto de QA1.
+
+Escenario reproducible de QA local: [datos, recorridos y límites](local-demo.md).
+
+- [Entrenamientos locales](training.md): recorridos, persistencia y límites de la comprobación.
+
+- [Medicación y suplementos](medication.md): horarios, tomas, historial y avisos locales.
+
+- [Fotos de evolución](body-photos.md): importación, persistencia local y comparación.
+
+- [Nutrición](nutrition.md): registro diario, importación CSV y persistencia local.
+
+- [Analíticas de entrenamientos](training-analytics.md): progresión, cargas, volumen y marcas.
+
+- [Backup y restauración de Salud](health-backup.md): ZIP portátil, fotos, recuperación y fallos de escritura.
+
+- [Tema Geist Pixel y QA en Linux](appearance.md): apariencia local y copia grande de 117,76 MiB.

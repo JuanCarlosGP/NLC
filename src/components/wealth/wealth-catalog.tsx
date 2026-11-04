@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react-native";
@@ -223,7 +224,7 @@ function CashRow({ amount, onPress }: { amount: number; onPress: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   section: { gap: 4, paddingTop: 8 },
   sectionHead: {
     flexDirection: "row",

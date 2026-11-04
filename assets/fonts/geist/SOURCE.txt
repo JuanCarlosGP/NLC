@@ -1,0 +1,5 @@
+Geist Pixel Square, unmodified OTF.
+Source: https://github.com/vercel/geist-font/tree/v1.9.0/fonts/GeistPixel/otf
+Download: https://raw.githubusercontent.com/vercel/geist-font/v1.9.0/fonts/GeistPixel/otf/GeistPixel-Square.otf
+SHA-256: 3e5c5a93a54ef21fb98ea547809a84ed46ee1c425ea152ce3303d0983f5f1d63
+License: SIL Open Font License 1.1; see OFL.txt.

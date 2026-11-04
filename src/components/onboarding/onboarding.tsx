@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AccessibilityInfo,
@@ -43,7 +44,7 @@ import { colors, fonts, layout, type } from "@/lib/theme";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { webInteractiveStyle } from "@/lib/interactive";
 
-const RIPPLE = { color: "rgba(240, 235, 227, 0.12)" };
+const RIPPLE = { color: colors.ripple };
 const STEPS = 5;
 const ICON_HIT = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 const IN_MS = 320;
@@ -1229,7 +1230,7 @@ function FoldersStep({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   root: {
     flex: 1,
     backgroundColor: colors.void,
@@ -1334,7 +1335,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(228, 213, 184, 0.1)",
+    backgroundColor: colors.accentWashSoft,
   },
   needCopy: { flex: 1, gap: 4, paddingTop: 2 },
   needLabel: {
@@ -1348,8 +1349,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 14,
     borderWidth: 1,
-    borderColor: "rgba(228, 213, 184, 0.28)",
-    backgroundColor: "rgba(228, 213, 184, 0.08)",
+    borderColor: colors.accentRule,
+    backgroundColor: colors.accentWashFaint,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -1407,7 +1408,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(14, 13, 12, 0.28)",
+    backgroundColor: colors.glassSoft,
   },
   listingRow: {
     flexDirection: "row",
@@ -1514,7 +1515,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(143, 184, 154, 0.16)",
+    backgroundColor: colors.okWash,
   },
   summary: {
     borderWidth: 1,

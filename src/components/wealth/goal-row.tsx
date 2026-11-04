@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { createStyles } from "@/lib/appearance/density";
+import { Pressable, Text, View } from "react-native";
 import { colors, fonts } from "@/lib/theme";
 import { useI18n } from "@/lib/i18n/context";
 import { formatGoalEta, type GoalProgress } from "@/lib/wealth/compute";
@@ -39,7 +40,7 @@ export function GoalRow({
 
 export const goalListStyle = { gap: 4 } as const;
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   row: {
     gap: 8,
     paddingVertical: 12,

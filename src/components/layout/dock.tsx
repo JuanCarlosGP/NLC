@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useRef } from "react";
-import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Platform, Pressable, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Home, Library, MessageCircle, Search, Settings } from "lucide-react-native";
@@ -15,7 +16,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useZone } from "@/lib/zone/zone-context";
 
 const HIDE_SPRING = { damping: 22, stiffness: 280, mass: 0.85 };
-const GLASS_FILL = "rgba(14, 13, 12, 0.94)";
+const GLASS_FILL = colors.glass;
 
 function isHomeRoute(pathname: string): boolean {
   const normalized = pathname.replace(/\/$/, "") || "/";
@@ -75,13 +76,14 @@ function DockIcons() {
     pathname.startsWith("/artist") ||
     pathname.startsWith("/imported") ||
     pathname.startsWith("/wealth") ||
+    pathname.startsWith("/health") ||
     pathname.startsWith("/focus") ||
     pathname.startsWith("/projects") ||
     pathname.startsWith("/project") ||
     pathname.startsWith("/task");
   const searchActive = pathname.startsWith("/search");
   const settingsActive = pathname.startsWith("/settings");
-  const libraryLabel = zone === "wealth" ? t("chrome.ledger") : t("chrome.library");
+  const libraryLabel = zone === "health" ? t("health.records") : zone === "wealth" ? t("chrome.ledger") : t("chrome.library");
 
   return (
     <>
@@ -203,7 +205,7 @@ export function Dock() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   host: {
     position: "absolute",
     left: 0,

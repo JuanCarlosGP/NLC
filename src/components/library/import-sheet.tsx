@@ -1,3 +1,4 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -328,7 +329,7 @@ function ImportSheetBody({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   panel: { flex: 1, minHeight: 0 },
   chooser: {
     paddingHorizontal: 20,

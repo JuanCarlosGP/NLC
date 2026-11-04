@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { TaskRow, taskListStyle } from "@/components/productivity/task-row";
@@ -79,7 +80,7 @@ export function FocusListScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   header: { gap: 6, paddingTop: 8 },
   heading: {
     flexDirection: "row",

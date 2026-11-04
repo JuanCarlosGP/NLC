@@ -1,5 +1,6 @@
+import { createStyles } from "@/lib/appearance/density";
 import { useMemo, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { FocusListScreen } from "@/components/productivity/focus-list-screen";
 import { TaskComposerSheet } from "@/components/productivity/task-composer-sheet";
@@ -60,7 +61,7 @@ export default function ProjectScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   dot: {
     width: 22,
     height: 22,

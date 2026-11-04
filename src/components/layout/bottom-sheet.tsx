@@ -1,3 +1,4 @@
+import { createStyles, densityData } from "@/lib/appearance/density";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   BackHandler,
@@ -78,7 +79,7 @@ export function BottomSheet({
         ? window.innerHeight
         : Math.max(windowHeightRef.current - insets.top, 0);
     setLayoutHeight(next);
-  }, [open, windowWidth, insets.top]);
+  }, [open, windowWidth, windowHeight, insets.top]);
 
   const viewportCap = layoutHeight * ratio;
   const available = Math.max(layoutHeight - chrome, 160);
@@ -237,6 +238,7 @@ export function BottomSheet({
 
         <Animated.View
           {...sheetProps}
+          {...densityData("sheet")}
           style={[
             styles.sheet,
             {
@@ -301,7 +303,7 @@ export function BottomSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createStyles({
   overlayHost: {
     ...StyleSheet.absoluteFillObject,
     zIndex: OVERLAY_Z_INDEX,
