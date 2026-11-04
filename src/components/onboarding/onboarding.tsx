@@ -16,6 +16,7 @@ import { Check, ChevronLeft, ChevronRight, File, Folder, FolderSearch, KeyRound,
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LadybugMark } from "@/components/brand/ladybug-mark";
 import { Field, SwitchRow } from "@/components/settings/source-fields";
+import { AppearanceToggle } from "@/components/onboarding/appearance-toggle";
 import { PartyPopper } from "@/components/onboarding/party-popper";
 import { XMark } from "@/components/onboarding/x-mark";
 import { useI18n } from "@/lib/i18n/context";
@@ -720,7 +721,7 @@ export function Onboarding() {
       )}
 
       <View style={[styles.footer, { paddingBottom: footerBottom }]}>
-        {step === 0 ? <LanguageToggle /> : null}
+        {step === 0 ? <><LanguageToggle /><AppearanceToggle /></> : null}
         <PrimaryButton
           label={primary.label}
           accessibilityLabel={primary.accessibilityLabel}

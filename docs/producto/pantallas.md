@@ -30,6 +30,12 @@ En componentes nuevos, usar `createStyles(() => ({ ... }))` de
 componentes `Text`/`TextInput` de `components/ui/themed-text`. Los valores usados en
 geometría o animaciones siguen siendo números. Classic conserva sus tamaños.
 
+## Onboarding
+
+El primer paso permite elegir idioma y, justo debajo, NLC clásico o Geist Pixel,
+antes de Empezar. Cambiar de tema actualiza la pantalla al instante, conserva
+el paso y usa la misma preferencia sin conexión que Ajustes → App → Apariencia.
+
 ## Home (F01)
 
 Estado: borrador QA1
