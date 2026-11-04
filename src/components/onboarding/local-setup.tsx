@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, View } from "react-native";
-import { Folder, Smartphone, Server, Check } from "lucide-react-native";
+import {
+  Folder,
+  FolderTree,
+  Smartphone,
+  Server,
+  Check,
+} from "lucide-react-native";
 import { Text } from "@/components/ui/themed-text";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { colors, type } from "@/lib/theme";
 import { useI18n } from "@/lib/i18n/context";
+import { prepareLocalRoot } from "@/lib/local/root-folder";
 import { pickLocalFolder } from "@/lib/local/pick-folder";
 import {
   SERVICES,
@@ -30,21 +37,28 @@ export function LocalSetup({
   useThemeId();
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-  async function choose(id: ServiceId) {
-    if (!settings || busy) return;
+  const [error, setError] = useState<"folderError" | "rootFolderError" | null>(
+    null,
+  );
+  const locked = useRef(false);
+  async function choose(id?: ServiceId) {
+    if (!settings || locked.current) return;
+    locked.current = true;
     setBusy(true);
     onBusyChange?.(true);
-    setError(false);
+    setError(null);
     try {
-      const folder = await pickLocalFolder();
+      const folder = await pickLocalFolder({ writable: !id });
       if (folder)
         onSettingsChange?.(
-          withLocalFolder(settings, id, folder.uri, folder.name),
+          id
+            ? withLocalFolder(settings, id, folder.uri, folder.name)
+            : await prepareLocalRoot(settings, folder),
         );
     } catch {
-      setError(true);
+      setError(id ? "folderError" : "rootFolderError");
     } finally {
+      locked.current = false;
       setBusy(false);
       onBusyChange?.(false);
     }
@@ -57,6 +71,40 @@ export function LocalSetup({
       <Text style={type.body}>
         {t(settings ? "localSetup.foldersHint" : "localSetup.hint")}
       </Text>
+      {error ? (
+        <Text
+          accessibilityRole="alert"
+          style={[type.body, { color: colors.danger }]}
+        >
+          {t(`localSetup.${error}`)}
+        </Text>
+      ) : null}
+      {settings ? (
+        <View style={styles.card}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("localSetup.generalFolder")}
+            disabled={busy}
+            onPress={() => void choose()}
+            style={styles.row}
+          >
+            <FolderTree size={20} color={colors.inkSoft} />
+            <View style={styles.text}>
+              <Text style={type.track}>{t("localSetup.generalFolder")}</Text>
+              <Text style={type.meta}>
+                {settings.localRootFolderName ||
+                  t("localSetup.generalFolderHint")}
+              </Text>
+            </View>
+            {settings.localRootFolderUri ? (
+              <Check size={18} color={colors.ok} />
+            ) : null}
+          </Pressable>
+        </View>
+      ) : null}
+      {settings ? (
+        <Text style={type.label}>{t("localSetup.byService")}</Text>
+      ) : null}
       {settings
         ? SERVICES.map((id) => {
             const folder = localFolder(settings, id);
@@ -128,14 +176,6 @@ export function LocalSetup({
               </Pressable>
             );
           })}
-      {error ? (
-        <Text
-          accessibilityRole="alert"
-          style={[type.body, { color: colors.danger }]}
-        >
-          {t("localSetup.folderError")}
-        </Text>
-      ) : null}
     </View>
   );
 }

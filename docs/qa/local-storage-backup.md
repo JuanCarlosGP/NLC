@@ -13,6 +13,12 @@ Validación en Linux y Android API 34 x86_64 emulado, en modo avión, con datos 
 - Regresiones de datos: los seis servicios, listas, favoritos, metadatos editados, progreso de vídeo, fotos, Mercury/WHOOP guardados, cuenta de integración distinta, transacción fallida, importación repetida, esquema de columnas y escaneo obsoleto tras restauración. Los archivos originales de una fuente quedan excluidos de «borrar descargas».
 - Compilación nativa: `npm run apk:check` genera el árbol Android y compila arm64. Los cambios requieren APK nueva; la versión usa un runtime independiente de APK anteriores.
 
+## Carpeta general del onboarding
+
+Probada en el mismo emulador sin conexión: una selección y un permiso SAF para configurar las seis rutas; reutilización de una carpeta de Música con un WAV preexistente, conservando su SHA-256; segunda selección del mismo padre sin duplicar carpetas; seis URI distintas guardadas en SQLite y conservadas tras cerrar la app. El selector mantiene las rutas individuales. Los nombres de las subcarpetas son estables al cambiar de idioma.
+
+`npm run test:local-folders` cubre creación, reutilización, conflicto con archivos, coincidencias ambiguas, recuperación tras fallo de escritura, excepciones individuales, permisos de escritura del navegador y cancelación. La preparación agrupada de Android admite almacenamiento interno y SD; los proveedores con ID opacos siguen usando las selecciones individuales.
+
 ## Repetir la prueba nativa
 
 1. Generar e instalar una APK debug x86_64 con applicationId `app.nlc.player.dev`.

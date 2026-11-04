@@ -13,8 +13,12 @@ export const localSetupEn = {
     both: "NAS + phone",
     storage: "Storage",
     folders: "Your folders",
-    foldersHint:
-      "Choose a folder for each service. You can add or change them later in Settings.",
+    generalFolder: "General folder",
+    generalFolderHint: "Create and assign the six service folders.",
+    byService: "By service",
+    rootFolderError:
+      "Could not prepare the folders. Choose a writable folder on your phone or SD card.",
+    foldersHint: "One folder for everything, or a folder for each service.",
     pick: "Choose folder",
     later: "Choose later",
     internal: "In NLC on this phone",
@@ -42,8 +46,12 @@ export const localSetupEs = {
     both: "NAS + teléfono",
     storage: "Almacenamiento",
     folders: "Tus carpetas",
-    foldersHint:
-      "Elige una carpeta para cada servicio. Puedes añadirlas o cambiarlas después en Ajustes.",
+    generalFolder: "Carpeta general",
+    generalFolderHint: "Crea y asigna las seis subcarpetas.",
+    byService: "Por servicio",
+    rootFolderError:
+      "No se pudieron preparar las carpetas. Elige una carpeta con permiso de escritura en el teléfono o la tarjeta SD.",
+    foldersHint: "Una carpeta para todo, o una por servicio.",
     pick: "Elegir carpeta",
     later: "Elegir después",
     internal: "En NLC, en este teléfono",
