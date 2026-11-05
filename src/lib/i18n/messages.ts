@@ -1,3 +1,4 @@
+import { localMoveEn, localMoveEs } from "./catalog-local-move";
 import { serviceBackupEn, serviceBackupEs } from "./catalog-service-backup";
 import { localSetupEn, localSetupEs } from "./catalog-local-setup";
 import { mobileMercuryEn, mobileMercuryEs } from "@/lib/i18n/catalog-mobile-mercury";
@@ -257,6 +258,7 @@ export const messages = {
     ...integrationsEn,
     ...mobileMercuryEn,
     ...localSetupEn,
+    ...localMoveEn,
     ...serviceBackupEn,
   },
   es: {
@@ -276,6 +278,7 @@ export const messages = {
     ...integrationsEs,
     ...mobileMercuryEs,
     ...localSetupEs,
+    ...localMoveEs,
     ...serviceBackupEs,
   },
 } as const;

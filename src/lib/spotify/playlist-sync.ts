@@ -1,3 +1,4 @@
+import { localMoveLocked, withLocalSourceSync } from "@/lib/local/move-lock";
 import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { t } from "@/lib/i18n/runtime";
 import { joinPath } from "@/lib/nas/webdav";
@@ -28,7 +29,7 @@ function canWriteNas(settings: NasSettings, password: string): boolean {
   );
 }
 
-async function dumpPlaylists(): Promise<PlaylistDump> {
+export async function dumpPlaylists(): Promise<PlaylistDump> {
   const playlists = await loadPlaylists();
   const storedAt = await getPlaylistsUpdatedAt();
   const importedAt = playlists.reduce((max, item) => Math.max(max, item.importedAt || 0), 0);
@@ -70,7 +71,8 @@ function pickNewer(a: PlaylistDump | null, b: PlaylistDump | null): PlaylistDump
   return b.updatedAt > a.updatedAt ? b : a;
 }
 
-export async function pullPlaylistsFromSources(settings: NasSettings, password: string): Promise<boolean> {
+async function pullPlaylistsFromSourcesUnlocked(settings: NasSettings, password: string): Promise<boolean> {
+  if (await localMoveLocked()) return false;
   const local = await dumpPlaylists();
   const remoteNas = await readNasPlaylists(settings, password);
   const remoteFolder = usesLocal(settings, "music") && settings.localFolderUri
@@ -79,12 +81,15 @@ export async function pullPlaylistsFromSources(settings: NasSettings, password: 
   const incoming = pickNewer(remoteNas, remoteFolder);
   if (!incoming) return false;
   if (local.playlists.length > 0 && incoming.updatedAt <= local.updatedAt) return false;
+  if (await localMoveLocked()) return false;
   await replacePlaylists(incoming);
   return true;
 }
 
-export async function pushPlaylistsToSources(settings: NasSettings, password: string): Promise<string | null> {
+async function pushPlaylistsToSourcesUnlocked(settings: NasSettings, password: string): Promise<string | null> {
+  if (await localMoveLocked()) return null;
   const dump = { ...(await dumpPlaylists()), updatedAt: Date.now() };
+  if (await localMoveLocked()) return null;
   const writes: Promise<void>[] = [];
   if (usesLocal(settings, "music") && settings.localFolderUri) {
     writes.push(writeLocalPlaylistsFile(settings.localFolderUri, dump));
@@ -106,4 +111,12 @@ export async function pushPlaylistsToSources(settings: NasSettings, password: st
     await setPlaylistsUpdatedAt(dump.updatedAt);
   }
   return errors[0] ?? null;
+}
+
+export function pullPlaylistsFromSources(settings: NasSettings, password: string): Promise<boolean> {
+  return withLocalSourceSync(() => pullPlaylistsFromSourcesUnlocked(settings, password));
+}
+
+export function pushPlaylistsToSources(settings: NasSettings, password: string): Promise<string | null> {
+  return withLocalSourceSync(() => pushPlaylistsToSourcesUnlocked(settings, password));
 }

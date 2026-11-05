@@ -33,6 +33,8 @@ jobs:
 
       - run: npm run test:integrations
 
+      - run: npm run test:local-move
+
       - run: npm run test:local-folders
 
       - run: npm run test:service-backup

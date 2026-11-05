@@ -1,3 +1,4 @@
+import { localMoveLocked, withLocalSourceSync } from "@/lib/local/move-lock";
 import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { t } from "@/lib/i18n/runtime";
 import { joinPath } from "@/lib/nas/webdav";
@@ -53,7 +54,8 @@ function pickNewer(a: WealthDump | null, b: WealthDump | null): WealthDump | nul
   return b.updatedAt > a.updatedAt ? b : a;
 }
 
-export async function pullWealthFromSources(settings: NasSettings, password: string): Promise<boolean> {
+async function pullWealthFromSourcesUnlocked(settings: NasSettings, password: string): Promise<boolean> {
+  if (await localMoveLocked()) return false;
   const local = await dumpWealth();
   const remoteNas = await readNasWealth(settings, password);
   const remoteFolder = usesLocal(settings, "wealth") && settings.wealthLocalFolderUri
@@ -67,13 +69,16 @@ export async function pullWealthFromSources(settings: NasSettings, password: str
     local.accounts.length <= 1 &&
     !(local.goals?.length);
   if (!localEmpty && incoming.updatedAt <= local.updatedAt) return false;
+  if (await localMoveLocked()) return false;
   await replaceWealth(incoming);
   emitWealthStoreChanged();
   return true;
 }
 
-export async function pushWealthToSources(settings: NasSettings, password: string): Promise<string | null> {
+async function pushWealthToSourcesUnlocked(settings: NasSettings, password: string): Promise<string | null> {
+  if (await localMoveLocked()) return null;
   const dump = { ...(await dumpWealth()), updatedAt: Date.now() };
+  if (await localMoveLocked()) return null;
   const writes: Promise<void>[] = [];
   if (usesLocal(settings, "wealth") && settings.wealthLocalFolderUri) {
     writes.push(writeLocalWealthFile(settings.wealthLocalFolderUri, dump));
@@ -92,4 +97,12 @@ export async function pushWealthToSources(settings: NasSettings, password: strin
     }
   }
   return errors[0] ?? null;
+}
+
+export function pullWealthFromSources(settings: NasSettings, password: string): Promise<boolean> {
+  return withLocalSourceSync(() => pullWealthFromSourcesUnlocked(settings, password));
+}
+
+export function pushWealthToSources(settings: NasSettings, password: string): Promise<string | null> {
+  return withLocalSourceSync(() => pushWealthToSourcesUnlocked(settings, password));
 }

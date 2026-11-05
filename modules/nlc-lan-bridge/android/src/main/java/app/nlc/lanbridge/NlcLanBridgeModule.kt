@@ -35,7 +35,7 @@ class NlcLanBridgeModule : Module() {
   }
   override fun definition() = ModuleDefinition {
     Name("NlcLanBridge")
-    Events("onBridgeRequest", "onBridgeUnlinked", "onBridgeClaimed", "onDownloadWatchFinished", "onServiceArchiveProgress", "onServiceArchiveAuth")
+    Events("onBridgeRequest", "onBridgeUnlinked", "onBridgeClaimed", "onDownloadWatchFinished", "onServiceArchiveProgress", "onServiceArchiveAuth", "onLocalMoveProgress")
 
     Function("cancelServiceArchive") { job: String -> ServiceArchive.cancel(job); archiveAuth.values.filter { it.job == job }.forEach { it.latch.countDown() } }
     Function("resolveServiceArchiveAuth") { id: String, headers: String -> archiveAuth[id]?.let { it.headers = headers; it.latch.countDown() } }
@@ -53,6 +53,15 @@ class NlcLanBridgeModule : Module() {
       ServiceArchive.commit(appContext.reactContext ?: error("storage"), id, destination, job) { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files)) }
     }
     AsyncFunction("discardServiceStage") { id: String -> ServiceArchive.discard(appContext.reactContext ?: error("storage"), id) }
+
+    Function("cancelLocalMove") { id: String -> LocalMove.cancel(id) }
+    AsyncFunction("pendingLocalMoves") { LocalMove.pending(appContext.reactContext ?: error("storage")) }
+    AsyncFunction("prepareLocalMove") { id: String, uri: String -> LocalMove.prepare(appContext.reactContext ?: error("storage"), id, uri) { phase, bytes, files -> sendEvent("onLocalMoveProgress", mapOf("id" to id, "phase" to phase, "bytes" to bytes.toDouble(), "files" to files)) } }
+    AsyncFunction("copyLocalMove") { id: String -> LocalMove.copy(appContext.reactContext ?: error("storage"), id) { phase, bytes, files -> sendEvent("onLocalMoveProgress", mapOf("id" to id, "phase" to phase, "bytes" to bytes.toDouble(), "files" to files)) } }
+    AsyncFunction("verifyLocalMove") { id: String -> LocalMove.verify(appContext.reactContext ?: error("storage"), id) { phase, bytes, files -> sendEvent("onLocalMoveProgress", mapOf("id" to id, "phase" to phase, "bytes" to bytes.toDouble(), "files" to files)) } }
+    AsyncFunction("finishLocalMove") { id: String, uri: String -> LocalMove.finish(appContext.reactContext ?: error("storage"), id, uri) { phase, bytes, files -> sendEvent("onLocalMoveProgress", mapOf("id" to id, "phase" to phase, "bytes" to bytes.toDouble(), "files" to files)) } }
+    AsyncFunction("abortLocalMove") { id: String -> LocalMove.abort(appContext.reactContext ?: error("storage"), id) }
+    AsyncFunction("keepLocalMoveOriginals") { id: String -> LocalMove.keepOriginals(appContext.reactContext ?: error("storage"), id) }
 
     OnCreate {
       instance = this@NlcLanBridgeModule

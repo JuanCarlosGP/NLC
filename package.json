@@ -1,6 +1,6 @@
 {
   "name": "nlc",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "private": true,
   "description": "Aplicación Android personal con bibliotecas locales o NAS, tareas, finanzas y salud.",
   "license": "SEE LICENSE IN LICENSE",
@@ -58,7 +58,8 @@
     "test:appearance": "node --test scripts/test-appearance.cjs",
     "test:mercury-mobile": "node --test scripts/test-mercury-mobile.cjs",
     "test:service-backup": "node --test scripts/test-service-backup.cjs",
-    "test:local-folders": "node --test scripts/test-local-folders.cjs"
+    "test:local-folders": "node --test scripts/test-local-folders.cjs",
+    "test:local-move": "node --test scripts/test-local-move.cjs"
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",

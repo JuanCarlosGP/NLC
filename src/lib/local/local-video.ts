@@ -76,7 +76,7 @@ async function walkNative(uri: string, rel: string, depth: number): Promise<Loca
   } catch {
     return node;
   }
-  if (children.some(child => nameFromUri(child).startsWith(".nlc-importing-"))) { node.incomplete = true; return node; }
+  if (children.some(child => /^[.]nlc-(importing|moving)-/.test(nameFromUri(child)))) { node.incomplete = true; return node; }
   for (const child of children) {
     const childName = nameFromUri(child);
     if (SKIP.has(childName.toLowerCase()) || childName.startsWith(".")) continue;

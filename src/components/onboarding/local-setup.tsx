@@ -1,5 +1,6 @@
+import { LocalMoveSheet } from "@/components/settings/local-move-sheet";
 import { useRef, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import {
   Folder,
   FolderTree,
@@ -36,6 +37,7 @@ export function LocalSetup({
 }) {
   useThemeId();
   const { t } = useI18n();
+  const [moveOpen, setMoveOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<"folderError" | "rootFolderError" | null>(
     null,
@@ -102,6 +104,8 @@ export function LocalSetup({
           </Pressable>
         </View>
       ) : null}
+      {settings?.localRootFolderUri && Platform.OS === "android" ? <Pressable accessibilityRole="button" disabled={busy} style={styles.reset} onPress={() => { setMoveOpen(true); onBusyChange?.(true); }}><Text style={type.track}>{t("localMove.title")}</Text></Pressable> : null}
+      {moveOpen && settings ? <LocalMoveSheet target={settings} onCommitted={next => onSettingsChange?.(next)} onClose={() => { setMoveOpen(false); onBusyChange?.(false); }}/> : null}
       {settings ? (
         <Text style={type.label}>{t("localSetup.byService")}</Text>
       ) : null}
