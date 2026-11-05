@@ -4,7 +4,7 @@ import {
   withLocalFolder,
 } from "@/lib/settings/service-source";
 import type { CatalogDb } from "@/lib/db/types";
-import type { NasSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
 import { preferenceKey } from "@/lib/service-backup/preferences";
 import { importEpochKey } from "@/lib/service-backup/epochs";
 import { seriesFromPath } from "@/lib/video/browse";
@@ -111,6 +111,7 @@ export async function applyMove(
       ["recents", "track_id"],
       ["playlist_tracks", "matched_id"],
       ["service_media_origins", "track_id"],
+      ["service_media_retired", "id"],
     ])
       await db.runAsync(
         `UPDATE ${table} SET ${column} = ? WHERE ${column} = ?`,
@@ -118,6 +119,7 @@ export async function applyMove(
         old,
       );
   }
+  for(const [from,to] of uris)if(from!==to)await db.runAsync("UPDATE service_media_retired SET uri=? WHERE uri=?",to,from);
   const usedCovers = new Set(
     (
       await db.getAllAsync<{ uri: string }>(

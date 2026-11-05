@@ -14,12 +14,12 @@ export function createNativeBackupAdapter(open: () => Promise<CatalogDb>, transa
     async read() { const { data } = await readSqlHealth(await open()); validateHealthData(data); assertPhotoBudget(data); const photos = new Map<string, Uint8Array>(); for (const photo of photoList(data)) photos.set(photo.id, await files.read(photo)); return { data, photos }; },
     async recoveryInfo() { return (await record())?.info ?? null; },
     async recoveryBytes() { const previous = await record(); return previous ? files.readRecovery(previous.ref) : null; },
-    async apply(target, recovery, info) {
+    async apply(target, recovery, info, receipt) {
       const db = await open(); const previous = await readSqlHealth(db); const oldRecord = await record(); const ref = newId(); if (ref === oldRecord?.ref) throw new BackupError("storage"); const created: BodyPhoto[] = [];
       try {
         for (const photo of photoList(target.data)) { created.push(photo); await files.write(photo, target.photos.get(photo.id)!); }
         await files.writeRecovery(ref, recovery);
-        await transact(db, async () => { await writeSqlHealth(db, { data: target.data, rest: null }); await db.runAsync("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", RECOVERY_KEY, JSON.stringify({ ref, info })); });
+        await transact(db, async () => { await writeSqlHealth(db, { data: target.data, rest: null }); if(receipt)await db.runAsync("INSERT OR REPLACE INTO meta(key,value) VALUES (?,?)",`health_remote_restore:${receipt.id}`,JSON.stringify(receipt.result)); await db.runAsync("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", RECOVERY_KEY, JSON.stringify({ ref, info })); });
       } catch (error) {
         await Promise.all(created.map((photo) => files.remove(photo).catch(() => {}))); await files.removeRecovery(ref).catch(() => {}); throw error;
       }

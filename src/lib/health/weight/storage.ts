@@ -1,5 +1,3 @@
-import { coordinatedHealthStore } from "../access";
-import { getDb } from "@/lib/db/client";
-import { createWeightStore } from "./store";
-
-export const weightStore = coordinatedHealthStore(createWeightStore(getDb));
+import { exposeStore } from "@/lib/backend/registry";
+import { weightStore as local } from "./storage.impl";
+export const weightStore = exposeStore("weight", local);

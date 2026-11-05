@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getWebDavText, putWebDavText } from "@/lib/nas/webdav-source";
 import { joinPath } from "@/lib/nas/webdav";
-import type { NasSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
 
 export const PUSH_TOKENS_FILENAME = "nlc-push-tokens.json";
 const LOCAL_TOKEN_KEY = "nlc.ota.push-token";

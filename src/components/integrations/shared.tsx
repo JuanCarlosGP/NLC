@@ -1,3 +1,4 @@
+import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { MobileMercuryPanel } from "./mobile-mercury-panel";
 import { useState, type ReactNode } from "react";
@@ -53,10 +54,10 @@ function BridgeConnectionPanel({provider}:{provider:Provider}){
       {data?<Text style={type.meta}>{t("integrations.localHint")}</Text>:null}
       {mode==="live"&&provider==="whoop"?<Text style={type.meta}>{t(status?.connected?"integrations.connected":"integrations.notConnected")}</Text>:null}
       <View style={styles.row}>{mode==="live"?<Button title={working||ctx.busy===provider?t("integrations.syncing"):t("integrations.sync")} primary disabled={disabled||!ctx.online||status?.busy} onPress={()=>void sync()}/>:<Button title={t("integrations.example")} disabled={disabled||!ctx.online} onPress={()=>void sync(true)}/>}
-        {provider==="whoop"&&mode==="live"?<Button title={t(status?.connected?"integrations.disconnect":"integrations.connect")} disabled={disabled||!ctx.online||!status?.configured} onPress={()=>status?.connected?setConfirm("disconnect"):void run(async()=>{const result=await bridgeRequest("/whoop/connect",true) as {url:string};if(!result.url.startsWith("https://api.prod.whoop.com/oauth/oauth2/auth?"))throw new Error("invalid");setAuthUrl(result.url);})}/>:null}
+        {provider==="whoop"&&mode==="live"?<Button title={remoteEnabled?`${t(status?.connected?"integrations.disconnect":"integrations.connect")} · ${PHONE_ONLY}`:t(status?.connected?"integrations.disconnect":"integrations.connect")} disabled={remoteEnabled||disabled||!ctx.online||!status?.configured} onPress={()=>status?.connected?setConfirm("disconnect"):void run(async()=>{const result=await bridgeRequest("/whoop/connect",true) as {url:string};if(!result.url.startsWith("https://api.prod.whoop.com/oauth/oauth2/auth?"))throw new Error("invalid");setAuthUrl(result.url);})}/>:null}
         <Button title={t("integrations.retry")} disabled={disabled} onPress={()=>void run(()=>ctx.refresh())}/>
       </View>
-      {authUrl?<Button primary title={t("integrations.authorize")} onPress={()=>{if(Platform.OS==="web")window.location.assign(authUrl);else void Linking.openURL(authUrl);}}/>:null}
+      {authUrl?<Button primary title={remoteEnabled?`${t("integrations.authorize")} · ${PHONE_ONLY}`:t("integrations.authorize")} disabled={remoteEnabled} onPress={()=>{if(Platform.OS==="web")window.location.assign(authUrl);else void Linking.openURL(authUrl);}}/>:null}
       {mode==="live"&&ctx.online&&status&&!status.configured?<Text style={type.meta}>{t("integrations.missing",{fields:status.missing.join(", ")})}</Text>:null}
       {mode==="live"&&status?.automaticMinutes?<Text style={type.meta}>{t("integrations.automatic",{minutes:status.automaticMinutes})}</Text>:null}
       {mode==="live"&&status?.error?<Text accessibilityRole="alert" style={styles.error}>{t(`integrations.errors.${errorCodes.has(status.error)?status.error:"upstream"}`)}</Text>:null}

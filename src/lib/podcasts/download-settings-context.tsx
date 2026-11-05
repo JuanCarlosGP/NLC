@@ -1,3 +1,5 @@
+import { onBackendChange, hasRemoteDraft } from "@/lib/backend/remote";
+import { remoteEnabled } from "@/lib/backend/profile";
 import {
   createContext,
   useCallback,
@@ -70,11 +72,14 @@ export function DownloadSettingsProvider({ children }: { children: ReactNode }) 
     };
   }, []);
 
+  useEffect(()=>onBackendChange(domain=>{if (!["downloader","credentials","*"].includes(domain) || hasRemoteDraft())return;
+    void Promise.all([loadDownloadSettings(),loadDownloadToken()]).then(([next,secret])=>{setSettings(next);setToken(secret);}).catch(()=>{});
+  }),[]);
   const persist = useCallback(async () => {
     setBusy(true);
     setFeedback(null);
     try {
-      await Promise.all([saveDownloadSettings(settings), saveDownloadToken(token)]);
+      await Promise.all([saveDownloadSettings(settings), remoteEnabled && !token.trim() ? Promise.resolve() : saveDownloadToken(token)]);
       setFeedback({ text: t("feedback.downloadsSaved"), color: colors.ok });
     } catch (err) {
       setFeedback({

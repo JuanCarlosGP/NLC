@@ -1,27 +1,27 @@
-import { dumpPlaylists } from "@/lib/spotify/playlist-sync";
-import { emitPlaylistStoreChanged } from "@/lib/spotify/playlist-store";
+import { dumpPlaylists } from "@/lib/spotify/playlist-sync.internal";
+import { emitPlaylistStoreChanged } from "@/lib/spotify/playlist-store.internal";
 import * as Crypto from "expo-crypto";
 import { getDb, runInTransaction } from "@/lib/db/client";
 import { openIsolatedHealthDb } from "@/lib/db/sqlite-client";
-import { notifyCatalog } from "@/lib/db/catalog";
+import { notifyCatalog } from "@/lib/db/catalog.internal";
 import { servicePreferences } from "@/lib/service-backup/preferences";
 import { notifyServiceImport } from "@/lib/service-backup/events";
 import {
   reloadTrackArtworkCache,
   hydrateTrackArtworkCache,
-} from "@/lib/library/artwork-cache";
+} from "@/lib/library/artwork-cache.internal";
 import {
   flushWatchProgress,
   reloadWatchHistory,
   loadWatchHistory,
-} from "@/lib/video/watch-history";
+} from "@/lib/video/watch-history.internal";
 import {
   loadVideoFavorites,
   reloadVideoFavorites,
-} from "@/lib/video/favorites";
+} from "@/lib/video/favorites.internal";
 import { forgetLocalVideoTree } from "@/lib/local/local-video";
-import { dumpFocus } from "@/lib/productivity/sync";
-import { dumpWealth } from "@/lib/wealth/store";
+import { dumpFocus } from "@/lib/productivity/sync.internal";
+import { dumpWealth } from "@/lib/wealth/store.internal";
 import {
   pauseOfflineSync,
   getOfflineProgress,
@@ -41,7 +41,7 @@ import {
   withMoveJson,
   type MoveSummary,
 } from "./native";
-import type { NasSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
 const remaps = new Set<
   (ids: Map<string, string>, uris: Map<string, string>) => void
 >();

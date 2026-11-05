@@ -34,7 +34,7 @@ export default {
     newArchEnabled: true,
     android: {
       package: process.env.NLC_ANDROID_PACKAGE || "app.nlc.player",
-      versionCode: 22,
+      versionCode: 23,
       softwareKeyboardLayoutMode: "resize",
       usesCleartextTraffic: true,
       adaptiveIcon: {
@@ -88,7 +88,7 @@ export default {
         cameraPermission: "NLC uses the camera to pair the desktop TUI.",
         microphonePermission: false,
       }],
-      "expo-video",
+      ["expo-video", { supportsBackgroundPlayback: true, supportsPictureInPicture: true }],
       [
         "expo-screen-orientation",
         {
@@ -110,7 +110,7 @@ export default {
     ],
     web: {
       // "server" makes GET / HTML; Expo Go then fails to load the native bundle.
-      output: easBuild || process.env.EXPO_PUBLIC_NLC_DEMO === "1" ? "server" : "single",
+      output: process.env.EXPO_PUBLIC_NLC_WEB_REMOTE === "1" ? "single" : easBuild || process.env.EXPO_PUBLIC_NLC_DEMO === "1" ? "server" : "single",
     },
     experiments: {
       typedRoutes: true,

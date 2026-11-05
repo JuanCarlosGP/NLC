@@ -1,3 +1,5 @@
+import { hasPhoneClock, phoneTimeText, phoneInstant } from "../../backend/clock";
+import { phoneNow } from "../../backend/clock";
 import { isDateKey, localDateKey, shiftDateKey } from "../weight/model";
 
 export type MedicationKind = "medication" | "supplement";
@@ -19,9 +21,9 @@ export type DoseInput = { planId: string; date: string; time: string; status: Do
 export type MedicationErrorCode = "name" | "date" | "time" | "frequency" | "note" | "future" | "missing" | "invalid";
 export class MedicationValidationError extends Error { constructor(public code: MedicationErrorCode) { super(code); } }
 const fail = (code: MedicationErrorCode): never => { throw new MedicationValidationError(code); };
-export function medicationId(): string { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`; }
+export function medicationId(): string { return `${phoneNow().toString(36)}-${Math.random().toString(36).slice(2, 12)}`; }
 export function isTime(value: string): boolean { return /^([01]\d|2[0-3]):[0-5]\d$/.test(value); }
-export function timeText(date = new Date()): string { return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`; }
+export function timeText(date = new Date(phoneNow())): string { if (hasPhoneClock()) return phoneTimeText(date); return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`; }
 export function parseTimes(text: string): string[] {
   if (!text.trim()) return [];
   const times = text.split(",").map((time) => time.trim());
@@ -48,14 +50,14 @@ export function validatePlan(plan: MedicationPlan): MedicationPlan {
   }
   return plan;
 }
-export function newMedicationPlan(input: PlanInput, now = Date.now(), id = medicationId()): MedicationPlan {
+export function newMedicationPlan(input: PlanInput, now = phoneNow(), id = medicationId()): MedicationPlan {
   const normalized = normalizePlanInput(input);
   return validatePlan({ id, revisions: [{ ...normalized, fromDate: normalized.anchorDate, active: true }], createdAt: now, updatedAt: now });
 }
 export function revisionOn(plan: MedicationPlan, date: string): MedicationRevision | null {
   return [...plan.revisions].reverse().find((revision) => revision.fromDate <= date) ?? null;
 }
-export function revisePlan(plan: MedicationPlan, input: PlanInput, active: boolean, today = localDateKey(), now = Date.now()): MedicationPlan {
+export function revisePlan(plan: MedicationPlan, input: PlanInput, active: boolean, today = localDateKey(), now = phoneNow()): MedicationPlan {
   const normalized = normalizePlanInput(input);
   const revisions = plan.revisions.filter((revision) => revision.fromDate < today);
   // Revisions later than today can only be the first (not-yet-started) schedule.
@@ -96,6 +98,7 @@ export function doseSummary(slots: DoseSlot[]) {
 }
 export function localDoseTimestamp(date: string, time: string): number {
   if (!isDateKey(date)) fail("date"); if (!isTime(time)) fail("time");
+  if (hasPhoneClock()) return phoneInstant(date, time);
   const [year, month, day] = date.split("-").map(Number); const [hour, minute] = time.split(":").map(Number);
   const value = new Date(year, month - 1, day, hour, minute);
   if (localDateKey(value) !== date || timeText(value) !== time) fail("time");
@@ -109,7 +112,7 @@ export function validateLog(log: DoseLog): DoseLog {
   if (log.status === "taken" ? !Number.isFinite(log.takenAt) || !log.actualTime || !isTime(log.actualTime) : log.takenAt !== null || log.actualTime !== null) fail("time");
   return log;
 }
-export function makeDoseLog(data: MedicationData, input: DoseInput, now = Date.now()): DoseLog {
+export function makeDoseLog(data: MedicationData, input: DoseInput, now = phoneNow()): DoseLog {
   if (!isDateKey(input.date)) fail("date"); if (input.date > localDateKey(new Date(now))) fail("future");
   if (typeof input.note !== "undefined" && (typeof input.note !== "string" || input.note.length > 2000)) fail("note");
   const slot = slotsForDay(data, input.date).find((row) => row.id === doseId(input.planId, input.date, input.time));
@@ -120,7 +123,7 @@ export function makeDoseLog(data: MedicationData, input: DoseInput, now = Date.n
   return validateLog({ id: slot.id, planId: input.planId, date: input.date, time: input.time, snapshot: slot.snapshot, status: input.status, takenAt, actualTime, note: (input.note ?? "").trim(), updatedAt: now });
 }
 export type MedicationAlert = { id: string; planId: string; date: string; time: string; at: number };
-export function upcomingMedicationAlerts(data: MedicationData, now = Date.now(), days = 30, limit = 40): MedicationAlert[] {
+export function upcomingMedicationAlerts(data: MedicationData, now = phoneNow(), days = 30, limit = 40): MedicationAlert[] {
   if (!data.alertsEnabled) return [];
   const alerts: MedicationAlert[] = []; const today = localDateKey(new Date(now));
   for (let offset = 0; offset < days; offset++) {

@@ -27,3 +27,6 @@ tui/target/
 # Generated Python cache
 __pycache__/
 *.py[cod]
+
+# Rebuilt for APK and compatible OTA exports
+assets/generated/phone-web.zip

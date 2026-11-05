@@ -43,6 +43,56 @@ fn handle(mut stream: TcpStream) -> Result<(), String> {
     }
     let req = read_headers(&mut stream)?;
     let path = request_path(&req);
+    if path == "/session" {
+        let host = header_value(&req, "host").unwrap_or_default();
+        if header_value(&req, "x-nlc-protocol").as_deref() != Some("1")
+            || header_value(&req, "origin").is_some_and(|value| value != format!("http://{host}"))
+        {
+            return write_raw(
+                &mut stream,
+                403,
+                "application/json",
+                b"{\"error\":\"invalid_origin\"}",
+            );
+        }
+        let target = request_target(&req);
+        let op = query_param(&target, "op").unwrap_or_default();
+        if ![
+            "state", "queue", "prepare", "confirm", "control", "progress",
+        ]
+        .contains(&op.as_str())
+        {
+            return write_raw(&mut stream, 400, "application/json", b"{}");
+        }
+        let session = crate::session::env_session().ok_or("phone session unavailable")?;
+        let client = crate::client::BridgeClient::new(&session);
+        let mut query = format!("op=web-{op}");
+        for key in [
+            "client", "id", "lease", "position", "duration", "playing", "revision", "sequence",
+            "method", "queue", "part", "stage",
+        ] {
+            if let Some(value) = query_param(&target, key) {
+                query.push_str(&format!("&{key}={}", urlencoding::encode(&value)));
+            }
+        }
+        let result = client
+            .device(&query)
+            .map_err(|_| "phone session unavailable".to_string());
+        return match result {
+            Ok(value) => write_raw(
+                &mut stream,
+                200,
+                "application/json",
+                value.to_string().as_bytes(),
+            ),
+            Err(_) => write_raw(
+                &mut stream,
+                502,
+                "application/json",
+                b"{\"error\":\"phone_unavailable\"}",
+            ),
+        };
+    }
     if path == "/media" {
         let id = query_param(&request_target(&req), "id").unwrap_or_default();
         let range = header_value(&req, "range");
@@ -90,7 +140,8 @@ fn query_param(target: &str, name: &str) -> Option<String> {
 fn header_value(req: &str, name: &str) -> Option<String> {
     req.lines().find_map(|line| {
         let (key, value) = line.split_once(':')?;
-        key.eq_ignore_ascii_case(name).then(|| value.trim().to_string())
+        key.eq_ignore_ascii_case(name)
+            .then(|| value.trim().to_string())
     })
 }
 
@@ -113,7 +164,9 @@ fn proxy_media(client: &mut TcpStream, id: &str, range: Option<&str>) -> Result<
         req.push_str(&format!("Range: {range}\r\n"));
     }
     req.push_str("\r\n");
-    upstream.write_all(req.as_bytes()).map_err(|e| e.to_string())?;
+    upstream
+        .write_all(req.as_bytes())
+        .map_err(|e| e.to_string())?;
     std::io::copy(&mut upstream, client).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -140,7 +193,9 @@ fn write_raw(stream: &mut TcpStream, status: u16, ctype: &str, body: &[u8]) -> R
         "HTTP/1.1 {status} {reason}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         body.len()
     );
-    stream.write_all(header.as_bytes()).map_err(|e| e.to_string())?;
+    stream
+        .write_all(header.as_bytes())
+        .map_err(|e| e.to_string())?;
     stream.write_all(body).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -216,7 +271,11 @@ fn attach_tui(ws: &mut tungstenite::WebSocket<TcpStream>) -> Result<(), String> 
                             .to_string(),
                         );
                     } else if msg.cols.unwrap_or(0) >= 2 && msg.rows.unwrap_or(0) >= 1 {
-                        resize_pty(pty.master.as_raw_fd(), msg.cols.unwrap_or(0), msg.rows.unwrap_or(0));
+                        resize_pty(
+                            pty.master.as_raw_fd(),
+                            msg.cols.unwrap_or(0),
+                            msg.rows.unwrap_or(0),
+                        );
                     }
                 } else {
                     let _ = write_all_fd(pty.master.as_raw_fd(), text.as_bytes());
@@ -278,7 +337,8 @@ fn split_media_osc(input: &[u8]) -> (Vec<u8>, Vec<String>, Vec<u8>) {
             }
             if rest.starts_with(marker) {
                 if let Some(rel) = rest[marker.len()..].iter().position(|byte| *byte == 0x07) {
-                    let json = String::from_utf8_lossy(&rest[marker.len()..marker.len() + rel]).into_owned();
+                    let json = String::from_utf8_lossy(&rest[marker.len()..marker.len() + rel])
+                        .into_owned();
                     cmds.push(json);
                     i += marker.len() + rel + 1;
                     continue;

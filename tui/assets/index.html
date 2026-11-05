@@ -37,66 +37,57 @@ term.loadAddon(fit);
 term.loadAddon(new ImageAddon.ImageAddon({ iipSupport: true, sixelScrolling: true }));
 term.open(document.getElementById("t"));
 fit.fit();
-const video = document.getElementById("player");
-const audio = document.getElementById("audio");
-let current = null;
+let video = document.getElementById("player"), audio = document.getElementById("audio");
+let current = null, sequence = 0, busyMedia = false, polling = false, reporting = false, lastReport = 0;
+const clientId=Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,"0")).join("");
+const leaseId=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,"0")).join("");
+async function session(op,args={}) {
+ const query=new URLSearchParams({op,client:clientId,...args});const response=await fetch("/session?"+query,{headers:{"X-NLC-Protocol":"1"},cache:"no-store"});
+ if(!response.ok)throw new Error("No se pudo conectar con el móvil");const result=await response.json();if(!result.ok)throw new Error(result.error||"phone_unavailable");return result;
+}
+function localPause() {video.pause();audio.pause();}
 function report(el) {
-  if (!current || ws.readyState !== 1) return;
-  const dur = Number.isFinite(el.duration) ? el.duration : 0;
-  ws.send(JSON.stringify({
-    media: { id: current.id, pos: el.currentTime || 0, dur, paused: el.paused, ended: el.ended }
-  }));
+ if (!current || ws.readyState !== 1) return;
+ const duration=Number.isFinite(el.duration)?el.duration:0;
+ ws.send(JSON.stringify({media:{id:current.id,pos:el.currentTime||0,dur:duration,paused:el.paused,ended:el.ended}}));
+ if(current.owner===clientId&&!reporting&&(Date.now()-lastReport>900||el.ended)){reporting=true;lastReport=Date.now();void session("progress",{revision:current.revision,sequence:++sequence,position:el.currentTime||0,duration,playing:el.paused?"0":"1"}).catch(()=>{localPause();}).finally(()=>{reporting=false;});}
 }
-function bind(el) {
-  ["timeupdate", "pause", "play", "ended", "seeked"].forEach((name) => {
-    el.addEventListener(name, () => report(el));
-  });
+function bind(el) {["timeupdate","pause","play","ended","seeked"].forEach(name=>el.addEventListener(name,()=>report(el)));}
+bind(video);bind(audio);
+async function candidate(id,isVideo,position,playing,volume) {
+ const el=document.createElement(isVideo?"video":"audio");el.preload="auto";el.playsInline=true;el.controls=isVideo;el.volume=Math.max(0,Math.min(1,(volume??80)/100));
+ el.src="/media?id="+encodeURIComponent(id);
+ try {await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error("Formato no compatible. Puedes reproducirlo en el móvil.")),15000);el.oncanplay=()=>{clearTimeout(timer);resolve();};el.onerror=()=>{clearTimeout(timer);reject(new Error("Formato no compatible. Puedes reproducirlo en el móvil."));};el.load();});el.currentTime=position||0;if(playing)await el.play();return el;}
+ catch(error){el.pause();el.removeAttribute("src");el.load();throw error;}
 }
-bind(video);
-bind(audio);
-function applyMedia(msg) {
-  if (msg.op === "stop") {
-    video.pause();
-    audio.pause();
-    video.classList.remove("show");
-    video.removeAttribute("src");
-    audio.removeAttribute("src");
-    current = null;
-    fit.fit();
-    term.focus();
-    return;
-  }
-  if (msg.op === "pause" && current) {
-    const el = current.video ? video : audio;
-    if (msg.paused) el.pause();
-    else el.play();
-    return;
-  }
-  if (msg.op === "volume" && current) {
-    const el = current.video ? video : audio;
-    el.volume = Math.max(0, Math.min(1, (msg.v || 0) / 100));
-    return;
-  }
-  if (msg.op !== "play" || !msg.id) return;
-  const el = msg.video ? video : audio;
-  const other = msg.video ? audio : video;
-  other.pause();
-  current = { id: msg.id, video: !!msg.video };
-  el.volume = Math.max(0, Math.min(1, (msg.volume || 0) / 100));
-  const start = Number(msg.start) || 0;
-  el.src = "/media?id=" + encodeURIComponent(msg.id);
-  video.classList.toggle("show", !!msg.video);
-  if (start > 3) {
-    const seek = () => {
-      if (Number.isFinite(el.duration) && start < el.duration - 2) el.currentTime = start;
-      el.removeEventListener("loadedmetadata", seek);
-    };
-    el.addEventListener("loadedmetadata", seek);
-  }
-  fit.fit();
-  el.play().catch(() => {});
-  term.focus();
+function install(el,id,isVideo,state) {
+ const old=isVideo?video:audio;localPause();old.replaceWith(el);old.removeAttribute("src");old.load();
+ if(isVideo){video=el;el.id="player";}else{audio=el;el.id="audio";}bind(el);
+ current={id,video:isVideo,revision:state.revision,owner:state.owner};sequence=0;video.classList.toggle("show",isVideo);fit.fit();
 }
+function stateId(state){return state.kind==="video"?"video:"+encodeURIComponent(state.videoPath):state.queue?.[state.index]?.id;}
+async function applyMedia(msg) {
+ busyMedia=true;
+ try {
+  if(msg.op==="volume"){(current?.video?video:audio).volume=Math.max(0,Math.min(1,(msg.v||0)/100));return;}
+  if(msg.op==="pause"||msg.op==="stop") {const {state}=await session("state");if(state.owner===clientId)await session("control",{method:msg.op==="stop"||msg.paused?"pause":"toggle",revision:state.revision});if(msg.op==="stop")localPause();return;}
+  if(msg.op!=="play"||!msg.id)return;
+  if(!msg.video&&Array.isArray(msg.queue)&&msg.queue.length){const stage=leaseId();for(let index=0;index<msg.queue.length;index+=10)await session("queue",{stage,part:index/10,queue:JSON.stringify(msg.queue.slice(index,index+10))});}
+  const lease=await session("prepare",{id:msg.id,lease:leaseId(),position:Number(msg.start)||0});
+  const prepared=await candidate(msg.id,!!msg.video,lease.state.currentTime,true,msg.volume);
+  try {let state;try{state=(await session("confirm",{lease:lease.leaseId})).state;}catch(error){state=(await session("state")).state;if(state.owner!==clientId||stateId(state)!==msg.id)throw error;}prepared.currentTime=state.currentTime;install(prepared,msg.id,!!msg.video,state);term.focus();}
+  catch(error){prepared.pause();prepared.removeAttribute("src");prepared.load();throw error;}
+ } catch(error){term.writeln("\r\n"+(error.message||error));}finally{busyMedia=false;}
+}
+setInterval(()=>{if(polling||busyMedia||!current)return;polling=true;void(async()=>{
+ const {state}=await session("state");if(state.owner!==clientId){current.owner=state.owner;localPause();return;}
+ const id=stateId(state);if(!id)return;const isVideo=state.kind==="video";
+ if(id!==current.id){const el=await candidate(id,isVideo,state.currentTime,state.playing);install(el,id,isVideo,state);}
+ const el=current.video?video:audio,changed=state.revision!==current.revision;current.revision=state.revision;current.owner=state.owner;
+ if(changed&&Math.abs(el.currentTime-state.currentTime)>1.5)el.currentTime=state.currentTime;
+ if(state.playing&&el.paused)await el.play();else if(!state.playing)el.pause();report(el);
+})().catch(()=>localPause()).finally(()=>{polling=false;});},1000);
+let mediaCommands=Promise.resolve();
 const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
 ws.binaryType = "arraybuffer";
 ws.onopen = () => {
@@ -114,7 +105,7 @@ ws.onmessage = (ev) => {
   try {
     const msg = JSON.parse(text);
     if (msg && msg.op) {
-      applyMedia(msg);
+      mediaCommands=mediaCommands.catch(()=>{}).then(()=>applyMedia(msg));
       return;
     }
   } catch (_) {}

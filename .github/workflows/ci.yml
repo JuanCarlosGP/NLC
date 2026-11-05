@@ -27,6 +27,12 @@ jobs:
 
       - run: npm run typecheck
 
+      - run: npm run test:phone-backend
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - run: npm run tui:test
+
       - run: npm run test:appearance
 
       - run: npm run test:mercury-mobile
@@ -74,6 +80,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           MSG="$(git log -1 --pretty=%s)"
+          npm run web:package
           npx eas-cli update --channel production --non-interactive --message "$MSG"
 
       - name: Notify devices

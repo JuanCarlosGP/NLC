@@ -11,7 +11,7 @@ import {
   replaceRecents as catalogReplaceRecents,
   subscribeCatalog,
   toggleFavorite as catalogToggleFavorite,
-} from "@/lib/db/catalog";
+} from "@/lib/db/catalog.internal";
 import { withTrackArtwork } from "@/lib/library/artwork-cache";
 import type { Album, Artist, MusicSourceKind, Track } from "@/lib/nas/types";
 import { isPodcastTrack } from "@/lib/nas/webdav";

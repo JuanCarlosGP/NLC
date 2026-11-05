@@ -1,6 +1,6 @@
 import { t } from "@/lib/i18n/runtime";
-import type { NasSettings } from "@/lib/settings/storage";
-import { nasBaseUrl } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
+import { nasBaseUrl } from "@/lib/settings/storage.impl";
 import type {
   Album,
   AlbumDetail,

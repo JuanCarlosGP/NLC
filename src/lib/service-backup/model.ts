@@ -6,7 +6,7 @@ import {
   MAX_SNAPSHOT_BYTES,
   type Snapshot,
 } from "@/lib/integrations/model";
-import type { ServiceId } from "@/lib/settings/storage";
+import type { ServiceId } from "@/lib/settings/storage.impl";
 export type Row = Record<string, string | number | null>;
 export const TABLES: Record<ServiceId, string[]> = {
   music: [

@@ -5,4 +5,8 @@ import { localDemoEnabled } from "@/lib/dev/local-demo";
 import { createWeightStore } from "./store";
 import { createWebWeightStore } from "./web-store";
 
-export const weightStore = coordinatedHealthStore(localDemoEnabled ? createWeightStore(getDb) : createWebWeightStore(healthWeb.storage));
+const local = coordinatedHealthStore(localDemoEnabled ? createWeightStore(getDb) : createWebWeightStore(healthWeb.storage));
+
+import { remoteEnabled } from "@/lib/backend/profile";
+import { exposeStore } from "@/lib/backend/registry";
+export const weightStore: typeof local = remoteEnabled ? exposeStore("weight", local) : local;

@@ -33,6 +33,7 @@ export type DownloadWatchFinishedEvent = {
 };
 
 type NativeBridge = {
+  usesHeadlessBackend?(): boolean;
   start(port: number, token: string, resume: boolean): Promise<BridgeStartResult>;
   stop(): Promise<void>;
   getLanAddress(): string;
@@ -213,3 +214,5 @@ export function addDownloadWatchFinishedListener(
   if (!mod?.addListener) return { remove() {} };
   return mod.addListener("onDownloadWatchFinished", listener);
 }
+
+export function bridgeUsesHeadless() { return loadNative()?.usesHeadlessBackend?.() === true; }

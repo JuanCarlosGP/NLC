@@ -337,12 +337,30 @@ object LanBridgeServer {
         proxyFile(out, method, uri, range)
       }
       uri.startsWith("content:", ignoreCase = true) -> {
-        writeStatus(out, 415, "application/json", """{"error":"content_uri"}""")
+        proxyContent(out, method, uri, range)
       }
       else -> proxyHttp(out, method, uri, headersJson, range)
     }
   }
 
+  private fun proxyContent(out: OutputStream, method: String, raw: String, header: String?) {
+    val ctx = appContext ?: return writeStatus(out, 503, "application/json", "{}")
+    val uri = Uri.parse(raw)
+    val descriptor = ctx.contentResolver.openAssetFileDescriptor(uri,"r") ?: return writeStatus(out,404,"application/json","{}")
+    var length = descriptor.length
+    if(length < 0)ctx.contentResolver.query(uri,arrayOf(android.provider.OpenableColumns.SIZE),null,null,null)?.use { cursor -> if(cursor.moveToFirst() && !cursor.isNull(0))length=cursor.getLong(0) }
+    descriptor.createInputStream().use { input ->
+      val range = try { PhoneWebMedia.range(header,length) } catch (_:IllegalArgumentException) { out.write("HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */$length\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray());return }
+      val start=range?.start?:0; val count=range?.let {it.end-it.start+1}?:length
+      var skipped=0L;while(skipped<start){val n=input.skip(start-skipped);if(n<=0){if(input.read()<0)return;skipped++}else skipped+=n}
+      val type=ctx.contentResolver.getType(uri)?:"application/octet-stream"
+      val headers=StringBuilder("HTTP/1.1 ${if(range==null)"200 OK" else "206 Partial Content"}\r\nContent-Type: $type\r\nAccept-Ranges: bytes\r\nConnection: close\r\n")
+      if(count>=0)headers.append("Content-Length: $count\r\n")
+      if(range!=null)headers.append("Content-Range: bytes ${range.start}-${range.end}/$length\r\n")
+      headers.append("\r\n");out.write(headers.toString().toByteArray(Charsets.US_ASCII))
+      if(method!="HEAD"){var remaining=count;val buffer=ByteArray(65536);while(remaining!=0L){val n=input.read(buffer,0,if(remaining<0)buffer.size else minOf(buffer.size.toLong(),remaining).toInt());if(n<0)break;out.write(buffer,0,n);if(remaining>0)remaining-=n}}
+    }
+  }
   private fun extraHeaders(headersJson: String): Map<String, String> {
     val map = mutableMapOf<String, String>()
     try {

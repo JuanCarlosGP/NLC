@@ -1,3 +1,4 @@
+import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space, radius, textSize } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,7 +36,8 @@ function MedicationAlerts() {
   }
   return <View style={styles.card}><Text style={type.sectionTitle}>{t("medication.alerts")}</Text>
     {!medicationAlertsSupported ? <Text style={type.meta}>{t("medication.webAlerts")}</Text> : <>
-      <Button title={t(data.alertsEnabled ? "medication.disableAlerts" : "medication.enableAlerts")} disabled={busy} onPress={() => void toggle()} />
+      <Button title={t(data.alertsEnabled ? "medication.disableAlerts" : "medication.enableAlerts")} disabled={busy || remoteEnabled && !alerts.permission && !data.alertsEnabled} onPress={() => void toggle()} />
+      {remoteEnabled && !alerts.permission && <Text style={type.meta}>{PHONE_ONLY}</Text>}
       {data.alertsEnabled ? <Text style={type.meta}>{t(!alerts.permission ? "medication.alertDenied" : alerts.count ? "medication.alertRange" : "medication.noAlerts", { count: alerts.count, date: alerts.through ?? "—" })}</Text> : null}
       <Text style={type.meta}>{t("medication.alertHorizon")}</Text>
     </>}

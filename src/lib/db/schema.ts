@@ -239,4 +239,324 @@ CREATE TABLE IF NOT EXISTS health_nutrition_days (
   entry_date TEXT PRIMARY KEY NOT NULL CHECK (length(entry_date) = 10),
   payload TEXT NOT NULL
 );
-`
+CREATE TABLE IF NOT EXISTS integration_cache (key TEXT PRIMARY KEY, payload TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS service_media_retired (id TEXT PRIMARY KEY, uri TEXT, service TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS service_import_receipts (id TEXT PRIMARY KEY, service TEXT NOT NULL, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS backend_source_tracks (id TEXT PRIMARY KEY, signature TEXT NOT NULL, payload TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS backend_resources (kind TEXT NOT NULL, id TEXT NOT NULL, directory INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(kind,id));
+CREATE TABLE IF NOT EXISTS backend_versions (key TEXT PRIMARY KEY, domain TEXT NOT NULL, version INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS backend_version_domain ON backend_versions(domain);
+CREATE TABLE IF NOT EXISTS backend_requests (id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result TEXT, created_at INTEGER NOT NULL);
+`;
+
+// Triggers cover writes from background synchronization, imports and legacy native entry points too.
+export const BACKEND_TRIGGER_SQL: string[] = [];
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_weight_entries_insert AFTER INSERT ON health_weight_entries BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('weight:' || NEW.entry_date,'weight',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('weight:$collection','weight',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_weight_entries_update AFTER UPDATE ON health_weight_entries BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('weight:' || NEW.entry_date,'weight',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('weight:$collection','weight',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_weight_entries_delete AFTER DELETE ON health_weight_entries BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('weight:' || OLD.entry_date,'weight',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('weight:$collection','weight',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_training_sessions_insert AFTER INSERT ON health_training_sessions BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:' || NEW.id,'training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:$collection','training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_training_sessions_update AFTER UPDATE ON health_training_sessions BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:' || NEW.id,'training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:$collection','training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_training_sessions_delete AFTER DELETE ON health_training_sessions BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:' || OLD.id,'training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:$collection','training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_training_rest_insert AFTER INSERT ON health_training_rest BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:$rest','training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:$collection','training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_training_rest_update AFTER UPDATE ON health_training_rest BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:$rest','training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:$collection','training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_training_rest_delete AFTER DELETE ON health_training_rest BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:$rest','training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('training:$collection','training',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_medication_plans_insert AFTER INSERT ON health_medication_plans BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:' || NEW.id,'medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_medication_plans_update AFTER UPDATE ON health_medication_plans BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:' || NEW.id,'medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_medication_plans_delete AFTER DELETE ON health_medication_plans BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:' || OLD.id,'medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_medication_logs_insert AFTER INSERT ON health_medication_logs BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:' || NEW.id,'medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_medication_logs_update AFTER UPDATE ON health_medication_logs BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:' || NEW.id,'medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_medication_logs_delete AFTER DELETE ON health_medication_logs BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:' || OLD.id,'medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_medication_settings_insert AFTER INSERT ON health_medication_settings BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_medication_settings_update AFTER UPDATE ON health_medication_settings BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_medication_settings_delete AFTER DELETE ON health_medication_settings BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('medication:$collection','medication',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_nutrition_days_insert AFTER INSERT ON health_nutrition_days BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('nutrition:' || NEW.entry_date,'nutrition',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('nutrition:$collection','nutrition',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_nutrition_days_update AFTER UPDATE ON health_nutrition_days BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('nutrition:' || NEW.entry_date,'nutrition',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('nutrition:$collection','nutrition',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_nutrition_days_delete AFTER DELETE ON health_nutrition_days BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('nutrition:' || OLD.entry_date,'nutrition',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('nutrition:$collection','nutrition',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_body_reviews_insert AFTER INSERT ON health_body_reviews BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('body:' || NEW.id,'body',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('body:$collection','body',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_body_reviews_update AFTER UPDATE ON health_body_reviews BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('body:' || NEW.id,'body',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('body:$collection','body',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_health_body_reviews_delete AFTER DELETE ON health_body_reviews BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('body:' || OLD.id,'body',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('body:$collection','body',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_prod_projects_insert AFTER INSERT ON prod_projects BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:' || NEW.id,'tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:$collection','tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_prod_projects_update AFTER UPDATE ON prod_projects BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:' || NEW.id,'tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:$collection','tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_prod_projects_delete AFTER DELETE ON prod_projects BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:' || OLD.id,'tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:$collection','tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_prod_tasks_insert AFTER INSERT ON prod_tasks BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:' || NEW.id,'tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:$collection','tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_prod_tasks_update AFTER UPDATE ON prod_tasks BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:' || NEW.id,'tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:$collection','tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_prod_tasks_delete AFTER DELETE ON prod_tasks BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:' || OLD.id,'tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('tasks:$collection','tasks',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_prod_reminders_insert AFTER INSERT ON prod_reminders BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('reminders:' || NEW.id,'reminders',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('reminders:$collection','reminders',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_prod_reminders_update AFTER UPDATE ON prod_reminders BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('reminders:' || NEW.id,'reminders',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('reminders:$collection','reminders',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_prod_reminders_delete AFTER DELETE ON prod_reminders BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('reminders:' || OLD.id,'reminders',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('reminders:$collection','reminders',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_accounts_insert AFTER INSERT ON wealth_accounts BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_accounts_update AFTER UPDATE ON wealth_accounts BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_accounts_delete AFTER DELETE ON wealth_accounts BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || OLD.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_assets_insert AFTER INSERT ON wealth_assets BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_assets_update AFTER UPDATE ON wealth_assets BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_assets_delete AFTER DELETE ON wealth_assets BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || OLD.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_quotes_insert AFTER INSERT ON wealth_quotes BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_quotes_update AFTER UPDATE ON wealth_quotes BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_quotes_delete AFTER DELETE ON wealth_quotes BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || OLD.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_tx_insert AFTER INSERT ON wealth_tx BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_tx_update AFTER UPDATE ON wealth_tx BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_tx_delete AFTER DELETE ON wealth_tx BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || OLD.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_goals_insert AFTER INSERT ON wealth_goals BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_goals_update AFTER UPDATE ON wealth_goals BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || NEW.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_wealth_goals_delete AFTER DELETE ON wealth_goals BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:' || OLD.id,'wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('wealth:$collection','wealth',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_artists_insert AFTER INSERT ON artists BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_artists_update AFTER UPDATE ON artists BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_artists_delete AFTER DELETE ON artists BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || OLD.id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_albums_insert AFTER INSERT ON albums BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_albums_update AFTER UPDATE ON albums BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_albums_delete AFTER DELETE ON albums BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || OLD.id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_tracks_insert AFTER INSERT ON tracks BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_tracks_update AFTER UPDATE ON tracks BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_tracks_delete AFTER DELETE ON tracks BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || OLD.id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_recents_insert AFTER INSERT ON recents BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.track_id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_recents_update AFTER UPDATE ON recents BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.track_id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_recents_delete AFTER DELETE ON recents BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || OLD.track_id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_favorites_insert AFTER INSERT ON favorites BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.track_id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_favorites_update AFTER UPDATE ON favorites BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || NEW.track_id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_favorites_delete AFTER DELETE ON favorites BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:' || OLD.track_id,'catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('catalog:$collection','catalog',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_playlists_insert AFTER INSERT ON playlists BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:' || NEW.id,'playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:$collection','playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_playlists_update AFTER UPDATE ON playlists BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:' || NEW.id,'playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:$collection','playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_playlists_delete AFTER DELETE ON playlists BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:' || OLD.id,'playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:$collection','playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_playlist_tracks_insert AFTER INSERT ON playlist_tracks BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:' || NEW.playlist_id,'playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:$collection','playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_playlist_tracks_update AFTER UPDATE ON playlist_tracks BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:' || NEW.playlist_id,'playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:$collection','playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_playlist_tracks_delete AFTER DELETE ON playlist_tracks BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:' || OLD.playlist_id,'playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('playlists:$collection','playlists',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_integration_cache_insert AFTER INSERT ON integration_cache BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('integrations:' || NEW.key,'integrations',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('integrations:$collection','integrations',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_integration_cache_update AFTER UPDATE ON integration_cache BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('integrations:' || NEW.key,'integrations',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('integrations:$collection','integrations',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_integration_cache_delete AFTER DELETE ON integration_cache BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('integrations:' || OLD.key,'integrations',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('integrations:$collection','integrations',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_meta_settings_insert AFTER INSERT ON meta WHEN NEW.key='nas_settings' BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('settings:$collection','settings',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_meta_preferences_insert AFTER INSERT ON meta WHEN NEW.key LIKE 'service_preference:%' BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('preferences:' || substr(NEW.key,20),'preferences',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('preferences:$collection','preferences',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_meta_settings_update AFTER UPDATE ON meta WHEN NEW.key='nas_settings' BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('settings:$collection','settings',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_meta_preferences_update AFTER UPDATE ON meta WHEN NEW.key LIKE 'service_preference:%' BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('preferences:' || substr(NEW.key,20),'preferences',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('preferences:$collection','preferences',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_meta_settings_delete AFTER DELETE ON meta WHEN OLD.key='nas_settings' BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('settings:$collection','settings',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);
+BACKEND_TRIGGER_SQL.push(`CREATE TRIGGER IF NOT EXISTS nlc_revision_meta_preferences_delete AFTER DELETE ON meta WHEN OLD.key LIKE 'service_preference:%' BEGIN
+ INSERT INTO backend_versions(key,domain,version) VALUES ('preferences:' || substr(OLD.key,20),'preferences',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+ INSERT INTO backend_versions(key,domain,version) VALUES ('preferences:$collection','preferences',1) ON CONFLICT(key) DO UPDATE SET version=version+1;
+END`);

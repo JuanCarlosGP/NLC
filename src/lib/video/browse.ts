@@ -1,5 +1,5 @@
 import { collateLocale, t } from "@/lib/i18n/runtime";
-import type { NasSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
 import { createVideoClient } from "@/lib/video/source";
 import { LOCAL_VIDEO_ROOT, isLocalVideoPath } from "@/lib/local/local-video";
 import { showTitle, videoShareRoot } from "@/lib/video/catalog";

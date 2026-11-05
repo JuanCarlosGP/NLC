@@ -1,3 +1,6 @@
+import { ControlledVideo } from "@/components/player/controlled-video";
+import { remoteEnabled } from "@/lib/backend/profile";
+import { Platform } from "react-native";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -106,7 +109,7 @@ function WatchChrome({
   );
 }
 
-function EpisodePlayer({
+function LegacyEpisodePlayer({
   source,
   path,
   startAt,
@@ -236,6 +239,8 @@ function EpisodePlayer({
     />
   );
 }
+
+const EpisodePlayer = Platform.OS === "android" || remoteEnabled ? ControlledVideo : LegacyEpisodePlayer;
 
 export default function WatchScreen() {
   useThemeId();

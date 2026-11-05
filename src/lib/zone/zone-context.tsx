@@ -1,3 +1,4 @@
+import { setEditZone } from "@/lib/backend/edit-drafts";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -107,6 +108,8 @@ export function ZoneProvider({ children }: { children: ReactNode }) {
     },
     [zone],
   );
+
+  useEffect(() => { setEditZone(zone); }, [zone]);
 
   const value = useMemo(
     () => ({ zone, enabled, setZone, setZoneEnabled }),

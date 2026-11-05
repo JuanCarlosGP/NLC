@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { AppState } from "react-native";
 import {
+  bridgeUsesHeadless,
   addBridgeClaimedListener,
   addBridgeRequestListener,
   addBridgeUnlinkedListener,
@@ -55,7 +56,7 @@ export function BridgeHost({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isLanBridgeAvailable) return;
-    const sub = addBridgeRequestListener((event) => {
+    const sub = bridgeUsesHeadless() ? { remove() {} } : addBridgeRequestListener((event) => {
       void (async () => {
         try {
           const route = event.path.replace(/\/+$/, "") || "/";

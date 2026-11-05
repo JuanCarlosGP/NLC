@@ -1,7 +1,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { Platform } from "react-native";
-import type { NasSettings, ServiceId } from "@/lib/settings/storage";
+import type { NasSettings, ServiceId } from "@/lib/settings/storage.impl";
 export type MoveMetadata = {
   fingerprint: string;
   source?: NasSettings;

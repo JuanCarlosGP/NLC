@@ -10,7 +10,7 @@ import {
 import { loadFavorites, toggleFavorite } from "@/lib/library/cache";
 import { moveWebDavPath } from "@/lib/nas/webdav-source";
 import { sidecarCoverPath } from "@/lib/nas/webdav";
-import type { NasSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
 import {
   addTracksToImportedPlaylist,
   createEmptyImportedPlaylist,

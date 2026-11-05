@@ -9,8 +9,16 @@ function open(): Promise<IDBDatabase> { return opened ??= new Promise((resolve,r
   request.onsuccess = () => { const db=request.result; db.onversionchange=()=>{db.close();opened=null;}; resolve(db); };
 }); }
 async function transaction<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> { const db=await open(); return new Promise((resolve,reject)=>{const tx=db.transaction("cache",mode);const request=action(tx.objectStore("cache")); tx.oncomplete=()=>resolve(request.result);tx.onabort=()=>reject(tx.error ?? new Error("storage"));tx.onerror=()=>{};}); }
-export const integrationStorage: CacheStorage = {
+const localStorage: CacheStorage = {
   async getItem(key) { return (await transaction("readonly",store=>store.get(key))) ?? null; },
   async setItem(key,value) { await transaction("readwrite",store=>store.put(value,key)); },
   async removeItem(key) { await transaction("readwrite",store=>store.delete(key)); },
 };
+
+import { remoteEnabled } from "@/lib/backend/profile";
+import { browserBackend } from "@/lib/backend/remote";
+export const integrationStorage: CacheStorage = remoteEnabled ? {
+ getItem: key => browserBackend.invoke("integrations.cache.get", [key], { domain: "integrations" }),
+ setItem: (key, value) => browserBackend.invoke("integrations.cache.set", [key, value], { domain: "integrations", write: true, key: args => args[0] }),
+ removeItem: key => browserBackend.invoke("integrations.cache.remove", [key], { domain: "integrations", write: true, key: args => args[0] }),
+} : localStorage;

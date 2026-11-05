@@ -1,3 +1,4 @@
+import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
 import { Pressable, View } from "react-native";
 import { Text } from "@/components/ui/themed-text";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
@@ -17,12 +18,12 @@ export function ServiceSourcePicker({ service }: { service: ServiceId }) {
   const current = sourceMode(settings, service);
   return (
     <View style={styles.body}>
-      <Text style={type.label}>{t("localSetup.storage")}</Text>
+      <Text style={type.label}>{remoteEnabled ? PHONE_ONLY : t("localSetup.storage")}</Text>
       <View style={styles.row}>
         {(["local", "nas", "both"] as const).map((mode) => (
           <Pressable
             key={mode}
-            disabled={busy}
+            disabled={busy || remoteEnabled}
             accessibilityRole="radio"
             accessibilityState={{ checked: current === mode }}
             style={[styles.choice, current === mode && styles.on]}

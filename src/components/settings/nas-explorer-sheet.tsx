@@ -1,3 +1,4 @@
+import {remoteEnabled} from "@/lib/backend/profile";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -82,7 +83,7 @@ export function NasExplorerSheet({
   const [entries, setEntries] = useState<WebDavEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const canBrowse = Boolean(settings.host.trim() && password);
+  const canBrowse = Boolean(settings.host.trim() && (password || remoteEnabled));
   const role = containingRole(path, libraries);
 
   async function load(target: string) {

@@ -1,7 +1,9 @@
+import { remoteEnabled } from "@/lib/backend/profile";
+import { browserBackend } from "@/lib/backend/remote";
 import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { collateLocale } from "@/lib/i18n/runtime";
-import type { NasSettings } from "@/lib/settings/storage";
-import { videoSourceSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
+import { videoSourceSettings } from "@/lib/settings/storage.impl";
 import { createVideoClient } from "@/lib/video/source";
 import { listLocalVideoShows } from "@/lib/local/local-video";
 import { extOf, toWebDavPath } from "@/lib/nas/webdav";
@@ -82,6 +84,7 @@ async function listFolder(
 }
 
 export async function listVideoShows(settings: NasSettings, password: string): Promise<VideoShow[]> {
+  if (remoteEnabled) return browserBackend.invoke("video.shows", [], { domain: "video" });
   const [series, movies, local] = await Promise.all([
     listFolder(settings, password, videoSeriesRoot(settings), "series").catch(() => []),
     listFolder(settings, password, videoMoviesRoot(settings), "movie").catch(() => []),

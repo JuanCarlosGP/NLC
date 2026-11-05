@@ -1,3 +1,4 @@
+import { remoteEnabled, phoneOnly } from "@/lib/backend/profile";
 import { t } from "@/lib/i18n/runtime";
 import { Platform } from "react-native";
 
@@ -49,6 +50,7 @@ function nameFromUri(uri: string): string {
 export async function pickLocalFolder(
   options: { writable?: boolean } = {},
 ): Promise<PickedFolder | null> {
+  if (remoteEnabled) phoneOnly();
   if (Platform.OS === "web") {
     const picker = (
       globalThis as {

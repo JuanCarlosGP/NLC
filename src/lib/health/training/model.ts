@@ -1,3 +1,4 @@
+import { phoneNow } from "../../backend/clock";
 import { isDateKey, localDateKey, shiftDateKey } from "../weight/model";
 
 export type TrainingSet = { id: string; weightKg: number | null; reps: number | null; warmup: boolean; completed: boolean };
@@ -12,14 +13,14 @@ export class TrainingValidationError extends Error {
   constructor(public code: TrainingErrorCode) { super(code); }
 }
 export function trainingId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  return `${phoneNow().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 export function newSet(): TrainingSet { return { id: trainingId(), weightKg: null, reps: null, warmup: false, completed: false }; }
 export function newExercise(name: string): TrainingExercise {
   return { id: trainingId(), name: name.trim(), restSec: 90, sets: [newSet(), newSet(), newSet()] };
 }
 export function newSession(name: string, date = localDateKey()): TrainingSession {
-  const now = Date.now();
+  const now = phoneNow();
   return validateSession({ id: trainingId(), name: name.trim(), date, note: "", startedAt: now, updatedAt: now, finishedAt: null, exercises: [] });
 }
 export function validateSession(session: TrainingSession): TrainingSession {
@@ -63,7 +64,7 @@ export function previousExercise(sessions: TrainingSession[], session: TrainingS
   }
   return null;
 }
-export function remainingRest(timer: RestTimer, now = Date.now()): number { return Math.max(0, Math.ceil((timer.endsAt - now) / 1000)); }
+export function remainingRest(timer: RestTimer, now = phoneNow()): number { return Math.max(0, Math.ceil((timer.endsAt - now) / 1000)); }
 export function clock(seconds: number): string { return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`; }
 export function validateRest(timer: RestTimer): RestTimer {
   if (!timer || typeof timer.sessionId !== "string" || typeof timer.exerciseName !== "string" || !Number.isFinite(timer.endsAt)) throw new TrainingValidationError("invalid");

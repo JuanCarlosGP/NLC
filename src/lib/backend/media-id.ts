@@ -1,0 +1,4 @@
+import { encodeBase64, decodeBase64 } from "@/lib/health/backup/base64";
+/** URL-safe opaque catalogue IDs; NanoHTTPD decodes percent escapes before routing. */
+export function encodeMediaId(id: string) { const bytes = new Uint8Array(encodeURIComponent(id).replace(/%([0-9A-F]{2})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16))).split("").map(char => char.charCodeAt(0))); return encodeBase64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+export function decodeMediaId(value: string) { if (!/^[A-Za-z0-9_-]{1,12000}$/.test(value)) throw new Error("invalid_media_id"); const raw = value.replace(/-/g, "+").replace(/_/g, "/"); const bytes = decodeBase64(raw.padEnd(Math.ceil(raw.length / 4) * 4, "=")); return decodeURIComponent(Array.from(bytes, byte => `%${byte.toString(16).padStart(2, "0")}`).join("")); }

@@ -1,7 +1,7 @@
 import {
   getTrackArtworkUrl,
   hydrateTrackArtworkCache,
-} from "@/lib/library/artwork-cache";
+} from "@/lib/library/artwork-cache.internal";
 import type { Track } from "@/lib/nas/types";
 
 /** Valid URL only — data: URIs crash expo-audio's Android URL parser and kill the session. */

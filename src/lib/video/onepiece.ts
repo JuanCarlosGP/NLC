@@ -1,5 +1,5 @@
-import type { NasSettings } from "@/lib/settings/storage";
-import { videoSourceSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
+import { videoSourceSettings } from "@/lib/settings/storage.impl";
 import { createVideoClient } from "@/lib/video/source";
 import type { VideoArc, VideoEpisode, VideoSaga } from "@/lib/video/types";
 import { extOf, toWebDavPath } from "@/lib/nas/webdav";

@@ -1,3 +1,4 @@
+import { remoteEnabled } from "@/lib/backend/profile";
 import { createMemoryDb } from "@/lib/db/memory";
 import { localDemoEnabled } from "@/lib/dev/local-demo";
 import type { CatalogDb } from "@/lib/db/types";
@@ -5,6 +6,7 @@ import type { CatalogDb } from "@/lib/db/types";
 let opened: Promise<CatalogDb> | null = null;
 
 export async function getDb(): Promise<CatalogDb> {
+  if (remoteEnabled) throw new Error("Remote NLC uses the phone backend; browser databases are disabled");
   if (localDemoEnabled) {
     const sqlite = await import("./sqlite-client");
     return sqlite.getDb();

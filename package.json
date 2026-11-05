@@ -1,6 +1,6 @@
 {
   "name": "nlc",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "private": true,
   "description": "Aplicación Android personal con bibliotecas locales o NAS, tareas, finanzas y salud.",
   "license": "SEE LICENSE IN LICENSE",
@@ -39,8 +39,8 @@
     "apk:check": "bash scripts/check-android-native.sh",
     "tui": "cargo run --manifest-path tui/Cargo.toml",
     "tui:test": "cargo test --manifest-path tui/Cargo.toml",
-    "update:preview": "npx eas-cli update --channel preview && node scripts/notify-ota.mjs preview",
-    "update:production": "npx eas-cli update --channel production && node scripts/notify-ota.mjs production",
+    "update:preview": "npm run web:package && npx eas-cli update --channel preview && node scripts/notify-ota.mjs preview",
+    "update:production": "npm run web:package && npx eas-cli update --channel production && node scripts/notify-ota.mjs production",
     "apk:release": "node scripts/release-apk.mjs",
     "ios": "expo run:ios",
     "test:health": "node scripts/test-health-weight.cjs",
@@ -59,7 +59,13 @@
     "test:mercury-mobile": "node --test scripts/test-mercury-mobile.cjs",
     "test:service-backup": "node --test scripts/test-service-backup.cjs",
     "test:local-folders": "node --test scripts/test-local-folders.cjs",
-    "test:local-move": "node --test scripts/test-local-move.cjs"
+    "test:local-move": "node --test scripts/test-local-move.cjs",
+    "web:package": "node scripts/build-phone-web.mjs",
+    "eas-build-post-install": "npm run web:package",
+    "eas-update-on-export": "npm run web:package",
+    "test:phone-backend": "node scripts/test-phone-backend.cjs",
+    "prestart": "node scripts/ensure-phone-web.mjs",
+    "preandroid": "npm run web:package"
   },
   "dependencies": {
     "@expo-google-fonts/figtree": "^0.4.1",

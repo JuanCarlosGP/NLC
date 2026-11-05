@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { NasSettings, ServiceId } from "@/lib/settings/storage";
+import type { NasSettings, ServiceId } from "@/lib/settings/storage.impl";
 type Listener = (service: ServiceId, settings: NasSettings) => void;
 const listeners = new Set<Listener>();
 let revision = 0;

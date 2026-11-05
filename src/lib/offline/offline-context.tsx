@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   clearOfflineFiles,
@@ -37,7 +38,7 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || Platform.OS === "android") return;
     setOfflineResolver((trackId) => source.streamUrl(trackId));
     return () => setOfflineResolver(null);
   }, [ready, source]);
