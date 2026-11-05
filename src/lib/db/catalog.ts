@@ -1,3 +1,4 @@
+import { localMoveLocked } from "@/lib/local/move-lock";
 import { getDb, runInTransaction } from "@/lib/db/client";
 import { migrateLegacyIfNeeded } from "@/lib/db/migrate-legacy";
 import type { CatalogDb } from "@/lib/db/types";
@@ -246,6 +247,7 @@ export async function upsertLocalLibrary(
   const db = await ready();
   const seen = new Set(index.tracks.map((track) => track.id));
   await runInTransaction(db, async () => {
+    if (await localMoveLocked(db)) return;
     // A scan started before a source change must not reinsert media from the old folder.
     if (/^local(?:pod)?:.+/.test(prefix)) {
       const stored = await db.getFirstAsync<{ value: string }>("SELECT value FROM meta WHERE key = 'nas_settings'");

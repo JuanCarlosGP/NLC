@@ -1,3 +1,4 @@
+import { localMoveLocked, withLocalSourceSync } from "@/lib/local/move-lock";
 import { serviceImportEpoch } from "@/lib/service-backup/epochs";
 import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { t } from "@/lib/i18n/runtime";
@@ -34,7 +35,7 @@ function focusDavPath(settings: NasSettings): string {
   return joinPath(conn.sharePath, FOCUS_FILE);
 }
 
-async function dumpFocus(): Promise<FocusDump> {
+export async function dumpFocus(): Promise<FocusDump> {
   const [{ projects, tasks }, reminders] = await Promise.all([dumpProductivity(), listReminders()]);
   let updatedAt = await serviceImportEpoch("focus");
   for (const rows of [projects, tasks, reminders]) for (const row of rows) updatedAt = Math.max(updatedAt, row.createdAt, "updatedAt" in row ? row.updatedAt : 0);
@@ -78,7 +79,8 @@ function isLocalEmpty(dump: FocusDump): boolean {
   return dump.tasks.length === 0 && extraProjects.length === 0 && dump.reminders.length === 0;
 }
 
-export async function pullFocusFromSources(settings: NasSettings, password: string): Promise<boolean> {
+async function pullFocusFromSourcesUnlocked(settings: NasSettings, password: string): Promise<boolean> {
+  if (await localMoveLocked()) return false;
   const local = await dumpFocus();
   const remoteNas = await readNasFocus(settings, password);
   const remoteFolder = usesLocal(settings, "focus") && settings.focusLocalFolderUri
@@ -87,12 +89,15 @@ export async function pullFocusFromSources(settings: NasSettings, password: stri
   const incoming = pickNewer(remoteNas, remoteFolder);
   if (!incoming) return false;
   if (!isLocalEmpty(local) && incoming.updatedAt <= local.updatedAt) return false;
+  if (await localMoveLocked()) return false;
   await replaceFocus(incoming);
   return true;
 }
 
-export async function pushFocusToSources(settings: NasSettings, password: string): Promise<string | null> {
+async function pushFocusToSourcesUnlocked(settings: NasSettings, password: string): Promise<string | null> {
+  if (await localMoveLocked()) return null;
   const dump = { ...(await dumpFocus()), updatedAt: Date.now() };
+  if (await localMoveLocked()) return null;
   const writes: Promise<void>[] = [];
   if (usesLocal(settings, "focus") && settings.focusLocalFolderUri) {
     writes.push(writeLocalFocusFile(settings.focusLocalFolderUri, dump));
@@ -111,4 +116,12 @@ export async function pushFocusToSources(settings: NasSettings, password: string
     }
   }
   return errors[0] ?? null;
+}
+
+export function pullFocusFromSources(settings: NasSettings, password: string): Promise<boolean> {
+  return withLocalSourceSync(() => pullFocusFromSourcesUnlocked(settings, password));
+}
+
+export function pushFocusToSources(settings: NasSettings, password: string): Promise<string | null> {
+  return withLocalSourceSync(() => pushFocusToSourcesUnlocked(settings, password));
 }

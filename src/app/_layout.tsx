@@ -1,3 +1,4 @@
+import { LocalMoveRecovery } from "@/components/settings/local-move-sheet";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { IntegrationsProvider } from "@/lib/integrations/integrations-context";
 import { createStyles } from "@/lib/appearance/density";
@@ -98,6 +99,7 @@ export default function RootLayout() {
         <BridgeHost>
         <LocaleProvider>
         <OtaBootstrap />
+        <LocalMoveRecovery />
         <OnboardingGate>
         <IntegrationsProvider>
         <ZoneProvider>

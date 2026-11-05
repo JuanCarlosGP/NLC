@@ -1,3 +1,4 @@
+import { LocalMoveSheet } from "@/components/settings/local-move-sheet";
 import { ServiceSourcePicker } from "@/components/settings/service-source-picker";
 import { usesNas, usesLocal } from "@/lib/settings/service-source";
 import { healthSourceSettings, applyHealthSourceSettings } from "@/lib/settings/storage";
@@ -57,6 +58,7 @@ export default function SettingsScreen() {
   const projects = useActiveProjects();
   const [clearOpen, setClearOpen] = useState(false);
   const [clearBusy, setClearBusy] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const { t, locale, setLocale } = useI18n();
   const { settings, setSettings, password, setPassword, feedback, connected, videoConnected, wealthConnected, focusConnected } = nas;
   const [configOpen, setConfigOpen] = useState(false);
@@ -538,6 +540,9 @@ export default function SettingsScreen() {
           />
           <View style={styles.divider} />
           <SettingsRow title={t("serviceBackup.openSettings")} summary={`${t(`zones.${zone}`)} · ${t("serviceBackup.settingsHint")}`} onPress={() => router.push({ pathname: "/service-backup", params: { service: zone } } as Href)} />
+          <View style={styles.divider} />
+          <SettingsRow title={t("localMove.title")} summary={settings.localRootFolderName || t("localSetup.generalFolder")} onPress={() => setMoveOpen(true)} />
+          {moveOpen ? <LocalMoveSheet onClose={() => setMoveOpen(false)}/> : null}
           <AppearancePicker />
           <View style={styles.divider} />
           {usesNas(settings, zone) ? <SettingsRow

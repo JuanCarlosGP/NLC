@@ -63,7 +63,7 @@ async function walkNative(
     if (depth === 0) throw new Error(t("nasExtra.localRead"));
     return;
   }
-  if (children.some(child => nameFromUri(child).startsWith(".nlc-importing-"))) { state.complete = false; return; }
+  if (children.some(child => /^[.]nlc-(importing|moving)-/.test(nameFromUri(child)))) { state.complete = false; return; }
   for (const child of children) {
     if (files.length > 8000) { state.complete = false; return; }
     const name = nameFromUri(child);

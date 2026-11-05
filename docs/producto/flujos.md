@@ -13,6 +13,20 @@ Si eliges NAS, el asistente muestra **Qué necesitas**, Conectar, Carpetas y el 
 
 En el recorrido **En este teléfono → Tus carpetas**, pulsar **Carpeta general**, elegir una ubicación y conceder acceso. NLC prepara las seis subcarpetas y muestra las rutas en las tarjetas de cada servicio. Se pueden modificar individualmente antes de continuar. Volver a elegir la misma carpeta reutiliza los directorios; no mueve ni borra los archivos existentes.
 
+## Trasladar archivos existentes
+
+Desde **Tus carpetas**, después de elegir la carpeta general, o desde **Ajustes → App → Trasladar archivos existentes**:
+
+1. Elegir el destino y pulsar **Revisar traslado**. El inventario incluye el contenido de las carpetas locales configuradas y los archivos descargados registrados en NLC; no lee ni borra originales del NAS.
+2. Revisar los orígenes, el número de archivos y el espacio que se copiará. Confirmar **Trasladar archivos**. La app pausa las descargas y la reproducción durante el proceso.
+3. NLC copia por bloques, conserva ambas versiones si coincide un nombre y comprueba SHA-256. Guarda las seis rutas, las identidades multimedia, las carátulas, los favoritos, los recientes, las listas y el progreso de vídeo en una única transacción.
+4. Solo después de confirmar esa transacción vuelve a comprobar las copias y los originales antes de retirar estos últimos. Conserva los archivos que hayan cambiado o no pueda verificar. Los espejos anteriores de listas, tareas y finanzas se guardan con otro nombre antes de escribir el estado actual.
+5. **Detener de forma segura** conserva un traslado pendiente; al abrir NLC se puede continuar. Antes de guardar las rutas se puede cancelar sin retirar originales. Después de guardarlas, se continúa la limpieza; si algún original debe conservarse por seguridad, se ofrece conservarlo y terminar.
+
+Si se pierde un permiso, **Renovar acceso a una carpeta** permite volver a concederlo con el selector; después se puede continuar.
+
+Los registros privados de Tareas, Finanzas y Salud y las fotos corporales permanecen en NLC. La carpeta `Health` recibe los archivos que ya hubiera en la carpeta configurada (por ejemplo, copias ZIP), no una exportación automática de las fotos privadas. Requiere APK **0.1.20 (22)** o posterior y un destino en el teléfono o en la SD concedido con el selector de Android. Límites: 50.000 archivos, 512 GiB y 32 MiB de metadatos, sujetos al espacio libre. Una copia parcial o editada que no pueda eliminarse con seguridad se conserva; no se sobrescriben archivos ajenos.
+
 ## Exportar e importar un servicio
 
 1. Elegir el servicio y entrar en **Ajustes → App → Exportar / importar servicio**.

@@ -1,3 +1,5 @@
+import { onLocalMoveLock } from "@/lib/local/move-lock";
+import { onLocalMoveRemap } from "@/lib/local/move/service";
 import {
   createContext,
   useCallback,
@@ -112,6 +114,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   loadedRef.current = status.isLoaded;
 
   const current = queue[index] ?? null;
+  useEffect(() => onLocalMoveLock(active => { if (active) { lockScreenGenRef.current++; player.pause(); } }), [player]);
+  useEffect(() => onLocalMoveRemap((ids, uris) => {
+    player.pause();
+    setQueue(rows => rows.map(track => ({ ...track, id: ids.get(track.id) ?? track.id, coverId: track.coverId ? uris.get(track.coverId) ?? track.coverId : track.coverId, artworkUrl: track.artworkUrl ? uris.get(track.artworkUrl) ?? track.artworkUrl : track.artworkUrl })));
+    // Reload the relocated URI when playback resumes; keep queue order and position.
+    const track = queueRef.current[indexRef.current];
+    const id = track && ids.get(track.id);
+    const position = currentTimeRef.current;
+    if (id) void getLocalUri(id).then(uri => { if (uri) { player.replace({ uri }); void player.seekTo(position); } }).catch(() => {});
+  }), [player]);
+
 
   useEffect(() => {
     void setAudioModeAsync({
