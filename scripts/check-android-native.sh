@@ -15,6 +15,7 @@ fi
 
 cd "$root"
 export CI=1
+npm run web:package
 npx expo prebuild --platform android --no-install
 
 if ! npx expo-modules-autolinking resolve --platform android 2>/dev/null | grep -q "nlc-lan-bridge"; then

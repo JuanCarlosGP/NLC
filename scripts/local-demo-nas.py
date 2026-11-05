@@ -172,7 +172,7 @@ def serve(root, port):
                     folder.mkdir(parents=True, exist_ok=True)
                     dest = folder / f'{job_id} - Descarga de prueba.mp3'
                     shutil.copyfile(root / '.fixture.mp3', dest)
-                    job.update(status='done', progress=100, filename=str(dest.relative_to(root)))
+                    job.update(status='done', progress=100, filename=dest.name)
                 threading.Timer(2, finish).start()
                 return {'id': job_id, 'status': 'queued'}
             if self.path == '/download': return self.reply(enqueue(body))

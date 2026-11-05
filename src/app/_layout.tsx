@@ -1,3 +1,8 @@
+import { setEditPath } from "@/lib/backend/edit-drafts";
+import { usePathname } from "expo-router";
+import { WebHostBootstrap } from "@/lib/backend/host-bootstrap";
+import { MediaDestination } from "@/components/player/media-destination";
+import { RemoteGate } from "@/lib/backend/remote-gate";
 import { LocalMoveRecovery } from "@/components/settings/local-move-sheet";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { IntegrationsProvider } from "@/lib/integrations/integrations-context";
@@ -73,6 +78,8 @@ const fonts = {
 };
 
 export default function RootLayout() {
+  const editPath = usePathname();
+  useEffect(() => setEditPath(editPath), [editPath]);
   useThemeId();
   const [loaded] = useFonts(fonts);
   const [timedOut, setTimedOut] = useState(false);
@@ -93,12 +100,14 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
+    <RemoteGate>
     <AppearanceProvider>
     <SafeAreaProvider>
       <SettingsProvider>
         <BridgeHost>
         <LocaleProvider>
         <OtaBootstrap />
+        <WebHostBootstrap />
         <LocalMoveRecovery />
         <OnboardingGate>
         <IntegrationsProvider>
@@ -120,6 +129,7 @@ export default function RootLayout() {
         <SpotifyProvider>
           <FavoritesProvider>
             <PlayerProvider>
+              <MediaDestination />
               <PlayerUiProvider>
                 <TrackActionsProvider>
                 <VideoActionsProvider>
@@ -215,6 +225,7 @@ export default function RootLayout() {
       </SettingsProvider>
     </SafeAreaProvider>
     </AppearanceProvider>
+    </RemoteGate>
     </ErrorBoundary>
   );
 }

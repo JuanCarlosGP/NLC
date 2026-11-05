@@ -1,3 +1,4 @@
+import { phoneNow } from "../../backend/clock";
 import { isDateKey, localDateKey } from "../weight/model";
 
 export const BODY_POSES = ["front", "left", "right", "back"] as const;
@@ -12,7 +13,7 @@ export type BodyReview = {
 };
 export type BodyErrorCode = "date" | "future" | "note" | "type" | "size" | "dimensions" | "conflict" | "missing" | "invalid" | "unsupported" | "nativeUpdate";
 export class BodyPhotoError extends Error { constructor(public code: BodyErrorCode) { super(code); } }
-export function bodyId(): string { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`; }
+export function bodyId(): string { return `${phoneNow().toString(36)}-${Math.random().toString(36).slice(2, 12)}`; }
 export function validBodyId(id: string): boolean { return typeof id === "string" && /^[\w-]{1,100}$/.test(id); }
 export function photoExtension(mime: PhotoMime): string { return mime === "image/jpeg" ? "jpg" : mime === "image/png" ? "png" : "webp"; }
 export function detectPhotoMime(bytes: Uint8Array): PhotoMime {

@@ -1,12 +1,13 @@
+import { inBackendTransaction } from "@/lib/backend/transaction-scope";
 import { openDatabaseAsync } from "expo-sqlite";
 import { Platform } from "react-native";
-import { SCHEMA_SQL } from "@/lib/db/schema";
+import { SCHEMA_SQL, BACKEND_TRIGGER_SQL } from "@/lib/db/schema";
 import type { CatalogDb } from "@/lib/db/types";
 
 import { localDemoEnabled } from "@/lib/dev/local-demo";
 
 const DB_NAME = localDemoEnabled ? "nlc-local-demo.db" : "nlc-catalog.db";
-const SCHEMA_VERSION = "11";
+const SCHEMA_VERSION = "12";
 
 let opened: Promise<CatalogDb> | null = null;
 
@@ -41,6 +42,7 @@ async function boot(db: CatalogDb): Promise<CatalogDb> {
   // The OPFS VFS used by Expo's web worker supports rollback journals, not WAL.
   await db.getFirstAsync(Platform.OS === "web" ? "PRAGMA journal_mode = DELETE" : "PRAGMA journal_mode = WAL");
   await db.getFirstAsync("PRAGMA foreign_keys = ON");
+  await db.execAsync("PRAGMA busy_timeout = 5000");
 
   let current: string | undefined;
   try {
@@ -51,6 +53,7 @@ async function boot(db: CatalogDb): Promise<CatalogDb> {
   }
 
   await execStatements(db, SCHEMA_SQL);
+  for (const trigger of BACKEND_TRIGGER_SQL) await db.execAsync(trigger);
   await ensureWealthAssetAccountColumn(db);
   await db.execAsync("CREATE INDEX IF NOT EXISTS wealth_assets_account ON wealth_assets(account_id)");
   if (current !== SCHEMA_VERSION) {
@@ -89,6 +92,7 @@ export async function runInTransaction<T = void>(
   db: CatalogDb,
   task: () => Promise<T>,
 ): Promise<T> {
+  if (inBackendTransaction(db)) return task();
   const previous = txQueue;
   let resolveCurrent!: () => void;
   txQueue = new Promise<void>((resolve) => {

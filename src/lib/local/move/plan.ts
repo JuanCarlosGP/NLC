@@ -5,7 +5,7 @@ import {
   localFolder,
   sourceMode,
 } from "@/lib/settings/service-source";
-import type { NasSettings, ServiceId } from "@/lib/settings/storage";
+import type { NasSettings, ServiceId } from "@/lib/settings/storage.impl";
 import type { MoveMetadata } from "./native";
 export function moveFingerprint(settings: NasSettings) {
   return JSON.stringify([

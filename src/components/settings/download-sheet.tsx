@@ -1,3 +1,4 @@
+import {useCredentialState} from "@/lib/backend/use-credential-state";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
@@ -96,6 +97,7 @@ export function DownloadSheet({
 function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: AppZone }) {
   useThemeId();
   const { t } = useI18n();
+  const credentialState=useCredentialState();
   const { settings, setSettings, token, setToken, busy, feedback, job, persist, testConnection, enqueue } =
     download;
   const [url, setUrl] = useState("");
@@ -181,7 +183,7 @@ function DownloadSheetBody({ download, zone }: { download: DownloadHook; zone?: 
                 onChange={setToken}
                 secure
                 autoCapitalize="none"
-                placeholder={t("downloadSheet.tokenOptional")}
+                placeholder={credentialState?.downloader ? "Guardado en el móvil" : t("downloadSheet.tokenOptional")}
               />
               <View style={styles.actions}>
                 <Pressable

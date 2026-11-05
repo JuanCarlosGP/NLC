@@ -1,3 +1,5 @@
+import { remoteEnabled } from "@/lib/backend/profile";
+import { onBackendChange, hasRemoteDraft } from "@/lib/backend/remote";
 import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
@@ -158,6 +160,8 @@ export function WealthProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }, []);
 
+  useEffect(() => onBackendChange(domain => { if ((domain === "wealth" || domain === "*") && !hasRemoteDraft()) void refresh().catch(() => {}); }), [refresh]);
+
   useEffect(() => onServiceImport((service, next) => { if (service === "wealth") void refresh().then(() => pushWealthToSources(next, passwordRef.current)).catch(() => {}); }), [refresh]);
 
   useEffect(() => onWealthStoreChanged(() => {
@@ -165,6 +169,7 @@ export function WealthProvider({ children }: { children: ReactNode }) {
   }), [refresh]);
 
   const mirror = useCallback(async () => {
+    if (remoteEnabled) return;
     try {
       await pushWealthToSources(settingsRef.current, passwordRef.current);
     } catch {
@@ -180,7 +185,7 @@ export function WealthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void (async () => {
       try {
-        if (settingsReady) {
+        if (settingsReady && !remoteEnabled) {
           await pullWealthFromSources(settings, password);
         }
         if (!cancelled) await refresh();

@@ -1,3 +1,6 @@
+import { ControlledVideo } from "@/components/player/controlled-video";
+import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
+import { Platform } from "react-native";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -106,7 +109,7 @@ function WatchChrome({
   );
 }
 
-function EpisodePlayer({
+function LegacyEpisodePlayer({
   source,
   path,
   startAt,
@@ -237,6 +240,8 @@ function EpisodePlayer({
   );
 }
 
+const EpisodePlayer = Platform.OS === "android" || remoteEnabled ? ControlledVideo : LegacyEpisodePlayer;
+
 export default function WatchScreen() {
   useThemeId();
   const router = useRouter();
@@ -321,7 +326,8 @@ export default function WatchScreen() {
   }, [current, settings, password]);
 
   useEffect(() => {
-    pause();
+    // The shared controller pauses the previous session when video is ready.
+    if (Platform.OS !== "android" && !remoteEnabled) pause();
   }, [pause]);
 
   useEffect(() => {
@@ -442,18 +448,23 @@ export default function WatchScreen() {
             </Text>
           ) : null}
         </View>
+        <View style={{ alignItems: "center", maxWidth: 156 }}>
         <Pressable
+          disabled={remoteEnabled}
           accessibilityRole="button"
           accessibilityLabel={landscape ? t("watch.portrait") : t("watch.landscape")}
-          accessibilityState={{ selected: landscape }}
+          accessibilityHint={remoteEnabled ? PHONE_ONLY : undefined}
+          accessibilityState={{ selected: landscape, disabled: remoteEnabled }}
           onPress={() => {
             triggerUiHaptic();
             toggleLandscape();
           }}
           style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.7 : 1 }]}
         >
-          <RotateCw color={landscape ? colors.accent : colors.ink} size={22} strokeWidth={2} />
+          <RotateCw color={remoteEnabled ? colors.muted : landscape ? colors.accent : colors.ink} size={22} strokeWidth={2} />
         </Pressable>
+        {remoteEnabled && <Text style={styles.headSub}>{PHONE_ONLY}</Text>}
+        </View>
         {nextEpisode ? (
           <Pressable
             accessibilityLabel={t("watch.next")}

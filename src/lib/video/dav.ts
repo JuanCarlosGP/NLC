@@ -1,7 +1,7 @@
 import { t } from "@/lib/i18n/runtime";
 import { Platform } from "react-native";
-import type { NasSettings } from "@/lib/settings/storage";
-import { nasBaseUrl, videoSourceSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
+import { nasBaseUrl, videoSourceSettings } from "@/lib/settings/storage.impl";
 import type { PlayableSource } from "@/lib/nas/types";
 import { createDavAuthSession } from "@/lib/nas/dav-auth";
 import {

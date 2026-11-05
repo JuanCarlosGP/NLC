@@ -1,7 +1,9 @@
+import { remoteEnabled } from "@/lib/backend/profile";
+import { browserBackend } from "@/lib/backend/remote";
 import type { ProdReminder } from "@/lib/reminders/types";
 
 export async function ensureReminderPermission(_prompt = false): Promise<boolean> {
-  return false;
+  return remoteEnabled ? browserBackend.invoke("notifications.permission",[],{domain:"notifications"}) : false;
 }
 
 export async function syncReminderNotification(_reminder: ProdReminder, _prompt = false): Promise<void> {}

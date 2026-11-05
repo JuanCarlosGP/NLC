@@ -1,5 +1,6 @@
 package app.nlc.lanbridge
 
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import java.util.concurrent.ConcurrentHashMap
@@ -23,6 +24,14 @@ class PendingStream(
 }
 
 class NlcLanBridgeModule : Module() {
+  private val ioJobs = ConcurrentHashMap.newKeySet<String>()
+  private val ioExecutor = java.util.concurrent.ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS, java.util.concurrent.ArrayBlockingQueue<Runnable>(16))
+  private fun archiveIo(promise: Promise, job: String = "", work: () -> Any?) {
+    if (job.isNotBlank()) ioJobs.add(job)
+    try {
+      ioExecutor.execute { try { promise.resolve(work()) } catch (error: Exception) { promise.reject("archive", error.message ?: "storage", error) } finally { ioJobs.remove(job) } }
+    } catch (error: java.util.concurrent.RejectedExecutionException) { ioJobs.remove(job); promise.reject("busy", "busy", error) }
+  }
   private class ArchiveAuth(val job: String, val latch: CountDownLatch = CountDownLatch(1)) { @Volatile var headers: String? = null }
   private val archiveAuth = ConcurrentHashMap<String, ArchiveAuth>()
   private fun requestArchiveAuth(job: String, uri: String, retry: Boolean): org.json.JSONObject {
@@ -35,22 +44,70 @@ class NlcLanBridgeModule : Module() {
   }
   override fun definition() = ModuleDefinition {
     Name("NlcLanBridge")
+    AsyncFunction("pendingServiceCommits") { ServiceArchive.pendingCommits(appContext.reactContext ?: error("storage")) }
+    AsyncFunction("finishServiceCommit") { job: String, keep: Boolean -> ServiceArchive.finishCommit(appContext.reactContext ?: error("storage"), job, keep) }
+
+    AsyncFunction("interruptedWebTransfers") { PhoneWebTransfers.interrupted(appContext.reactContext ?: error("storage")) }
+    Function("usesHeadlessBackend") { true }
+    AsyncFunction("installWebPackage") { uri: String -> PhoneWebPackage.install(appContext.reactContext ?: error("storage"), uri) }
+    AsyncFunction("startWebInterface") { directory: String, bundle: String ->
+      val ctx = appContext.reactContext ?: error("storage")
+      val root = java.io.File(directory).canonicalFile
+      require(root.parentFile == java.io.File(ctx.filesDir, "phone-web").canonicalFile && root.name == bundle && java.io.File(root, "index.html").isFile)
+      PhoneWebRuntime.start(ctx, root, bundle)
+      mapOf("running" to PhoneWebRuntime.running(), "port" to 7682, "lanAddress" to LanBridgeServer.lanAddress())
+    }
+    AsyncFunction("stopWebInterface") { appContext.reactContext?.let { PhoneWebService.stop(it) } }
+    Function("webInterfaceState") { mapOf("enabled" to (appContext.reactContext?.getSharedPreferences(PhoneWebService.PREFS, android.content.Context.MODE_PRIVATE)?.getBoolean("enabled", false) ?: false), "running" to PhoneWebRuntime.running(), "bundleId" to PhoneWebRuntime.server?.bundle, "port" to 7682, "lanAddress" to LanBridgeServer.lanAddress(), "batteryExempt" to (appContext.reactContext?.let { PhoneWebService.battery(it) } ?: false), "tuiRunning" to WebTuiProcess.running()) }
+    Function("readWebRequestBody") { id:String -> PhoneWebRuntime.requestBody(id) }
+    Function("resolveWebRequest") { id: String, json: String -> PhoneWebRuntime.resolve(id, json) }
+    Function("publishWebEvent") { json: String -> PhoneWebRuntime.publish(json) }
+    Function("openWebBatterySettings") { appContext.reactContext?.let { PhoneWebService.openBattery(it) } }
+    Function("startWebChat") { body: String ->
+      require(body.length < 20000)
+      val ctx = appContext.reactContext ?: error("storage")
+      ctx.startService(android.content.Intent(ctx, PhoneWebBackendService::class.java).putExtra("requestId", java.util.UUID.randomUUID().toString()).putExtra("method", "CHAT").putExtra("path", "chat").putExtra("body", body))
+    }
+    Function("startWebJob") { id: String, action: String ->
+      require(Regex("[a-zA-Z0-9_-]{16,80}").matches(id) && action in listOf("preview", "restore", "export", "health-inspect", "health-restore", "health-export", "health-recovery", "track-audio-replace", "mercury-sync"))
+      val ctx = appContext.reactContext ?: error("storage")
+      ctx.startService(android.content.Intent(ctx, PhoneWebBackendService::class.java).putExtra("requestId", id).putExtra("method", "JOB").putExtra("path", action).putExtra("body", ""))
+    }
+    AsyncFunction("inspectWebPhoto") { id: String ->
+      val ctx = appContext.reactContext ?: error("storage")
+      val file = PhoneWebTransfers.file(ctx, id)
+      val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+      android.graphics.BitmapFactory.decodeFile(file.path, options)
+      require(options.outWidth in 1..1800 && options.outHeight in 1..1800 && options.outMimeType in listOf("image/jpeg", "image/png", "image/webp")) { "invalid_photo" }
+      mapOf("width" to options.outWidth, "height" to options.outHeight, "mime" to options.outMimeType, "bytes" to file.length().toDouble())
+    }
+    AsyncFunction("createEmptyWebTransfer") { id:String,name:String -> PhoneWebTransfers.createEmpty(appContext.reactContext ?: error("storage"),id,name) }
+    AsyncFunction("readWebTransferRecord") { id:String -> PhoneWebTransfers.read(appContext.reactContext ?: error("storage"),id).toString() }
+    AsyncFunction("cancelWebTransfer") { id:String -> PhoneWebTransfers.cancelJob(appContext.reactContext ?: error("storage"),id).toString() }
+    AsyncFunction("commitWebTransfer") { id:String -> PhoneWebTransfers.claimCommit(appContext.reactContext ?: error("storage"),id) }
+    AsyncFunction("webTransferInfo") { id: String -> PhoneWebTransfers.resolve(appContext.reactContext ?: error("storage"), id) }
+    AsyncFunction("updateWebTransfer") { id: String, json: String -> PhoneWebTransfers.update(appContext.reactContext ?: error("storage"), id, json) }
+
     Events("onBridgeRequest", "onBridgeUnlinked", "onBridgeClaimed", "onDownloadWatchFinished", "onServiceArchiveProgress", "onServiceArchiveAuth", "onLocalMoveProgress")
 
     Function("cancelServiceArchive") { job: String -> ServiceArchive.cancel(job); archiveAuth.values.filter { it.job == job }.forEach { it.latch.countDown() } }
     Function("resolveServiceArchiveAuth") { id: String, headers: String -> archiveAuth[id]?.let { it.headers = headers; it.latch.countDown() } }
-    AsyncFunction("listServiceFolder") { uri: String ->
-      ServiceArchive.list(appContext.reactContext ?: error("storage"), uri)
-    }
-    AsyncFunction("exportServiceArchive") { plan: String ->
+    AsyncFunction("listServiceFolder") { uri: String, promise: Promise ->
       val ctx = appContext.reactContext ?: error("storage")
-      ServiceArchive.export(ctx, plan, { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files)) }, { job, uri, retry -> requestArchiveAuth(job, uri, retry) })
+      archiveIo(promise) { ServiceArchive.list(ctx, uri) }
     }
-    AsyncFunction("prepareServiceArchive") { uri: String, job: String ->
-      ServiceArchive.prepare(appContext.reactContext ?: error("storage"), uri, job) { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files)) }
+    AsyncFunction("exportServiceArchive") { plan: String, promise: Promise ->
+      val ctx = appContext.reactContext ?: error("storage")
+      val job = org.json.JSONObject(plan).optString("job")
+      archiveIo(promise, job) { ServiceArchive.export(ctx, plan, { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files, "job" to job)) }, { id, uri, retry -> requestArchiveAuth(id, uri, retry) }) }
     }
-    AsyncFunction("commitServiceFiles") { id: String, destination: String, job: String ->
-      ServiceArchive.commit(appContext.reactContext ?: error("storage"), id, destination, job) { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files)) }
+    AsyncFunction("prepareServiceArchive") { uri: String, job: String, promise: Promise ->
+      val ctx = appContext.reactContext ?: error("storage")
+      archiveIo(promise, job) { ServiceArchive.prepare(ctx, uri, job) { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files, "job" to job)) } }
+    }
+    AsyncFunction("commitServiceFiles") { id: String, destination: String, job: String, promise: Promise ->
+      val ctx = appContext.reactContext ?: error("storage")
+      archiveIo(promise, job) { ServiceArchive.commit(ctx, id, destination, job) { bytes, files -> sendEvent("onServiceArchiveProgress", mapOf("bytes" to bytes.toDouble(), "files" to files, "job" to job)) } }
     }
     AsyncFunction("discardServiceStage") { id: String -> ServiceArchive.discard(appContext.reactContext ?: error("storage"), id) }
 
@@ -68,6 +125,7 @@ class NlcLanBridgeModule : Module() {
     }
 
     OnDestroy {
+      ioJobs.forEach { ServiceArchive.cancel(it) }; ioExecutor.shutdownNow()
       archiveAuth.values.forEach { it.latch.countDown() }
       archiveAuth.clear()
       if (instance === this@NlcLanBridgeModule) instance = null
@@ -209,16 +267,9 @@ class NlcLanBridgeModule : Module() {
   }
 
   private fun emitRequest(reqId: String, method: String, path: String, query: String, range: String?) {
-    sendEvent(
-      "onBridgeRequest",
-      mapOf(
-        "id" to reqId,
-        "method" to method,
-        "path" to path,
-        "query" to query,
-        "range" to range,
-      ),
-    )
+    val ctx = appContext.reactContext ?: return
+    val body = org.json.JSONObject().put("id", reqId).put("method", method).put("path", path).put("query", query).put("range", range).toString()
+    ctx.startService(android.content.Intent(ctx, PhoneWebBackendService::class.java).putExtra("requestId", reqId).putExtra("method", "BRIDGE").putExtra("path", path).putExtra("body", body))
   }
 
   companion object {

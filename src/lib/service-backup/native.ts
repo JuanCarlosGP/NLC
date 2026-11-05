@@ -13,7 +13,7 @@ export type ArchiveStage = {
   files: Record<string, { uri: string; bytes: number }>;
   bytes: number;
 };
-export type ArchiveProgress = { bytes: number; files: number };
+export type ArchiveProgress = { bytes: number; files: number; job?: string };
 export type ArchiveAuthorizer = (
   uri: string,
   retry: boolean,
@@ -26,6 +26,8 @@ type ArchiveAuthRequest = {
   retry: boolean;
 };
 type Native = {
+  pendingServiceCommits?(): Promise<string>;
+  finishServiceCommit?(job:string,keep:boolean): Promise<void>;
   resolveServiceArchiveAuth(id: string, headers: string): void;
   listServiceFolder(uri: string): Promise<string>;
   exportServiceArchive(plan: string): Promise<string>;
@@ -149,3 +151,6 @@ export function cancelArchive(job: string) {
 export function assertArchiveAvailable() {
   native();
 }
+
+export async function pendingArchiveCommits(): Promise<string[]> {return JSON.parse(await native().pendingServiceCommits?.() ?? "[]");}
+export async function finishArchiveCommit(job:string,keep:boolean) {await native().finishServiceCommit?.(job,keep);}

@@ -1,3 +1,4 @@
+import { onBackendChange, hasRemoteDraft } from "@/lib/backend/remote";
 import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { bodyStore } from "./storage";
@@ -17,6 +18,8 @@ export function BodyPhotosProvider({ children }: { children: ReactNode }) {
     catch { if (requested === revision.current) setLoadFailed(true); }
     finally { setReady(true); }
   }, []);
+  useEffect(() => onBackendChange(domain => { if ((domain === "body" || domain === "*") && !hasRemoteDraft()) void refresh().catch(() => {}); }), [refresh]);
+
   useEffect(() => onServiceImport(service => { if (service === "health") void refresh().catch(() => {}); }), [refresh]);
 
   useEffect(() => { void refresh(); }, [refresh]);

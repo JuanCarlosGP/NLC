@@ -390,6 +390,7 @@ impl App {
             start_sec,
             &client.stream_url(&track.id),
             &client.auth_header(),
+            &self.queue.iter().take(10000).map(|track| track.id.clone()).collect::<Vec<_>>(),
         ) {
             Ok(player) => {
                 self.status = if is_video {

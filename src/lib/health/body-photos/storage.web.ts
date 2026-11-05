@@ -32,4 +32,18 @@ const persistence: BodyPersistence = {
     const uri = URL.createObjectURL(row.blob); return { uri, dispose() { URL.revokeObjectURL(uri); } };
   },
 };
-export const bodyStore = coordinatedHealthStore(createBodyStore(persistence));
+const local = coordinatedHealthStore(createBodyStore(persistence));
+
+import { remoteEnabled } from "@/lib/backend/profile";
+import { exposeStore } from "@/lib/backend/registry";
+import { uploadFile } from "@/lib/backend/transfers";
+import { mediaUrl } from "@/lib/backend/remote";
+const remote = remoteEnabled ? exposeStore("body", local) : local;
+export const bodyStore: typeof local = !remoteEnabled ? local : { ...remote,
+ source: async photo => ({ uri: mediaUrl("photo", photo.id), dispose() {} }),
+ setPhoto: async (id, pose, input) => {
+  if (!input || typeof input.source === "string") return remote.setPhoto(id, pose, input);
+  const job = await uploadFile(input.source as Blob, "body-photo.jpg");
+  return remote.setPhoto(id, pose, { ...input, source: job.id });
+ },
+};

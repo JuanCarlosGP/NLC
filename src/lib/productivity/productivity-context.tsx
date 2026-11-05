@@ -1,3 +1,5 @@
+import { remoteEnabled } from "@/lib/backend/profile";
+import { onBackendChange, hasRemoteDraft } from "@/lib/backend/remote";
 import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { subscribeAssistantMutations } from "@/lib/cursor/assistant-bus";
@@ -77,12 +79,15 @@ export function ProductivityProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const mirror = useCallback(async () => {
+    if (remoteEnabled) return;
     try {
       await pushFocusToSources(settingsRef.current, passwordRef.current);
     } catch {
       // NAS / carpeta local are best-effort.
     }
   }, []);
+
+  useEffect(() => onBackendChange(domain => { if ((domain === "tasks" || domain === "*") && !hasRemoteDraft()) void refresh().catch(() => {}); }), [refresh]);
 
   useEffect(() => onServiceImport((service, next) => { if (service === "focus") void refresh().then(() => pushFocusToSources(next, passwordRef.current)).catch(() => {}); }), [refresh]);
 
@@ -94,7 +99,7 @@ export function ProductivityProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void (async () => {
       try {
-        if (settingsReady) {
+        if (settingsReady && !remoteEnabled) {
           await pullFocusFromSources(settings, password);
         }
         if (!cancelled) await refresh();

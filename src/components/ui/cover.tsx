@@ -1,3 +1,4 @@
+import { coverUri } from "@/lib/library/cover-uri";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { Image, StyleSheet, View } from "react-native";
@@ -34,7 +35,7 @@ export function Cover({
       ]}
     >
       {uri ? (
-        <Image source={{ uri }} style={[styles.image, { borderRadius: radius }]} />
+        <Image source={{ uri: coverUri(uri)! }} style={[styles.image, { borderRadius: radius }]} />
       ) : (
         <Text style={[styles.initial, { fontSize: fill ? 28 : Math.round((size as number) * 0.38) }]}>{initial}</Text>
       )}

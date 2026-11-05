@@ -2,7 +2,7 @@ import { servicePreferences } from "./preferences";
 import { withHealthLock } from "@/lib/health/access";
 import * as FileSystem from "expo-file-system/legacy";
 import { getDb } from "@/lib/db/client";
-import { createMusicSource } from "@/lib/nas/source-factory";
+import { createMusicSource } from "@/lib/nas/source-factory.internal";
 import { createDavTransport, listWebDavDir } from "@/lib/nas/webdav-source";
 import {
   isAudioFile,
@@ -17,18 +17,18 @@ import {
   videoSourceSettings,
   type NasSettings,
   type ServiceId,
-} from "@/lib/settings/storage";
+} from "@/lib/settings/storage.impl";
 import { readSqlHealth } from "@/lib/health/backup/sql";
 import { validateHealthData, photoList } from "@/lib/health/backup/model";
 import { photoExtension } from "@/lib/health/body-photos/model";
-import { integrationStorage } from "@/lib/integrations/storage";
+import { rawIntegrationStorage as integrationStorage } from "@/lib/integrations/storage";
 import { createIntegrationCache } from "@/lib/integrations/cache";
-import { hydrateTrackArtworkCache } from "@/lib/library/artwork-cache";
+import { hydrateTrackArtworkCache } from "@/lib/library/artwork-cache.internal";
 import {
   loadWatchHistory,
   flushWatchProgress,
-} from "@/lib/video/watch-history";
-import { loadVideoFavorites } from "@/lib/video/favorites";
+} from "@/lib/video/watch-history.internal";
+import { loadVideoFavorites } from "@/lib/video/favorites.internal";
 import { listArchiveFolder, type ArchiveFile } from "./native";
 import {
   TABLES,
@@ -63,7 +63,7 @@ function sameUri(a: string, b: string) {
     return a === b;
   }
 }
-export async function createArchivePlan(
+async function createArchivePlanRaw(
   service: ServiceId,
   settings: NasSettings,
   password: string,
@@ -98,6 +98,7 @@ export async function createArchivePlan(
     string,
     { path: string; transport: ReturnType<typeof createDavTransport> }
   >();
+  const retired=new Set((await db.getAllAsync<{uri:string}>("SELECT uri FROM service_media_retired WHERE uri IS NOT NULL AND service=?",service)).map(row=>row.uri));
   const byUri = new Map<string, ArchiveFile>();
   const paths = new Set<string>();
   function add(file: ArchiveFile) {
@@ -119,7 +120,7 @@ export async function createArchivePlan(
       const items = await listArchiveFolder(folder.uri);
       for (const file of items) {
         if (
-          !visible(file.path) ||
+          retired.has(file.uri) || !visible(file.path) ||
           !supported(file.path, service) ||
           (service === "music" && isPodcastFolderName(file.path.split("/")[0]))
         )
@@ -400,3 +401,6 @@ export async function createArchivePlan(
     },
   };
 }
+
+import { serialize } from "@/lib/backend/write-queue";
+export const createArchivePlan: typeof createArchivePlanRaw = (...args) => serialize(() => createArchivePlanRaw(...args));

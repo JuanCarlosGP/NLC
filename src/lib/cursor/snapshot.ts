@@ -1,7 +1,7 @@
-import { getAlbums, getTracks, loadPlaylists } from "@/lib/db/catalog";
+import { getAlbums, getTracks, loadPlaylists } from "@/lib/db/catalog.internal";
 import { t } from "@/lib/i18n/runtime";
-import { listProjects, listTasks } from "@/lib/productivity/store";
-import { listAccounts, listAssets, listGoals, listTx } from "@/lib/wealth/store";
+import { listProjects, listTasks } from "@/lib/productivity/store.internal";
+import { listAccounts, listAssets, listGoals, listTx } from "@/lib/wealth/store.internal";
 import { formatEuro } from "@/lib/wealth/money";
 import {
   formatGoalEta,
@@ -17,7 +17,7 @@ import {
 } from "@/lib/wealth/compute";
 import { projectDisplayName, STATUS_LABEL } from "@/lib/productivity/types";
 import { formatDue } from "@/lib/productivity/dates";
-import { listReminders } from "@/lib/reminders/store";
+import { listReminders } from "@/lib/reminders/store.internal";
 import { formatReminderWhen } from "@/lib/reminders/types";
 import { accountDisplayName, TX_KIND_LABEL } from "@/lib/wealth/types";
 import type { AppZone } from "@/lib/zone/zone-context";

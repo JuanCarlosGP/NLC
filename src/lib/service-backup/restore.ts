@@ -1,18 +1,19 @@
+import { saveMediaRemap, notifyMediaRemap } from "@/lib/player/media-remap";
 import { importEpochKey } from "./epochs";
 import { preferenceKey, servicePreferences } from "./preferences";
 import {
   loadWatchHistory,
   reloadWatchHistory,
-} from "@/lib/video/watch-history";
+} from "@/lib/video/watch-history.internal";
 import {
   loadVideoFavorites,
   reloadVideoFavorites,
-} from "@/lib/video/favorites";
+} from "@/lib/video/favorites.internal";
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
 import { openIsolatedHealthDb } from "@/lib/db/sqlite-client";
 import { runInTransaction } from "@/lib/db/client";
-import { notifyCatalog } from "@/lib/db/catalog";
+import { notifyCatalog } from "@/lib/db/catalog.internal";
 import { withHealthLock } from "@/lib/health/access";
 import { readSqlHealth, writeSqlHealth } from "@/lib/health/backup/sql";
 import {
@@ -22,8 +23,8 @@ import {
 } from "@/lib/health/backup/model";
 import { photoExtension } from "@/lib/health/body-photos/model";
 import { withLocalFolder, withSourceMode } from "@/lib/settings/service-source";
-import type { NasSettings, ServiceId } from "@/lib/settings/storage";
-import { integrationStorage } from "@/lib/integrations/storage";
+import type { NasSettings, ServiceId } from "@/lib/settings/storage.impl";
+import { rawIntegrationStorage as integrationStorage } from "@/lib/integrations/storage";
 import { createIntegrationCache } from "@/lib/integrations/cache";
 import {
   TABLES,
@@ -31,12 +32,12 @@ import {
   type Row,
   type ServiceArchiveData,
 } from "./model";
-import { commitArchiveFiles, type ArchiveStage } from "./native";
+import { commitArchiveFiles, finishArchiveCommit, type ArchiveStage } from "./native";
 import { mapVideoBackup } from "@/lib/video/backup";
 import {
   hydrateTrackArtworkCache,
   reloadTrackArtworkCache,
-} from "@/lib/library/artwork-cache";
+} from "@/lib/library/artwork-cache.internal";
 import { notifyServiceImport } from "./events";
 function merge<T>(before: T[], after: T[], id: (row: T) => string): T[] {
   const rows = new Map(before.map((row) => [id(row), row]));
@@ -74,6 +75,7 @@ export async function restoreService(
   settings: NasSettings,
   destination: string | null,
   job: string,
+  options: { preserveSources?: boolean; beforeCommit?: () => Promise<void> } = {},
 ) {
   const data = validateServiceArchive(JSON.parse(stage.metadata), service);
   if (
@@ -109,9 +111,9 @@ export async function restoreService(
       if (!destination) throw new Error("destination");
       const result = await commitArchiveFiles(stage, destination, job);
       mapping = result.files;
-      relativePaths = result.paths ?? {};
+      relativePaths = Object.fromEntries(Object.entries(result.paths ?? {}).map(([path, relative]) => [path, options.preserveSources ? `${result.name}/${relative}` : relative]));
       copiedRoot = result.root;
-      next = withSourceMode(
+      if (!options.preserveSources) next = withSourceMode(
         withLocalFolder(settings, service, result.root, result.name),
         service,
         "local",
@@ -168,6 +170,13 @@ export async function restoreService(
       row.offline_status = "ready";
       row.on_nas = 0;
     }
+    const uriRemap:Record<string,string> = {};
+    for(const identity of identities)for(const id of identity.previous) {
+      const old=await db.getFirstAsync<{local_uri:string|null}>("SELECT local_uri FROM tracks WHERE id=?",id);
+      const replacement=data.tables.tracks.find(row=>row.id===identity.id)?.local_uri;
+      if(old?.local_uri && typeof replacement==="string")uriRemap[old.local_uri]=replacement;
+    }
+    for(const [key,path] of Object.entries(data.links))if(key.startsWith("cover:")&&mapping[path])uriRemap[key.slice(6)]=mapping[path];
     const cover = (raw: string | number | null) =>
       typeof raw === "string" && data.links[`cover:${raw}`]
         ? (mapping[data.links[`cover:${raw}`]] ?? null)
@@ -241,12 +250,17 @@ export async function restoreService(
       };
     }
     try {
+    await options.beforeCommit?.();
       await withHealthLock(async () => {
         const currentHealth =
           service === "health" ? (await readSqlHealth(db)).data : null;
         await runInTransaction(db, async () => {
+          await db.runAsync("INSERT OR REPLACE INTO service_import_receipts(id,service,created_at) VALUES (?,?,?)",job,service,Date.now());
+          if(media)await saveMediaRemap(db,Object.fromEntries(remap),uriRemap);
           for (const identity of identities) {
             for (const previous of identity.previous) {
+              const old=await db.getFirstAsync<{local_uri:string|null}>("SELECT local_uri FROM tracks WHERE id=?",previous);
+              await db.runAsync("INSERT OR REPLACE INTO service_media_retired(id,uri,service) VALUES (?,?,?)",previous,old?.local_uri??null,service);
               for (const table of ["favorites", "recents"])
                 await db.runAsync(
                   `UPDATE ${table} SET track_id = ? WHERE track_id = ?`,
@@ -357,6 +371,7 @@ export async function restoreService(
       throw error;
     }
     committed = true;
+    await finishArchiveCommit(job,true).catch(() => {});
     // Presentation cache reloads are optional: the committed SQLite values are already durable.
     if (service === "video")
       await Promise.all([reloadWatchHistory(), reloadVideoFavorites()]).catch(
@@ -364,11 +379,12 @@ export async function restoreService(
       );
     if (service === "music" || service === "podcast")
       await reloadTrackArtworkCache().catch(() => {});
-    if (media) notifyCatalog();
+    if (media) { await notifyMediaRemap(Object.fromEntries(remap),uriRemap).catch(()=>{}); notifyCatalog(); }
     notifyServiceImport(service, next);
     return next;
   } finally {
     if (!committed) {
+      await finishArchiveCommit(job,false).catch(() => {});
       for (const uri of created)
         await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
       if (copiedRoot)

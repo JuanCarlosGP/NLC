@@ -1,6 +1,7 @@
+import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { Text, TextInput } from "@/components/ui/themed-text";
 import { useRouter } from "expo-router";
@@ -82,6 +83,10 @@ function TrackActionsBody({
   const [view, setView] = useState<ViewMode>("menu");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmReplace,setConfirmReplace]=useState(false);
+  const [deleteError,setDeleteError]=useState("");
+  const [sourceProgress,setSourceProgress]=useState("");
+  const replacementAbort=useRef<AbortController|null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [coverStatus, setCoverStatus] = useState<"idle" | "searching" | "found" | "not_found">("idle");
   const [fileId, setFileId] = useState(track.id);
@@ -223,10 +228,14 @@ function TrackActionsBody({
       setSourceError(t("player.sourceBadUrl"));
       return;
     }
+    replacementAbort.current=new AbortController();
     setSourceState("running");
     setSourceError("");
     try {
       const nextId = await replaceTrackAudio({
+        confirmed: true,
+        signal:replacementAbort.current.signal,
+        onProgress:setSourceProgress,
         trackId: fileId,
         youtubeUrl: sourceUrl,
         nas: settings,
@@ -246,15 +255,15 @@ function TrackActionsBody({
 
   async function onDelete() {
     if (!source.deleteTrack) return;
-    setBusy(true);
+    setBusy(true);setDeleteError("");
     try {
       await source.deleteTrack(fileId);
-      await Promise.all([removeFavorite(fileId), removeRecent(fileId), clearLibraryCache(fileId)]);
-      await removeTrackFromQueue(fileId);
+      if (!remoteEnabled) { await Promise.all([removeFavorite(fileId), removeRecent(fileId), clearLibraryCache(fileId)]); await removeTrackFromQueue(fileId); }
       setConfirmDelete(false);
       onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
+      setDeleteError(message || t("player.sourceFail"));
       if (/ya no existe|not found|404/i.test(message)) {
         await Promise.all([removeFavorite(fileId), removeRecent(fileId), clearLibraryCache(fileId)]);
         await removeTrackFromQueue(fileId);
@@ -296,6 +305,7 @@ function TrackActionsBody({
             <Text style={styles.fieldLabel}>{t("player.sourceUrl")}</Text>
             <TextInput
               value={sourceUrl}
+              editable={sourceState!=="running"}
               onChangeText={setSourceUrl}
               placeholder="https://youtu.be/…"
               placeholderTextColor={colors.muted}
@@ -309,7 +319,7 @@ function TrackActionsBody({
               disabled={sourceState === "running"}
               onPress={() => {
                 triggerUiHaptic();
-                void replaceSource();
+                if(!isYoutubeUrl(sourceUrl)){setSourceError(t("player.sourceBadUrl"));return;}setConfirmReplace(true);
               }}
               style={({ pressed }) => [
                 styles.saveBtn,
@@ -320,6 +330,7 @@ function TrackActionsBody({
                 {sourceState === "running" ? t("player.replacingAudio") : t("player.replaceAudio")}
               </Text>
             </Pressable>
+            {sourceState==="running" && <><Text style={styles.fieldLabel}>{sourceProgress==="committing"?"Guardando en el móvil…":"Descargando en el móvil…"}</Text><Pressable accessibilityRole="button" disabled={sourceProgress==="committing"} onPress={()=>replacementAbort.current?.abort()}><Text style={styles.fieldLabel}>{t("common.cancel")}</Text></Pressable></>}
             {sourceError ? <Text style={styles.error}>{sourceError}</Text> : null}
           </>
         ) : view === "playlists" ? (
@@ -520,10 +531,11 @@ function TrackActionsBody({
         )}
       </SheetScrollView>
 
+      <ConfirmDialog open={confirmReplace} title={t("player.replaceAudio")} message="Se sustituirá el archivo de audio. El título, el artista y la carátula se conservarán." confirmLabel={t("player.replaceAudio")} cancelLabel={t("common.cancel")} destructive onCancel={()=>setConfirmReplace(false)} onConfirm={()=>{setConfirmReplace(false);void replaceSource();}}/>
       <ConfirmDialog
         open={confirmDelete}
         title={t("player.deleteNas")}
-        message={t("player.deleteNasMessage")}
+        message={t("player.deleteNasMessage")+(deleteError?`\n${deleteError}`:"")}
         confirmLabel={t("common.delete")}
         cancelLabel={t("common.cancel")}
         destructive

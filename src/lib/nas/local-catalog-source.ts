@@ -4,7 +4,7 @@ import {
   getArtists,
   getLocalUri,
   searchCatalog,
-} from "@/lib/db/catalog";
+} from "@/lib/db/catalog.internal";
 import type { MusicSource } from "./types";
 // An empty local installation stays empty. Restored files remain playable offline.
 export const localCatalogSource: MusicSource = {

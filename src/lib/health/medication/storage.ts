@@ -1,4 +1,3 @@
-import { coordinatedHealthStore } from "../access";
-import { getDb } from "@/lib/db/client";
-import { createSqlMedicationStore } from "./store";
-export const medicationStore = coordinatedHealthStore(createSqlMedicationStore(getDb));
+import { exposeStore } from "@/lib/backend/registry";
+import { medicationStore as local } from "./storage.impl";
+export const medicationStore = exposeStore("medication", local);

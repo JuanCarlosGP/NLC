@@ -194,7 +194,7 @@ test('cold reopening restores the credential and copy independently; neither cac
 
 test('the Android hook uses SecureStore and native streaming fetch; cached data survives foreground/background changes', async () => {
   const React = require('react'); const renderer = require('react-test-renderer'); global.IS_REACT_ACT_ENVIRONMENT = true;
-  const keychain = new Map(); const keyWrites = []; const listeners = new Set(); const p = provider();
+  const cache = new Map(); const keychain = new Map(); const keyWrites = []; const listeners = new Set(); const p = provider();
   let current = null; let connection; const saved = [];
   const AppState = { currentState: 'active', addEventListener(_type, listener) { listeners.add(listener); return { remove() { listeners.delete(listener); } }; } };
   const secure = { WHEN_UNLOCKED_THIS_DEVICE_ONLY: 7, getItemAsync: async key => keychain.get(key) ?? null,
@@ -203,7 +203,12 @@ test('the Android hook uses SecureStore and native streaming fetch; cached data 
   Module._load = function (request, parent, isMain) {
     if (request === 'react-native') return { AppState };
     if (request === 'expo-secure-store') return secure;
+    if (request === 'expo-crypto') return require('node:crypto');
     if (request === 'expo/fetch') return { fetch: p.fetch };
+    if (request === './storage' && parent.filename.endsWith('mercury-controller.native.ts')) return { integrationStorage: { getItem: async key => cache.get(key) ?? null, setItem: async (key, value) => { cache.set(key, value); }, removeItem: async key => cache.delete(key) } };
+    if (request === '@/lib/service-backup/events') return {onServiceImport:()=>()=>{}};
+    if (request === '@/lib/backend/remote') return {onBackendChange:()=>()=>{}};
+    if (request === '@/lib/backend/native-module') return { publishWebEvent() {} };
     if (request === '@react-native-async-storage/async-storage') throw new Error('Token must not use plaintext preferences');
     return original.call(this, request, parent, isMain);
   };
@@ -214,11 +219,11 @@ test('the Android hook uses SecureStore and native streaming fetch; cached data 
     await renderer.act(async () => { app = renderer.create(React.createElement(Host)); });
     assert.equal(connection.state.ready, true); assert.equal(connection.state.configured, false); assert.equal(p.calls.length, 0);
     await renderer.act(async () => { await connection.configure('synthetic-token'); await connection.sync(); });
-    assert.deepEqual(keyWrites, ['nlc.integrations.mercury.token.v1']); assert.equal(saved.length, 1); assert.equal(connection.state.configured, true);
+    assert.deepEqual(keyWrites, ['nlc.integrations.mercury.token.v1']); assert.equal(saved.length, 0); current=JSON.parse([...cache.values()][0]); assert.equal(current.provider,'mercury'); assert.equal(connection.state.configured, true);
     assert.doesNotMatch(JSON.stringify(current), /synthetic-token/);
     AppState.currentState = 'background'; await renderer.act(async () => { for (const listener of listeners) listener('background'); });
     AppState.currentState = 'active'; await renderer.act(async () => { for (const listener of listeners) listener('active'); });
-    assert.equal(saved.length, 1); await renderer.act(async () => { await connection.disconnect(); });
+    assert.equal(saved.length, 0); assert.equal(cache.size,1); await renderer.act(async () => { await connection.disconnect(); });
     assert.equal(keychain.size, 0); assert.equal(current.provider, 'mercury');
     await renderer.act(async () => { app.unmount(); }); app = null; assert.equal(listeners.size, 0);
   } finally { if (app) await renderer.act(async () => app.unmount()); Module._load = original; }

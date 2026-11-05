@@ -1,3 +1,5 @@
+import { onBackendChange, hasRemoteDraft } from "@/lib/backend/remote";
+import { remoteEnabled } from "@/lib/backend/profile";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createMusicSource } from "@/lib/nas/source-factory";
 import type { MusicSource } from "@/lib/nas/types";
@@ -66,7 +68,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.warn("No se pudieron cargar los ajustes", error);
-        if (!cancelled) setOnboardingNeeded(true);
+        if (!cancelled) setOnboardingNeeded(!remoteEnabled);
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -76,6 +78,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(()=>onBackendChange(domain=>{if (!["settings","credentials","*"].includes(domain) || hasRemoteDraft())return;
+    void Promise.all([loadNasSettings(),loadNasPassword()]).then(([next,secret])=>{setSettings(next);setPassword(secret);setSourceKey(key=>key+1);}).catch(()=>{});
+  }),[]);
   const source = useMemo(
     () => (ready ? createMusicSource(settings, password) : mockSource),
     [ready, settings, password, sourceKey],
@@ -85,7 +90,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     async (next?: NasSettings, nextPassword?: string) => {
       const resolvedSettings = next ?? settings;
       const resolvedPassword = nextPassword !== undefined ? nextPassword : password;
-      await Promise.all([saveNasSettings(resolvedSettings), saveNasPassword(resolvedPassword)]);
+      await Promise.all([saveNasSettings(resolvedSettings), remoteEnabled && !resolvedPassword.trim() ? Promise.resolve() : saveNasPassword(resolvedPassword)]);
       if (next) setSettings(next);
       if (nextPassword !== undefined) setPassword(nextPassword);
       setSourceKey((value) => value + 1);

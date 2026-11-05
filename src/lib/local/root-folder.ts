@@ -6,7 +6,7 @@ import {
   type PickedFolder,
 } from "./pick-folder";
 import { SERVICES, withLocalFolder } from "@/lib/settings/service-source";
-import type { NasSettings, ServiceId } from "@/lib/settings/storage";
+import type { NasSettings, ServiceId } from "@/lib/settings/storage.impl";
 
 // Stable names: changing the app language must not create a second set of folders.
 export const SERVICE_FOLDER_NAMES: Record<ServiceId, string> = {

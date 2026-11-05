@@ -1,17 +1,17 @@
-import { getAlbum, getAlbums, getArtists, getLocalUri, getTracks, loadPlaylists, searchCatalog } from "@/lib/db/catalog";
+import { getAlbum, getAlbums, getArtists, getLocalUri, getTracks, loadPlaylists, searchCatalog } from "@/lib/db/catalog.internal";
 import type { Album, AlbumDetail, MusicSource, PlayableSource, Track } from "@/lib/nas/types";
 import { isPodcastTrack } from "@/lib/nas/webdav";
-import { dumpProductivity } from "@/lib/productivity/store";
-import { listReminders } from "@/lib/reminders/store";
-import { loadNasPassword, loadNasSettings } from "@/lib/settings/storage";
+import { dumpProductivity } from "@/lib/productivity/store.internal";
+import { listReminders } from "@/lib/reminders/store.internal";
+import { loadNasPassword, loadNasSettings } from "@/lib/settings/storage.impl";
 import type { ImportedPlaylist } from "@/lib/spotify/types";
 import { baseName, episodeLocation, findNextEpisode, inspectFolder, seriesFromPath } from "@/lib/video/browse";
 import { listVideoShows } from "@/lib/video/catalog";
 import { parseEpisodeName } from "@/lib/video/onepiece";
 import { createVideoClient } from "@/lib/video/source";
-import { isWatchFinished, loadWatchHistory, noteVideoProgress } from "@/lib/video/watch-history";
+import { isWatchFinished, loadWatchHistory, noteVideoProgress } from "@/lib/video/watch-history.internal";
 import { createDavTransport } from "@/lib/nas/webdav-source";
-import { dumpWealth } from "@/lib/wealth/store";
+import { dumpWealth } from "@/lib/wealth/store.internal";
 import { handleDeviceQuery } from "@/lib/bridge/device-player";
 
 export type BridgeJson = { status: number; body: unknown };
@@ -210,7 +210,7 @@ export async function handleBridgeRequest(
   const route = path.replace(/\/+$/, "") || "/";
 
   if (route === "/v1/device") {
-    return { kind: "json", status: 200, body: handleDeviceQuery(q) };
+    return { kind: "json", status: 200, body: await handleDeviceQuery(q) };
   }
 
   if (route === "/v1/hello") {

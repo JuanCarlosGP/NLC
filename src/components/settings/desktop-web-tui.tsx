@@ -1,3 +1,6 @@
+import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
+import { remoteState } from "@/lib/backend/remote";
+import { useSyncExternalStore } from "react";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useCallback, useEffect, useState } from "react";
@@ -12,6 +15,7 @@ import { colors, fonts } from "@/lib/theme";
 export function DesktopWebTui() {
   useThemeId();
   const { t } = useI18n();
+  const remote = useSyncExternalStore(remoteState.subscribe, remoteState.getSnapshot, remoteState.getSnapshot);
   const [enabled, setEnabled] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,12 +88,12 @@ export function DesktopWebTui() {
       <View style={styles.row}>
         <View style={styles.meta}>
           <Text style={styles.title}>{t("desktop.webTitle")}</Text>
-          <Text style={styles.hint}>{android ? t("desktop.webHint") : t("desktop.androidOnly")}</Text>
+          <Text style={styles.hint}>{remoteEnabled ? PHONE_ONLY : android ? t("desktop.webHint") : t("desktop.androidOnly")}</Text>
         </View>
         <Switch
           accessibilityLabel={t("desktop.webTitle")}
           disabled={!android}
-          value={enabled}
+          value={remoteEnabled ? !!remote.bootstrap?.desktop.tuiRunning : enabled}
           onValueChange={(value) => void toggle(value)}
           trackColor={{ false: colors.rule, true: colors.accent }}
           thumbColor={colors.ink}

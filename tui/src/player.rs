@@ -86,7 +86,9 @@ impl MpvSession {
     }
 
     pub fn playback_times(&self) -> Option<(f64, f64)> {
-        let pos = self.prop_f64("time-pos").or_else(|| self.prop_f64("playback-time"))?;
+        let pos = self
+            .prop_f64("time-pos")
+            .or_else(|| self.prop_f64("playback-time"))?;
         let dur = self.prop_f64("duration").unwrap_or(0.0);
         Some((pos, dur))
     }
@@ -146,8 +148,10 @@ impl WebPlayer {
         volume: u8,
         video: bool,
         start_sec: u64,
+        queue: &[String],
     ) -> Result<Self, String> {
-        let _ = client.device("op=stop");
+        // The browser confirms readiness before the shared phone session changes.
+        let _ = client;
         let file = PathBuf::from(std::env::var("NLC_MEDIA_FILE").unwrap_or_default());
         if file.as_os_str().is_empty() {
             return Err("browser player is unavailable".into());
@@ -164,6 +168,7 @@ impl WebPlayer {
             "volume": volume,
             "video": video,
             "start": start_sec,
+            "queue": queue,
         }));
         Ok(player)
     }
@@ -188,7 +193,10 @@ impl WebPlayer {
         }
         let pos = value.get("pos").and_then(|v| v.as_f64()).unwrap_or(0.0);
         let dur = value.get("dur").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let ended = value.get("ended").and_then(|v| v.as_bool()).unwrap_or(false);
+        let ended = value
+            .get("ended")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         (pos, dur, ended)
     }
 
@@ -218,7 +226,11 @@ pub struct PhonePlayer {
 }
 
 impl PhonePlayer {
-    pub fn start(client: crate::client::BridgeClient, track_id: &str, volume: u8) -> Result<Self, String> {
+    pub fn start(
+        client: crate::client::BridgeClient,
+        track_id: &str,
+        volume: u8,
+    ) -> Result<Self, String> {
         let query = format!(
             "op=play&id={}&volume={volume}",
             urlencoding::encode(track_id)
@@ -264,14 +276,24 @@ impl Playback {
         start_sec: u64,
         stream_url: &str,
         auth_header: &str,
+        queue: &[String],
     ) -> Result<Self, String> {
         if std::env::var("NLC_WEB").ok().as_deref() == Some("1") {
-            return WebPlayer::start(client, track_id, title, volume, video, start_sec).map(Self::Web);
+            return WebPlayer::start(client, track_id, title, volume, video, start_sec, queue)
+                .map(Self::Web);
         }
         if std::env::var("NLC_ON_PHONE").ok().as_deref() == Some("1") {
             return PhonePlayer::start(client.clone(), track_id, volume).map(Self::Phone);
         }
-        MpvSession::spawn(stream_url, auth_header, volume, video, Some(title), start_sec).map(Self::Mpv)
+        MpvSession::spawn(
+            stream_url,
+            auth_header,
+            volume,
+            video,
+            Some(title),
+            start_sec,
+        )
+        .map(Self::Mpv)
     }
 
     pub fn set_volume(&self, volume: u8) {
@@ -401,7 +423,11 @@ fn parse_seconds(raw: &str) -> Option<u64> {
             return None;
         }
         line.split(|c: char| c.is_whitespace() || c == ',')
-            .find_map(|part| part.parse::<f64>().ok().filter(|n| *n > 0.0 && *n < 86_400.0))
+            .find_map(|part| {
+                part.parse::<f64>()
+                    .ok()
+                    .filter(|n| *n > 0.0 && *n < 86_400.0)
+            })
     })?;
     Some((line * 1000.0).round() as u64)
 }

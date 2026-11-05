@@ -1,54 +1,7 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { deleteSecret, getSecret, setSecret } from "@/lib/settings/secret-store";
-
-const SETTINGS_KEY = "nlc.download.settings.v1";
-const TOKEN_KEY = "nlc.download.token";
-
-export type DownloadSettings = {
-  host: string;
-  port: string;
-  enabled: boolean;
-};
-
-export const DEFAULT_DOWNLOAD_SETTINGS: DownloadSettings = {
-  host: "192.168.1.106",
-  port: "8091",
-  enabled: true,
-};
-
-export async function loadDownloadSettings(): Promise<DownloadSettings> {
-  try {
-    const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { ...DEFAULT_DOWNLOAD_SETTINGS };
-    const parsed = JSON.parse(raw) as Partial<DownloadSettings>;
-    return { ...DEFAULT_DOWNLOAD_SETTINGS, ...parsed };
-  } catch {
-    return { ...DEFAULT_DOWNLOAD_SETTINGS };
-  }
-}
-
-export async function saveDownloadSettings(settings: DownloadSettings): Promise<void> {
-  await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-}
-
-export async function loadDownloadToken(): Promise<string> {
-  try {
-    return (await getSecret(TOKEN_KEY)) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-export async function saveDownloadToken(token: string): Promise<void> {
-  if (!token) {
-    await deleteSecret(TOKEN_KEY);
-    return;
-  }
-  await setSecret(TOKEN_KEY, token);
-}
-
-export function downloadBaseUrl(settings: DownloadSettings): string {
-  const host = settings.host.trim();
-  const port = settings.port.trim();
-  return `http://${host}:${port}`;
-}
+import * as local from "./download-settings.impl";
+import { expose } from "@/lib/backend/registry";
+export * from "./download-settings.impl";
+export const loadDownloadSettings = expose("downloader.settings", local.loadDownloadSettings, { domain: "downloader" });
+export const saveDownloadSettings = expose("downloader.saveSettings", local.saveDownloadSettings, { domain: "downloader", write: true, atomic: false });
+export const loadDownloadToken = expose("downloader.tokenState", local.loadDownloadToken, { domain: "credentials" });
+export const saveDownloadToken = expose("downloader.token", local.saveDownloadToken, { domain: "credentials", write: true, atomic: false });

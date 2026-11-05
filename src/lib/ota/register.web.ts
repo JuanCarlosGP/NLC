@@ -1,4 +1,4 @@
-import type { NasSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
 
 export async function registerOtaPush(_settings: NasSettings, _password: string): Promise<void> {}
 

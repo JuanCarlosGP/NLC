@@ -174,6 +174,8 @@ export async function listLocalVideoShows(folderUri: string): Promise<LocalVideo
   const root = await loadLocalVideoTree(folderUri);
   const wrappers = new Set(["local", "nas", "offline", "artwork"]);
   function sourceRoots(node: LocalNode): LocalNode[] {
+    const imports = node.children.filter(child => child.dir && /^NLC-[a-zA-Z0-9_-]+/.test(child.name));
+    if (imports.length) return [node, ...imports.flatMap(sourceRoots)];
     return node.children.length && node.children.every(child => child.dir && wrappers.has(child.name))
       ? node.children.filter(child => child.name !== "artwork").flatMap(sourceRoots) : [node];
   }
@@ -190,7 +192,7 @@ export async function listLocalVideoShows(folderUri: string): Promise<LocalVideo
       }
     } else {
       for (const child of source.children) {
-        if (child.dir) items.push(toShow(child, "series"));
+        if (child.dir && !/^NLC-[a-zA-Z0-9_-]+/.test(child.name)) items.push(toShow(child, "series"));
         else if (VIDEO_EXT.has(extOf(child.name))) items.push(toShow(child, "movie", true));
       }
     }

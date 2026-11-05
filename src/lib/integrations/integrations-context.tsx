@@ -1,3 +1,7 @@
+import { invokeBoundary } from "@/lib/backend/registry";
+import { onBackendChange } from "@/lib/backend/remote";
+import { publishWebEvent } from "@/lib/backend/native-module";
+import { remoteEnabled } from "@/lib/backend/profile";
 import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
@@ -21,11 +25,11 @@ export function IntegrationsProvider({children}:{children:ReactNode}) {
   const copiesRef=useRef(copies); copiesRef.current=copies;
   const [selection,setSelection]=useState<Selection>({whoop:"live",mercury:"live"});
   const [ready,setReady]=useState(false); const [status,setStatus]=useState<BridgeStatus | null>(null); const [online,setOnline]=useState(false); const [busy,setBusy]=useState<Provider | null>(null); const locked=useRef(false); const refreshing=useRef(false); const [error,setError]=useState<string | null>(null);
-  const save=useCallback(async (value:Snapshot)=>{validateSnapshot(value);await cache.write(value);if(value.provider==="mercury"&&value.mode==="live")loadFailed.current=false;setError(null);setCopies(previous=>{const next={...previous,[value.provider]:{...previous[value.provider],[value.mode]:value}};copiesRef.current=next;return next;});},[]);
+  const save=useCallback(async (value:Snapshot)=>{validateSnapshot(value);await cache.write(value);if(!remoteEnabled)publishWebEvent({type:"change",domain:"integrations"});if(value.provider==="mercury"&&value.mode==="live")loadFailed.current=false;setError(null);setCopies(previous=>{const next={...previous,[value.provider]:{...previous[value.provider],[value.mode]:value}};copiesRef.current=next;return next;});},[]);
   const mobileMercury=useMobileMercury({ ready, current:()=>{const value=copiesRef.current.mercury.live;return value?.provider==="mercury"?value:null;}, save, allowAutomatic:()=>!loadFailed.current });
   const mobileEnabled=!!mobileMercury;
   const bridgeEnabled=!mobileEnabled || !!process.env.EXPO_PUBLIC_NLC_INTEGRATIONS_URL;
-  const select=useCallback(async(provider:Provider,mode:Mode)=>{setSelection(previous=>{const next={...previous,[provider]:mode};void AsyncStorage.setItem(selectionKey,JSON.stringify(next)).catch(()=>setError("storage"));return next;});},[]);
+  const select=useCallback(async(provider:Provider,mode:Mode)=>{setSelection(previous=>{const next={...previous,[provider]:mode};void invokeBoundary("preferences.set",[selectionKey,JSON.stringify(next)],{domain:"preferences",write:true,key:args=>String(args[0])},()=>AsyncStorage.setItem(selectionKey,JSON.stringify(next))).catch(()=>setError("storage"));return next;});},[]);
   const refresh=useCallback(async()=>{
     if(!bridgeEnabled)return;
     if(refreshing.current)return; refreshing.current=true;
@@ -44,6 +48,11 @@ export function IntegrationsProvider({children}:{children:ReactNode}) {
       const stored=await AsyncStorage.getItem(selectionKey);if(stored){const parsed=JSON.parse(stored);if(["live","demo"].includes(parsed.whoop)&&["live","demo"].includes(parsed.mercury)&&!cancelled)setSelection(parsed);}
     }catch{if(!cancelled){loadFailed.current=true;setError("storage");}}finally{if(!cancelled)setReady(true);}
   })();return()=>{cancelled=true;};},[]);
+  useEffect(() => onBackendChange(domain => { if (domain !== "integrations" && domain !== "*") return; void (async () => {
+    const result: Copies = { whoop: { live: null, demo: null }, mercury: { live: null, demo: null } };
+    for (const provider of ["whoop", "mercury"] as const) for (const mode of ["live", "demo"] as const) result[provider][mode] = await cache.read(provider, mode);
+    copiesRef.current = result; setCopies(result);
+  })().catch(() => setError("storage")); }), []);
   useEffect(() => onServiceImport((service) => { if (service !== "health" && service !== "wealth") return; void (async () => {
     const result: Copies = { whoop: { live: null, demo: null }, mercury: { live: null, demo: null } };
     for (const provider of ["whoop", "mercury"] as const) for (const mode of ["live", "demo"] as const) result[provider][mode] = await cache.read(provider, mode);

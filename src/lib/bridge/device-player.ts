@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { getTracks } from "@/lib/db/catalog";
+import { getTracks } from "@/lib/db/catalog.internal";
 import type { Track } from "@/lib/nas/types";
 import { decodeVideoId, watchRoute } from "@/lib/video/onepiece";
 
@@ -16,6 +16,8 @@ type DeviceControls = {
   snapshot: () => DeviceStatus;
 };
 
+let globalHandler: ((query: Record<string, string>) => Record<string, unknown> | Promise<Record<string, unknown>>) | null = null;
+export function bindGlobalDevicePlayer(handler: typeof globalHandler) { globalHandler = handler; }
 let controls: DeviceControls | null = null;
 type DeviceVideoControls = Omit<DeviceControls, "play">;
 
@@ -70,7 +72,8 @@ export async function findDeviceTrack(id: string): Promise<Track | null> {
   return podcasts.find((track) => track.id === id) ?? null;
 }
 
-export function handleDeviceQuery(query: Record<string, string>): Record<string, unknown> {
+export function handleDeviceQuery(query: Record<string, string>): Record<string, unknown> | Promise<Record<string, unknown>> {
+  if (globalHandler) return globalHandler(query);
   const op = query.op || "status";
   if (!controls) return { ok: false, error: "player_unavailable" };
   if (op === "play") {

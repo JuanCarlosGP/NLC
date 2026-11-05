@@ -1,3 +1,4 @@
+import { hasPhoneClock, phoneDateKey, phoneNow } from "../../backend/clock";
 export type WeightEntry = {
   entryDate: string;
   weightKg: number;
@@ -22,7 +23,8 @@ export function isDateKey(value: string): boolean {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-export function localDateKey(date = new Date()): string {
+export function localDateKey(date = new Date(phoneNow())): string {
+  if (hasPhoneClock()) return phoneDateKey(date);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 

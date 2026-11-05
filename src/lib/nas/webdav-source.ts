@@ -1,8 +1,12 @@
+import { getDb } from "@/lib/db/client";
+import { removeOfflineFile } from "@/lib/offline/downloader.impl";
+import { remoteEnabled } from "@/lib/backend/profile";
+import { browserBackend } from "@/lib/backend/remote";
 import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import { collateLocale, t } from "@/lib/i18n/runtime";
-import type { NasSettings } from "@/lib/settings/storage";
-import { nasBaseUrl } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
+import { nasBaseUrl } from "@/lib/settings/storage.impl";
 import type {
   Album,
   AlbumDetail,
@@ -13,7 +17,7 @@ import type {
   SearchResults,
   Track,
 } from "@/lib/nas/types";
-import { replaceLibrary } from "@/lib/db/catalog";
+import { replaceLibrary } from "@/lib/db/catalog.internal";
 import { createDavAuthSession } from "@/lib/nas/dav-auth";
 import {
   PROPFIND_BODY,
@@ -289,6 +293,7 @@ export async function listWebDavDir(
   password: string,
   path: string,
 ): Promise<WebDavEntry[]> {
+  if (remoteEnabled) return browserBackend.invoke("nas.list", [settings, password, path], { domain: "settings", atomic: false });
   const davPath = toWebDavPath(path) || "/";
   const dirPath = davPath.endsWith("/") ? davPath : `${davPath}/`;
   const { davFetch } = createDavTransport({ ...settings, sharePath: "/" }, password);
@@ -511,10 +516,12 @@ export async function moveWebDavPath(
   throwIfDavWriteFailed(response, body);
 }
 
+let libraryRevision = 0;
 export function createWebDavSource(settings: NasSettings, password: string): MusicSource {
   const { rootPath, session, absolute, davFetch } = createDavTransport(settings, password);
   const podcastRoot = toWebDavPath(settings.podcastSharePath);
   setPodcastRootHint(podcastRoot);
+  let revision = libraryRevision;
   let index: WebDavIndex | null = null;
   let scanPromise: Promise<WebDavIndex> | null = null;
 
@@ -574,6 +581,7 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
   }
 
   async function scan(): Promise<WebDavIndex> {
+    if(revision !== libraryRevision) {revision=libraryRevision;index=null;scanPromise=null;}
     if (index) return index;
     if (scanPromise) return scanPromise;
     scanPromise = (async () => {
@@ -806,6 +814,9 @@ export function createWebDavSource(settings: NasSettings, password: string): Mus
     async deleteTrack(trackId: string): Promise<void> {
       if (!trackId.startsWith("/")) throw new Error(t("nasExtra.invalidTrack"));
       await deleteWebDavFile(settings, password, trackId);
+      await removeOfflineFile(trackId);
+      await (await getDb()).runAsync("DELETE FROM tracks WHERE id=?",trackId);
+      libraryRevision++;
       index = null;
       scanPromise = null;
     },

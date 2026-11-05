@@ -1,6 +1,7 @@
+import { remoteEnabled } from "@/lib/backend/profile";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getDb } from "@/lib/db/client";
-import { loadOnboardingComplete } from "@/lib/settings/storage";
+import { loadOnboardingComplete } from "@/lib/settings/storage.impl";
 import { DEFAULT_LOCALE, parseLocale, type AppLocale } from "@/lib/i18n/locale";
 
 const LOCALE_KEY = "nlc.locale.v1";
@@ -22,6 +23,7 @@ async function writeSqliteLocale(locale: AppLocale): Promise<void> {
 }
 
 export async function loadLocale(): Promise<AppLocale> {
+  if (remoteEnabled) return parseLocale(await AsyncStorage.getItem(LOCALE_KEY)) ?? DEFAULT_LOCALE;
   const fromDb = await readSqliteLocale();
   if (fromDb) return fromDb;
   try {
@@ -45,6 +47,7 @@ export async function loadLocale(): Promise<AppLocale> {
 }
 
 export async function saveLocale(locale: AppLocale): Promise<void> {
+  if (remoteEnabled) { await AsyncStorage.setItem(LOCALE_KEY, locale); return; }
   try {
     await writeSqliteLocale(locale);
   } catch {

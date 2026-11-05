@@ -1,3 +1,4 @@
+import { onBackendChange, hasRemoteDraft } from "@/lib/backend/remote";
 import { onServiceImport } from "@/lib/service-backup/events";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
@@ -12,6 +13,8 @@ export function NutritionProvider({ children }: { children: ReactNode }) {
     try { const rows = await nutritionStore.list(); if (requested === revision.current) { setEntries(rows); setLoadFailed(false); } }
     catch { if (requested === revision.current) setLoadFailed(true); } finally { setReady(true); }
   }, []);
+  useEffect(() => onBackendChange(domain => { if ((domain === "nutrition" || domain === "*") && !hasRemoteDraft()) void refresh().catch(() => {}); }), [refresh]);
+
   useEffect(() => onServiceImport(service => { if (service === "health") void refresh().catch(() => {}); }), [refresh]);
 
   useEffect(() => { void refresh(); const subscription = AppState.addEventListener("change", (state) => { if (state === "active") void refresh(); }); return () => subscription.remove(); }, [refresh]);

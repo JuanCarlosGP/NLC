@@ -43,6 +43,7 @@ Module._load = function (request, parent, ...rest) {
       request = "@/lib/service-backup/native";
   }
   const stubs = {
+    "@/lib/backend/native-module": { publishWebEvent() {} },
     "@/lib/settings/secret-store": {
       getSecret: async () => null,
       setSecret: async () => {},
@@ -89,12 +90,14 @@ Module._load = function (request, parent, ...rest) {
       },
     },
     "@/lib/service-backup/native": {
+      finishArchiveCommit: async () => {},
       listArchiveFolder: async () => folderFiles,
       commitArchiveFiles: async (stage) => {
         commits++;
         return {
           root: "content://new-root",
           name: "NLC-import",
+          paths: Object.fromEntries(Object.keys(stage.files).map(p => [p, p.slice(6)])),
           files: Object.fromEntries(
             Object.entries(stage.files).map(([p]) => [
               p,
@@ -107,6 +110,7 @@ Module._load = function (request, parent, ...rest) {
     "@/lib/service-backup/events": { notifyServiceImport() {} },
     "@/lib/db/catalog": { notifyCatalog() {} },
   };
+  if (/\.(internal|impl)$/.test(request) && Object.hasOwn(stubs, request.replace(/\.(internal|impl)$/, ""))) request = request.replace(/\.(internal|impl)$/, "");
   if (Object.hasOwn(stubs, request)) return stubs[request];
   return originalLoad.call(this, request, parent, ...rest);
 };
@@ -153,7 +157,7 @@ function db(t) {
   sqlite = new DatabaseSync(":memory:");
   sqlite.exec(SCHEMA_SQL);
   sqlite.exec(
-    "CREATE TABLE integration_cache (key TEXT PRIMARY KEY, payload TEXT NOT NULL)",
+    "CREATE TABLE IF NOT EXISTS integration_cache (key TEXT PRIMARY KEY, payload TEXT NOT NULL)",
   );
   sqlite.exec("PRAGMA foreign_keys=ON");
   memory.clear();
@@ -862,4 +866,20 @@ test("a scan finishing after restore cannot reinsert the previous source files",
     sqlite.prepare("SELECT count(*) AS n FROM tracks WHERE id=?").get(oldId).n,
     0,
   );
+});
+
+test("desktop restore retains every configured folder and source mode", async t => {
+ db(t); insertAudio();
+ const configured = withLocalFolder(settings, "music", "content://tree", "Music");
+ const plan = await createArchivePlan("music", configured, "");
+ sqlite.prepare("INSERT INTO meta(key,value) VALUES('nas_settings',?)").run(JSON.stringify(configured));
+ const next = await restoreService(stage(plan.data), "music", configured, "content://tree", "remote-owned-job", { preserveSources: true });
+ assert.deepEqual(next, configured); assert.deepEqual(JSON.parse(sqlite.prepare("SELECT value FROM meta WHERE key='nas_settings'").get().value), configured);
+ assert.equal(sourceMode(next, "music"), sourceMode(configured, "music"));
+});
+test("cancelling before commit leaves existing records and configured folders intact", async t => {
+ db(t); insertAudio(); const configured = withLocalFolder(phoneOnly(settings), "music", "content://tree", "Music");
+ const plan = await createArchivePlan("music", configured, ""); const before = sqlite.prepare("SELECT id,title FROM tracks").all();
+ await assert.rejects(restoreService(stage(plan.data), "music", configured, "content://tree", "remote-cancelled-job", { preserveSources: true, beforeCommit: async () => { throw new Error("cancelled"); } }), /cancelled/);
+ assert.deepEqual(sqlite.prepare("SELECT id,title FROM tracks").all(), before);
 });

@@ -1,3 +1,5 @@
+import { remoteEnabled } from "@/lib/backend/profile";
+import { markEditDraft, hasEditDraft, confirmEdit } from "@/lib/backend/edit-drafts";
 import { BodyPhotoError, MAX_PHOTO_BYTES, detectPhotoMime, validatePhoto, type PickedBodyPhoto } from "./model";
 
 export async function prepareBodyFile(file: Blob): Promise<PickedBodyPhoto> {
@@ -19,11 +21,12 @@ export async function prepareBodyFile(file: Blob): Promise<PickedBodyPhoto> {
   } catch (error) { URL.revokeObjectURL(uri); throw error instanceof BodyPhotoError ? error : new BodyPhotoError("type"); }
 }
 export function pickBodyPhoto(): Promise<PickedBodyPhoto | null> {
+  const previous = hasEditDraft(); const generation = remoteEnabled ? markEditDraft("body") : 0;
   return new Promise((resolve, reject) => {
     const input = document.createElement("input"); input.type = "file"; input.accept = "image/jpeg,image/png,image/webp";
     input.setAttribute("aria-label", "Select body photo"); input.style.display = "none"; document.body.appendChild(input);
     const cleanup = () => input.remove();
-    input.addEventListener("cancel", () => { cleanup(); resolve(null); }, { once: true });
+    input.addEventListener("cancel", () => { cleanup(); if (!previous) confirmEdit("body", generation); resolve(null); }, { once: true });
     input.addEventListener("change", () => {
       const file = input.files?.[0]; cleanup(); if (!file) { resolve(null); return; }
       void prepareBodyFile(file).then(resolve, reject);

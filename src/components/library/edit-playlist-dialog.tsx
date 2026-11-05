@@ -1,3 +1,7 @@
+import { remoteEnabled } from "@/lib/backend/profile";
+import { browserBackend } from "@/lib/backend/remote";
+import { uploadFile } from "@/lib/backend/transfers";
+import { prepareBodyFile } from "@/lib/health/body-photos/picker.web";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +29,7 @@ export function EditPlaylistDialog({
   const { t } = useI18n();
   const [name, setName] = useState(playlist.name);
   const [coverUrl, setCoverUrl] = useState<string>(playlist.coverUrl ?? "");
+  const [fileError, setFileError] = useState("");
   const [busy, setBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -61,9 +66,16 @@ export function EditPlaylistDialog({
     }
   }
 
-  function handleFileSelect(event: any) {
+  async function handleFileSelect(event: any) {
     const file = event?.target?.files?.[0];
     if (!file) return;
+    if (remoteEnabled) {
+      setBusy(true); setFileError(""); let prepared;
+      try { prepared = await prepareBodyFile(file); const transfer = await uploadFile(prepared.source as Blob,file.name); setCoverUrl(await browserBackend.invoke<string>("artwork.import",[transfer.id],{domain:"artwork",write:true,atomic:false})); triggerUiHaptic(); }
+      catch(error) {setFileError(error instanceof Error ? error.message : "No se pudo subir la imagen");}
+      finally {prepared?.dispose();setBusy(false);}
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
@@ -99,6 +111,7 @@ export function EditPlaylistDialog({
             <Text style={styles.title}>{t("playlistActions.editTitle")}</Text>
           </View>
 
+          {!!fileError && <Text accessibilityRole="alert" style={type.meta}>{fileError}</Text>}
           {/* Cover Preview and Quick Actions */}
           <View style={styles.coverSection}>
             <Cover

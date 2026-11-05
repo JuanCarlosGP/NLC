@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import { t } from "@/lib/i18n/runtime";
-import { upsertLocalLibrary } from "@/lib/db/catalog";
+import { upsertLocalLibrary } from "@/lib/db/catalog.internal";
 import type { Album, AlbumDetail, Artist, MusicSource, PingResult, PlayableSource, SearchResults } from "@/lib/nas/types";
 import {
   buildIndex,

@@ -22,7 +22,7 @@ export function NutritionImport({ open, onClose, onDone }: { open: boolean; onCl
   const preview = incoming ? importPreview(entries, incoming, replace) : null;
   async function choose() {
     if (locked.current) return; locked.current = true; setBusy(true); setError("");
-    try { const selected = await pickNutritionCsv(); if (selected) { const parsed = parseMacroFactor(selected.text); setIncoming(parsed); setName(selected.name); setReplace(false); setPaste(false); } }
+    try { const selected = await pickNutritionCsv(); if (selected) { const parsed = selected.days ?? parseMacroFactor(selected.text); setIncoming(parsed); setName(selected.name); setReplace(false); setPaste(false); } }
     catch (err) { setError(nutritionError(err, t)); } finally { locked.current = false; setBusy(false); }
   }
   function review() { setError(""); try { setIncoming(parseMacroFactor(csv)); setName(t("nutrition.paste")); setReplace(false); } catch (err) { setError(nutritionError(err, t)); } }

@@ -1,3 +1,4 @@
+import { phoneNow } from "@/lib/backend/clock";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space, textSize, radius } from "@/lib/appearance/density";
 import { InlineHelp } from "@/components/ui/inline-help";
@@ -47,7 +48,7 @@ export function TrainingSessionScreen() {
   }
   async function startRest(exercise: TrainingExercise) {
     if (!session || !exercise.restSec) return;
-    try { await setRest({ sessionId: session.id, exerciseName: exercise.name, endsAt: Date.now() + exercise.restSec * 1000 }); }
+    try { await setRest({ sessionId: session.id, exerciseName: exercise.name, endsAt: phoneNow() + exercise.restSec * 1000 }); }
     catch { setError("training.errors.storage"); }
   }
   async function action() {
@@ -57,7 +58,7 @@ export function TrainingSessionScreen() {
       if (confirm === "delete") {
         await remove(session.id); if (rest?.sessionId === session.id) await setRest(null); setConfirm(null); router.replace("/health/training");
       } else if (confirm === "finish") {
-        change({ ...session, finishedAt: Date.now() }); await flush();
+        change({ ...session, finishedAt: phoneNow() }); await flush();
         if (rest?.sessionId === session.id) await setRest(null); setConfirm(null);
       } else {
         update({ ...session, exercises: session.exercises.filter((exercise) => exercise.id !== confirm) }); setConfirm(null);

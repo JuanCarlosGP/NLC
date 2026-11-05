@@ -1,3 +1,5 @@
+import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
+import { DesktopWebInterface } from "@/components/settings/desktop-web-interface";
 import { LocalMoveSheet } from "@/components/settings/local-move-sheet";
 import { ServiceSourcePicker } from "@/components/settings/service-source-picker";
 import { usesNas, usesLocal } from "@/lib/settings/service-source";
@@ -186,7 +188,7 @@ export default function SettingsScreen() {
             <View style={styles.divider} />
             {usesNas(settings, zone) ? <SettingsRow title={t("settings.shareFolder")} summary={settings.healthSharePath || t("common.none")} onPress={() => setConfigOpen(true)} /> : null}
             {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-            {usesLocal(settings, zone) ? <SettingsRow title={t("settings.localFolder")} summary={settings.healthLocalFolderName || t("localSetup.internal")} ready={Boolean(settings.healthLocalFolderUri)} showStatus onPress={() => setLocalOpen(true)} /> : null}
+            {usesLocal(settings, zone) ? <SettingsRow deviceOnly title={t("settings.localFolder")} summary={settings.healthLocalFolderName || t("localSetup.internal")} ready={Boolean(settings.healthLocalFolderUri)} showStatus onPress={() => setLocalOpen(true)} /> : null}
           </SettingsGroup>
         ) : null}
         {zone === "focus" ? (
@@ -203,7 +205,7 @@ export default function SettingsScreen() {
                 }}
               /> : null}
               {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-              {usesLocal(settings, zone) ? <SettingsRow
+              {usesLocal(settings, zone) ? <SettingsRow deviceOnly
                 title={t("settings.localFolder")}
                 summary={focusLocalSummary}
                 ready={Boolean(settings.focusLocalFolderUri)}
@@ -256,7 +258,7 @@ export default function SettingsScreen() {
                 }}
               /> : null}
               {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-              {usesLocal(settings, zone) ? <SettingsRow
+              {usesLocal(settings, zone) ? <SettingsRow deviceOnly
                 title={t("settings.localFolder")}
                 summary={wealthLocalSummary}
                 ready={Boolean(settings.wealthLocalFolderUri)}
@@ -341,7 +343,7 @@ export default function SettingsScreen() {
               }}
             /> : null}
             {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-            {usesLocal(settings, zone) ? <SettingsRow
+            {usesLocal(settings, zone) ? <SettingsRow deviceOnly
               title={t("settings.localFolder")}
               summary={localSummary}
               ready={Boolean(settings.localFolderUri)}
@@ -368,7 +370,7 @@ export default function SettingsScreen() {
                 }}
               /> : null}
               {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-              {usesLocal(settings, zone) ? <SettingsRow
+              {usesLocal(settings, zone) ? <SettingsRow deviceOnly
                 title={t("settings.localFolder")}
                 summary={podcastLocalSummary}
                 ready={Boolean(settings.podcastLocalFolderUri || settings.localFolderUri)}
@@ -395,7 +397,7 @@ export default function SettingsScreen() {
               }}
             /> : null}
             {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-            {usesLocal(settings, zone) ? <SettingsRow
+            {usesLocal(settings, zone) ? <SettingsRow deviceOnly
               title={t("settings.localFolder")}
               summary={videoLocalSummary}
               ready={Boolean(settings.videoLocalFolderUri)}
@@ -444,7 +446,7 @@ export default function SettingsScreen() {
         ) : null}
 
         <SettingsGroup label={t("settings.desktop")}>
-          <SettingsRow
+          <SettingsRow deviceOnly
             title={t("desktop.title")}
             summary={desktopSummary}
             ready={desktopLinked}
@@ -456,6 +458,8 @@ export default function SettingsScreen() {
           />
           <View style={styles.divider} />
           <DesktopWebTui />
+          <View style={styles.divider} />
+          <DesktopWebInterface />
         </SettingsGroup>
 
         <SettingsGroup label={t("settings.zones")}>
@@ -489,7 +493,7 @@ export default function SettingsScreen() {
             }}
           />
           <View style={styles.divider} />
-          <SettingsRow
+          <SettingsRow deviceOnly
             title={t("settings.apk")}
             summary={update.apkSummary}
             ready={update.apkStatus === "current"}
@@ -503,7 +507,7 @@ export default function SettingsScreen() {
             }}
           />
           <View style={styles.divider} />
-          <SettingsRow
+          <SettingsRow deviceOnly
             title={t("settings.ota")}
             summary={update.otaSummary}
             ready={update.otaStatus === "current"}
@@ -517,7 +521,7 @@ export default function SettingsScreen() {
             }}
           />
           <View style={styles.divider} />
-          <SettingsRow
+          <SettingsRow deviceOnly
             title={t("settings.notifications")}
             summary={pushSummary}
             ready={pushStatus === "ok"}
@@ -541,7 +545,7 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
           <SettingsRow title={t("serviceBackup.openSettings")} summary={`${t(`zones.${zone}`)} · ${t("serviceBackup.settingsHint")}`} onPress={() => router.push({ pathname: "/service-backup", params: { service: zone } } as Href)} />
           <View style={styles.divider} />
-          <SettingsRow title={t("localMove.title")} summary={settings.localRootFolderName || t("localSetup.generalFolder")} onPress={() => setMoveOpen(true)} />
+          <SettingsRow deviceOnly title={t("localMove.title")} summary={settings.localRootFolderName || t("localSetup.generalFolder")} onPress={() => setMoveOpen(true)} />
           {moveOpen ? <LocalMoveSheet onClose={() => setMoveOpen(false)}/> : null}
           <AppearancePicker />
           <View style={styles.divider} />
@@ -554,7 +558,7 @@ export default function SettingsScreen() {
             }}
           /> : null}
           <View style={styles.divider} />
-          <SettingsRow
+          <SettingsRow deviceOnly
             title={t("settings.onboarding")}
             summary={t("settings.onboardingReplay")}
             onPress={() => {
@@ -712,6 +716,7 @@ function SettingsRow({
   showStatus,
   tone,
   chevron = true,
+  deviceOnly = false,
   onPress,
 }: {
   title: string;
@@ -720,6 +725,7 @@ function SettingsRow({
   showStatus?: boolean;
   tone?: "ok" | "warn";
   chevron?: boolean;
+  deviceOnly?: boolean;
   onPress?: () => void;
 }) {
   useThemeId();
@@ -737,7 +743,7 @@ function SettingsRow({
             tone === "warn" ? styles.rowSummaryWarn : tone === "ok" ? styles.rowSummaryOk : null,
           ]}
         >
-          {summary}
+          {remoteEnabled && deviceOnly ? PHONE_ONLY : summary}
         </Text>
       </View>
       {chevron ? <ChevronRight color={colors.muted} size={18} /> : null}
@@ -749,7 +755,7 @@ function SettingsRow({
   }
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { opacity: pressed ? 0.82 : 1 }]}>
+    <Pressable disabled={remoteEnabled && deviceOnly} accessibilityState={{ disabled: remoteEnabled && deviceOnly }} onPress={onPress} style={({ pressed }) => [styles.row, { opacity: remoteEnabled && deviceOnly ? 0.45 : pressed ? 0.82 : 1 }]}>
       {body}
     </Pressable>
   );

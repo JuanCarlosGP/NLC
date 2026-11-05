@@ -162,7 +162,11 @@ impl BridgeClient {
         format!("Authorization: Bearer {}", self.token)
     }
 
-    fn get_with_timeout(&self, path: &str, timeout: std::time::Duration) -> Result<ureq::Response, String> {
+    fn get_with_timeout(
+        &self,
+        path: &str,
+        timeout: std::time::Duration,
+    ) -> Result<ureq::Response, String> {
         let res = ureq::get(&format!("{}{path}", self.base))
             .set("Authorization", &format!("Bearer {}", self.token))
             .timeout(timeout)
@@ -230,17 +234,26 @@ impl BridgeClient {
     }
 
     pub fn albums(&self) -> Result<Vec<Album>, String> {
-        let body: AlbumsBody = self.get("/v1/albums")?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        let body: AlbumsBody = self
+            .get("/v1/albums")?
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))?;
         Ok(body.albums)
     }
 
     pub fn playlists(&self) -> Result<Vec<Album>, String> {
-        let body: AlbumsBody = self.get("/v1/playlists")?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        let body: AlbumsBody = self
+            .get("/v1/playlists")?
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))?;
         Ok(body.albums)
     }
 
     pub fn tracks(&self) -> Result<Vec<Track>, String> {
-        let mut body: SearchBody = self.get("/v1/tracks")?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        let mut body: SearchBody = self
+            .get("/v1/tracks")?
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))?;
         for track in &mut body.tracks {
             track.normalize();
         }
@@ -249,14 +262,19 @@ impl BridgeClient {
 
     pub fn videos(&self) -> Result<Vec<Album>, String> {
         let res = self.get_with_timeout("/v1/video", std::time::Duration::from_secs(20))?;
-        let body: AlbumsBody = res.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        let body: AlbumsBody = res
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))?;
         Ok(body.albums)
     }
 
     /// Last video watched and the following episode, when the phone has history.
     pub fn video_continue(&self) -> Result<Vec<Track>, String> {
-        let res = self.get_with_timeout("/v1/video/continue", std::time::Duration::from_secs(20))?;
-        let mut body: SearchBody = res.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        let res =
+            self.get_with_timeout("/v1/video/continue", std::time::Duration::from_secs(20))?;
+        let mut body: SearchBody = res
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))?;
         for track in &mut body.tracks {
             track.normalize();
         }
@@ -323,7 +341,8 @@ impl BridgeClient {
 
         let trimmed_url = url.trim();
         if trimmed_url.starts_with("data:") {
-            return decode_data_uri(trimmed_url).ok_or_else(|| "invalid data uri from bridge".into());
+            return decode_data_uri(trimmed_url)
+                .ok_or_else(|| "invalid data uri from bridge".into());
         }
 
         if trimmed_url.starts_with(&self.base) {
@@ -359,7 +378,10 @@ impl BridgeClient {
 
     pub fn album(&self, id: &str) -> Result<AlbumDetail, String> {
         let path = format!("/v1/album?id={}", urlencoding::encode(id));
-        let mut body: AlbumBody = self.get(&path)?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        let mut body: AlbumBody = self
+            .get(&path)?
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))?;
         for track in &mut body.album.tracks {
             track.normalize();
         }
@@ -368,7 +390,10 @@ impl BridgeClient {
 
     pub fn search(&self, q: &str) -> Result<SearchBody, String> {
         let path = format!("/v1/search?q={}", urlencoding::encode(q));
-        let mut body: SearchBody = self.get(&path)?.into_json().map_err(|e| explain_bridge_err(&e.to_string()))?;
+        let mut body: SearchBody = self
+            .get(&path)?
+            .into_json()
+            .map_err(|e| explain_bridge_err(&e.to_string()))?;
         for track in &mut body.tracks {
             track.normalize();
         }
@@ -541,12 +566,15 @@ mod tests {
                 let body = if request.url().starts_with("/v1/hello") {
                     r#"{"ok":true}"#.to_string()
                 } else {
-                    r#"{"albums":[{"id":"a1","name":"In Rainbows","artistName":"Radiohead"}]}"#.to_string()
+                    r#"{"albums":[{"id":"a1","name":"In Rainbows","artistName":"Radiohead"}]}"#
+                        .to_string()
                 };
                 let len = body.len();
                 let _ = request.respond(Response::new(
                     StatusCode(200),
-                    vec![Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()],
+                    vec![
+                        Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
+                    ],
                     std::io::Cursor::new(body.into_bytes()),
                     Some(len),
                     None,
@@ -598,6 +626,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Manual device integration test; never run during emulator/Linux QA"]
     fn live_phone_cover_bytes() {
         if let Some(session) = crate::session::load_session() {
             let client = BridgeClient::new(&session);
@@ -618,4 +647,3 @@ mod tests {
         }
     }
 }
-

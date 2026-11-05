@@ -2,7 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Crypto from "expo-crypto";
 import { createDavTransport, ensureWebDavDir } from "@/lib/nas/webdav-source";
 import { joinPath } from "@/lib/nas/webdav";
-import type { NasSettings } from "@/lib/settings/storage";
+import type { NasSettings } from "@/lib/settings/storage.impl";
 export async function pickServiceBackup() {
   const picker = await import("expo-document-picker");
   const result = await picker.getDocumentAsync({

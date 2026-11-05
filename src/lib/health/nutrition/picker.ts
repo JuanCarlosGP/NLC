@@ -2,7 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { NutritionError } from "./model";
 import { MAX_CSV_BYTES } from "./macrofactor";
-export async function pickNutritionCsv(): Promise<{ name: string; text: string } | null> {
+export async function pickNutritionCsv(): Promise<{ name: string; text: string; days?: import("./model").ImportedDay[] } | null> {
   if (!requireOptionalNativeModule("ExpoDocumentPicker")) throw new NutritionError("nativeUpdate");
   const DocumentPicker = await import("expo-document-picker");
   const picked = await DocumentPicker.getDocumentAsync({ type: "*/*", copyToCacheDirectory: true, multiple: false });

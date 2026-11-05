@@ -48,13 +48,13 @@ test('offline cache survives reopening; imports are idempotent and examples neve
 });
 test('real browser IndexedDB storage commits atomically and reopens offline',async()=>{
   const {indexedDB}=require('fake-indexeddb');global.indexedDB=indexedDB;
-  const Module=require('node:module');const original=Module._load;Module._load=function(request,parent,isMain){if(request==='@/lib/dev/local-demo')return {localDemoEnabled:false};return original.call(this,request,parent,isMain);};
+  const Module=require('node:module');const original=Module._load;Module._load=function(request,parent,isMain){if(request==='@/lib/dev/local-demo')return {localDemoEnabled:false};if(request.startsWith('@/'))request=path.join(__dirname,'../src',request.slice(2));return original.call(this,request,parent,isMain);};
   let storage;try{storage=require('../src/lib/integrations/storage.web.ts').integrationStorage;}finally{Module._load=original;}
   const {demoSnapshot}=await load('demo.mjs');let cache=createIntegrationCache(storage,'test');const data=demoSnapshot('mercury');await cache.write(data);cache=createIntegrationCache(storage,'test');assert.deepEqual(await cache.read('mercury','demo'),data);await cache.clear('mercury','demo');assert.equal(await cache.read('mercury','demo'),null);
 });
 test('native SQLite cache preserves other tables and round-trips snapshots',async()=>{
   const {DatabaseSync}=require('node:sqlite');const db=new DatabaseSync(':memory:');db.exec('CREATE TABLE manual_data (value TEXT); INSERT INTO manual_data VALUES (\'keep\')');const adapter={execAsync:async sql=>db.exec(sql),getFirstAsync:async(sql,...params)=>db.prepare(sql).get(...params),runAsync:async(sql,...params)=>db.prepare(sql).run(...params)};
-  const Module=require('node:module');const original=Module._load;Module._load=function(request,parent,isMain){if(request==='@/lib/db/client')return {getDb:async()=>adapter};return original.call(this,request,parent,isMain);};let storage;try{storage=require('../src/lib/integrations/storage.ts').integrationStorage;}finally{Module._load=original;}
+  const Module=require('node:module');const original=Module._load;Module._load=function(request,parent,isMain){if(request==='@/lib/db/client')return {getDb:async()=>adapter};if(request==='@/lib/backend/registry')return {invokeBoundary:(_name,_args,_options,local)=>local()};return original.call(this,request,parent,isMain);};let storage;try{storage=require('../src/lib/integrations/storage.ts').integrationStorage;}finally{Module._load=original;}
   try{const {demoSnapshot}=await load('demo.mjs');const data=demoSnapshot('whoop');await storage.setItem('test',JSON.stringify(data));assert.deepEqual(parseSnapshot(await storage.getItem('test')),data);await storage.removeItem('test');assert.equal(await storage.getItem('test'),null);assert.equal(db.prepare('SELECT value FROM manual_data').get().value,'keep');}finally{db.close();}
 });
 async function freePort(){const server=net.createServer();await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));return port;}

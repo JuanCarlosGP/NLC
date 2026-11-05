@@ -1,3 +1,4 @@
+import { remoteEnabled } from "@/lib/backend/profile";
 import { onServiceImport } from "@/lib/service-backup/events";
 import { t } from "@/lib/i18n/runtime";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -72,10 +73,11 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
   const applyPlaylists = useCallback((next: ImportedPlaylist[]) => {
     const mapped = next.map(withKind);
     setPlaylists(mapped);
-    void syncArtworkFromPlaylists(mapped).then(() => persistPlaylistCovers(sourceRef.current, mapped));
+    if (!remoteEnabled) void syncArtworkFromPlaylists(mapped).then(() => persistPlaylistCovers(sourceRef.current, mapped)).catch(() => {});
   }, []);
 
   const mirror = useCallback(() => {
+    if (remoteEnabled) return;
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(() => {
       void pushPlaylistsToSources(settingsRef.current, passwordRef.current).catch(() => {
@@ -131,7 +133,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
       const stored = await loadImportedPlaylists();
       if (cancelled) return;
       applyPlaylists(stored);
-      await syncFromSources();
+      if (!remoteEnabled) await syncFromSources();
     })().catch(() => {
       if (!cancelled) setPlaylists([]);
     });
@@ -142,7 +144,7 @@ export function SpotifyProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") void syncFromSources();
+      if (state === "active" && !remoteEnabled) void syncFromSources();
     });
     return () => sub.remove();
   }, [syncFromSources]);

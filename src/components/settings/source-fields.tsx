@@ -1,3 +1,4 @@
+import {useCredentialState} from "@/lib/backend/use-credential-state";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
 import { Platform, Pressable, Switch, View } from "react-native";
@@ -28,7 +29,7 @@ export function Field({
   error?: string;
   accessibilityLabel?: string;
 }) {
-  useThemeId();
+  useThemeId(); const credentials=useCredentialState();
   return (
     <View style={styles.field}>
       <Text style={type.label}>{label}</Text>
@@ -40,7 +41,7 @@ export function Field({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
-        placeholder={placeholder}
+        placeholder={secure && credentials?.nas ? "Guardada en el móvil" : placeholder}
         placeholderTextColor={colors.muted}
         style={[styles.input, error ? styles.inputError : null]}
       />

@@ -1,3 +1,5 @@
+import { phoneNow } from "@/lib/backend/clock";
+import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { space, textSize } from "@/lib/appearance/density";
 import { useEffect, useState } from "react";
@@ -13,11 +15,11 @@ import { Button, styles } from "./ui";
 export function RestCard() {
   useThemeId();
   const { rest, setRest } = useTraining(); const { t } = useI18n();
-  const [now, setNow] = useState(Date.now()); const [permission, setPermission] = useState(false); const [error, setError] = useState(false); const [denied, setDenied] = useState(false);
+  const [now, setNow] = useState(phoneNow()); const [permission, setPermission] = useState(false); const [error, setError] = useState(false); const [denied, setDenied] = useState(false);
   useEffect(() => {
     void restAlertPermission(false).then(setPermission).catch(() => {});
-    const sub = AppState.addEventListener("change", () => setNow(Date.now()));
-    const interval = setInterval(() => setNow(Date.now()), 500);
+    const sub = AppState.addEventListener("change", () => setNow(phoneNow()));
+    const interval = setInterval(() => setNow(phoneNow()), 500);
     return () => { clearInterval(interval); sub.remove(); };
   }, []);
   if (!rest) return null;
@@ -30,7 +32,7 @@ export function RestCard() {
     <View style={styles.spread}><View style={{ flex: 1, gap: space(5) }}><Text style={type.label}>{t(remaining ? "training.rest" : "training.restOver")}</Text><Text style={type.body}>{rest.exerciseName}</Text></View>
       <Text style={{ fontFamily: fonts.serif, fontSize: textSize(38), color: colors.accent }}>{clock(remaining)}</Text></View>
     <Button title={t(remaining ? "training.skipRest" : "training.dismissRest")} onPress={() => { void setRest(null).catch(() => setError(true)); }} />
-    {!restAlertsSupported ? <Text style={type.meta}>{t("training.restWebHint")}</Text> : permission ? <Text style={type.meta}>{t("training.alertsOn")}</Text> : <Button title={t("training.enableAlerts")} onPress={() => void enable()} />}
+    {!restAlertsSupported ? <Text style={type.meta}>{t("training.restWebHint")}</Text> : permission ? <Text style={type.meta}>{t("training.alertsOn")}</Text> : <Button title={remoteEnabled ? `${t("training.enableAlerts")} · ${PHONE_ONLY}` : t("training.enableAlerts")} disabled={remoteEnabled} onPress={() => void enable()} />}
     {denied ? <Text style={type.meta}>{t("training.alertDenied")}</Text> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{t("training.errors.storage")}</Text> : null}
   </View>;

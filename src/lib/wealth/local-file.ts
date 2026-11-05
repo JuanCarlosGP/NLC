@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import type { WealthDump } from "@/lib/wealth/store";
+import type { WealthDump } from "@/lib/wealth/store.internal";
 
 const FILE_NAME = "nlc-wealth.json";
 

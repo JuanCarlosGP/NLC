@@ -132,8 +132,7 @@ function ChatSheetBody() {
   async function onSend() {
     const text = draft.trim();
     if (!text || busy) return;
-    setDraft("");
-    await send(text);
+    try { await send(text); setDraft(""); } catch { /* Keep the draft while disconnected. */ }
   }
 
   return (

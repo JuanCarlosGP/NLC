@@ -19,8 +19,10 @@ Gracias por interesarte en NLC. El código es público para usarlo en casa, estu
 git clone https://github.com/JuanCarlosGP/NLC.git
 cd NLC
 npm install
-npx expo start
+npm start
 ```
+
+La primera ejecución prepara el paquete web servido por la APK. Para regenerarlo después de cambiar la interfaz: `npm run web:package`.
 
 No hace falta cuenta de Expo para desarrollar. Sí hace falta para construir la APK oficial (`eas`).
 
