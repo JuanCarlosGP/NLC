@@ -36,3 +36,7 @@ try {
 } catch (e) {
   console.warn("[postinstall] failed to patch expo-audio:", e);
 }
+
+// 3. Video controllers must also work before an Android Activity exists.
+const withHeadlessVideo = require("../plugins/with-headless-video.js");
+withHeadlessVideo.patchExpoVideo(root);

@@ -24,4 +24,4 @@ Al perder la conexión se conservan los borradores y no se confirma un guardado 
 
 ## Actualizaciones
 
-La primera entrega requiere la APK **0.1.21 (23)** por sus cambios nativos. Las OTA compatibles incluyen también el paquete web. La interfaz, fuentes y recursos se sirven desde el teléfono; no dependen de CDN.
+La interfaz se incorporó en la APK **0.1.21 (23)**. Usa **0.1.22 (24)** para iniciar vídeo en el teléfono también con NLC cerrada. Las OTA compatibles incluyen también el paquete web. La interfaz, fuentes y recursos se sirven desde el teléfono; no dependen de CDN.

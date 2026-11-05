@@ -1,8 +1,8 @@
 {
   "name": "nlc",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "private": true,
-  "description": "Aplicación Android personal con bibliotecas locales o NAS, tareas, finanzas y salud.",
+  "description": "Aplicaci\u00f3n Android personal con bibliotecas locales o NAS, tareas, finanzas y salud.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "JuanCarlosGP",
   "homepage": "https://github.com/JuanCarlosGP/NLC#readme",
@@ -119,5 +119,14 @@
     "fake-indexeddb": "^6.2.4",
     "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"
+  },
+  "expo": {
+    "autolinking": {
+      "android": {
+        "buildFromSource": [
+          "expo-video"
+        ]
+      }
+    }
   }
 }

@@ -1,6 +1,6 @@
 # QA · Interfaz web desde la APK
 
-Issue: [#16](https://github.com/JuanCarlosGP/NLC/issues/16). Rama: `codex/phone-web-interface`. APK prevista: 0.1.21 (23).
+Issue: [#16](https://github.com/JuanCarlosGP/NLC/issues/16). Rama: `codex/phone-web-interface`. Primera APK: 0.1.21 (23). Corrección nativa de vídeo en segundo plano: 0.1.22 (24).
 
 ## Entorno y aislamiento
 
@@ -43,6 +43,7 @@ Las restauraciones tienen un recibo SQLite. Los archivos importados mantienen un
 - Corte del puente LAN durante una edición: se conserva la nota, aparece el error de guardado y el reintento tras reconectar guarda un único registro. El cambio de paquete pide recarga conservando el borrador.
 - SSE a un cliente que acepta gzip: entrega sin compresión, evento de escritura recibido en 176 ms. La compresión de NanoHTTPD retenía mensajes pequeños hasta cerrar el flujo; el servidor la excluye para `text/event-stream`.
 - Acción Detener pulsada en la notificación real: cierra HTTP, persiste el interruptor apagado y libera el wake lock. Con un proceso de QA ocupando 7682, el intento desde Ajustes muestra «El puerto 7682 está ocupado» y permanece apagado.
+- Reproducción sin Activity: el abandono del navegador genera el cambio de estado a los 12–14 s sin consultas periódicas; audio avanza de 25 a 29,87 s y vídeo de 10 a 15,11 s. Expo Video 3.0.16 exigía `throwingActivity` para obtener un contexto de aplicación. El plugin usa el contexto React y fuerza `expo-video` desde fuentes; un AAR precompilado no incluiría la corrección. Se aplica tanto en postinstall como en prebuild y falla si cambia el constructor esperado.
 - Reinicio completo del emulador: cambia el identificador de arranque, el receptor restaura el paquete verificado y Headless JS responde sin Activity. Queda comprobar la APK firmada sobre los datos de la versión anterior tras publicarla mediante el flujo oficial.
 
 Las integraciones reales de WHOOP y Mercury no utilizan credenciales en QA; se comprueban el contrato, los estados y la persistencia con datos sintéticos.
