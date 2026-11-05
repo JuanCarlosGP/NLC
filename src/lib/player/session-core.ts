@@ -73,7 +73,7 @@ export function createMediaSession(driver: MediaDriver) {
   const current=state.queue[state.index]?.id===before;const queue=state.queue.map(track=>track.id===before?after:track);
   if(current&&reload){active?.pause();active?.dispose();active=null;update({queue,currentTime:0,duration:0,playing:false,playNonce:state.playNonce+1},true);}else update({queue},true);
  });}
- function restore(saved: Partial<MediaState>) { active?.pause(); active?.dispose(); active = null; state = { ...EMPTY_MEDIA, ...saved, playing: false, owner: "phone", revision: (saved.revision ?? 0) + 1 }; listeners.forEach(fn => fn()); }
+ function restore(saved: Partial<MediaState>) { active?.pause(); active?.dispose(); active = null; state = { ...EMPTY_MEDIA, ...saved, playing: false, owner: "phone", revision: (saved.revision ?? 0) + 1 }; listeners.forEach(fn => fn()); driver.changed(state); }
  return { getSnapshot: () => state, getPlayer: () => active?.object, subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; }, play, video, next, control, prepareTransfer, prepareSelection, confirmTransfer, toPhone, reportBrowser, expireBrowser, remapTrack, restore };
 }
 export type MediaSession = ReturnType<typeof createMediaSession>;
