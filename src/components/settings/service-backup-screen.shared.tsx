@@ -1,3 +1,4 @@
+import { withExclusiveRestore } from "@/lib/backend/native";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, Pressable, View } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -211,13 +212,13 @@ export function ServiceBackupScreen() {
           : null;
       if (media && current.summary.files && !destination) return;
       check();
-      const next = await restoreService(
+      const next = await withExclusiveRestore(() => restoreService(
         current.stage,
         service,
         settings,
         destination,
         job.current,
-      );
+      ));
       if (next !== settings) {
         setSettings(next);
         reloadSource();

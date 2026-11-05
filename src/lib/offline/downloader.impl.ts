@@ -176,7 +176,7 @@ export async function startOfflineSync(includeSkipped = false, kind?: OfflineKin
       try {
         await downloadOne(item.id, item.title, item.nasBytes);
       } catch {
-        await coordinatedError(item.id);
+        await coordinatedError(item.id).catch(() => {});
       }
       await refreshOfflineTotals();
     }
@@ -190,7 +190,7 @@ export async function startOfflineSync(includeSkipped = false, kind?: OfflineKin
 
 export function requestOfflineSync(): void {
   if (!offlineSupported() || paused) return;
-  void startOfflineSync();
+  void startOfflineSync().catch(() => {});
 }
 
 export function resumeOfflineSync(kind?: OfflineKind): void {
@@ -198,7 +198,7 @@ export function resumeOfflineSync(kind?: OfflineKind): void {
   paused = false;
   emit();
   if (!offlineSupported()) return;
-  void startOfflineSync(true, kind);
+  void startOfflineSync(true, kind).catch(() => {});
 }
 
 export async function downloadTrackIds(ids: string[]): Promise<void> {
@@ -217,7 +217,7 @@ export async function downloadTrackIds(ids: string[]): Promise<void> {
       try {
         await downloadOne(item.id, item.title, item.nasBytes);
       } catch {
-        await coordinatedError(item.id);
+        await coordinatedError(item.id).catch(() => {});
       }
       await refreshOfflineTotals();
     }

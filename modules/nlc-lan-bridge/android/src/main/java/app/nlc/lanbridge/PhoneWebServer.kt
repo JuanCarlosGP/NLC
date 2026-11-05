@@ -17,16 +17,17 @@ object PhoneWebRuntime {
   @Volatile var server: PhoneWebServer? = null
   private val pending = ConcurrentHashMap<String, Pending>()
   private val subscribers = CopyOnWriteArraySet<EventStream>()
-  class Pending(val latch: CountDownLatch = CountDownLatch(1)) { @Volatile var result = JSONObject().put("status", 503).put("body", "{\"error\":\"phone_unavailable\"}") }
+  class Pending(val body: String, val latch: CountDownLatch = CountDownLatch(1)) { @Volatile var result = JSONObject().put("status", 503).put("body", "{\"error\":\"phone_unavailable\"}") }
   fun running() = server?.isAlive == true
   fun call(context: Context, method: String, path: String, body: String): JSONObject {
-    val id = UUID.randomUUID().toString(); val entry = Pending(); pending[id] = entry
+    val id = UUID.randomUUID().toString(); val entry = Pending(body); pending[id] = entry
     try {
-      context.startService(Intent(context, PhoneWebBackendService::class.java).putExtra("requestId", id).putExtra("method", method).putExtra("path", path).putExtra("body", body))
+      context.startService(Intent(context, PhoneWebBackendService::class.java).putExtra("requestId", id).putExtra("method", method).putExtra("path", path).putExtra("body", ""))
       if (!entry.latch.await(60, TimeUnit.SECONDS)) return JSONObject().put("status", 504).put("body", "{\"error\":\"phone_timeout\"}")
       return entry.result
     } finally { pending.remove(id) }
   }
+  fun requestBody(id: String): String = pending[id]?.body ?: ""
   fun resolve(id: String, json: String) { pending[id]?.let { it.result = JSONObject(json); it.latch.countDown() } }
   fun publish(json: String) { subscribers.forEach { if (!it.offer(json)) { it.close(); subscribers.remove(it) } } }
   fun events(): InputStream {
@@ -76,6 +77,9 @@ class PhoneWebServer(private val context: Context, private val directory: File, 
       override fun closeAll() { clients.forEach { it.close() }; clients.clear(); pool.shutdownNow() }
     })
   }
+  // NanoHTTPD's gzip stream buffers small writes until it closes. SSE stays open.
+  override fun useGzipWhenAccepted(response: Response): Boolean =
+    response.mimeType?.substringBefore(";") != "text/event-stream" && super.useGzipWhenAccepted(response)
   fun stopTransfers() { PhoneWebTransfers.stopAll(context) }
   fun rootPath(): String = directory.canonicalPath
   private fun json(status: Int, body: String): Response = newFixedLengthResponse(PhoneWebStatus.of(status), "application/json; charset=utf-8", body).apply { addHeader("Cache-Control", "no-store") }
@@ -87,7 +91,7 @@ class PhoneWebServer(private val context: Context, private val directory: File, 
     if (parts.size != 4 || parts.any { it !in 0..255 }) return false
     return parts[0] == 10 || parts[0] == 127 || parts[0] == 192 && parts[1] == 168 || parts[0] == 172 && parts[1] in 16..31 || parts[0] == 169 && parts[1] == 254
   }
-  private fun body(session: IHTTPSession, limit: Int = 1048576): String {
+  private fun body(session: IHTTPSession, limit: Int = 8 * 1048576): String {
     val length = session.headers["content-length"]?.toLongOrNull() ?: throw IllegalArgumentException("length_required")
     require(length in 0..limit.toLong()) { "body_too_large" }
     val bytes = ByteArray(length.toInt()); DataInputStream(session.inputStream).readFully(bytes); return String(bytes, Charsets.UTF_8)

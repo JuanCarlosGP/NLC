@@ -3,6 +3,7 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 import { Platform } from "react-native";
 export type WebHostState = { enabled?: boolean; running: boolean; bundleId: string | null; port: number; lanAddress: string; batteryExempt: boolean; tuiRunning: boolean };
 type NativeWeb = {
+ readWebRequestBody?(id:string):string;
  interruptedWebTransfers?():Promise<string>;
  installWebPackage(uri: string): Promise<{ directory: string; bundleId: string }>;
  startWebInterface(directory: string, bundle: string): Promise<WebHostState>;

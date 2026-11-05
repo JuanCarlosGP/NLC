@@ -10,7 +10,7 @@ export function createMediaSession(driver: MediaDriver) {
  let progressSeq = -1; let ending = false; const leases = new Map<string, { revision: number; owner: string; expires: number; next?: MediaState }>();
  const listeners = new Set<() => void>(); const now = driver.now ?? Date.now;
  let persisted = 0;
- function update(patch: Partial<MediaState>, structural = false) { state = { ...state, ...patch, revision: state.revision + (structural ? 1 : 0) }; listeners.forEach(fn => fn()); driver.changed(state); if (structural || now() - persisted > 3000) { persisted = now(); void driver.save({ ...state, playing: false }).catch(() => {}); } }
+ function update(patch: Partial<MediaState>, structural = false, saved = false) { state = { ...state, ...patch, revision: state.revision + (structural ? 1 : 0) }; listeners.forEach(fn => fn()); driver.changed(state); if (structural || now() - persisted > 3000) { persisted = now(); if (!saved) void driver.save({ ...state, playing: false }).catch(() => {}); } }
  function serialize<T>(task: () => Promise<T>) { const result = queue.then(task); queue = result.catch(() => {}); return result; }
  function assertRevision(revision?: number) { if (revision !== undefined && revision !== state.revision) throw new Error("media_session_changed"); }
  function report(position: number, duration: number, playing: boolean, ended = false) {
@@ -25,7 +25,8 @@ export function createMediaSession(driver: MediaDriver) {
     if (next.owner !== state.owner && next.playNonce === state.playNonce) next = { ...next, currentTime: Math.min(state.duration || Number.MAX_SAFE_INTEGER, state.currentTime + (state.playing && state.owner !== "phone" ? Math.max(0, now() - lastBrowserReport) / 1000 : 0)), playing: state.playing };
     await prepared.seek(next.currentTime); if (next.playing) await prepared.play(); }
    // Do not interrupt the previous destination until preparation and playback have succeeded.
-   active?.pause(); const previous = active; active = prepared; update({ ...next, error: null }, true); previous?.dispose(); prepared?.committed?.(); lastBrowserReport = now(); progressSeq = -1; leases.clear();
+   await driver.save({ ...next, playing: false });
+   active?.pause(); const previous = active; active = prepared; update({ ...next, error: null }, true, true); previous?.dispose(); prepared?.committed?.(); lastBrowserReport = now(); progressSeq = -1; leases.clear();
   } catch (error) { prepared?.dispose(); throw error; } finally { preparing--; }
  }
  function play(tracks: Track[], index = 0, owner = "phone", revision?: number) { return serialize(async () => { assertRevision(revision); if (!tracks.length || tracks.length > 10000 || !Number.isInteger(index) || index < 0 || index >= tracks.length) throw new Error("invalid_queue"); let ordered = tracks.slice(); if (state.shuffle) { const first = ordered[index]; ordered = ordered.filter((_, i) => i !== index).sort(() => Math.random() - 0.5); ordered.unshift(first); index = 0; } await activate({ ...state, queue: ordered, index, owner, kind: "audio", videoPath: null, currentTime: 0, duration: 0, playing: true, playNonce: state.playNonce + 1 }); }); }
@@ -59,7 +60,8 @@ export function createMediaSession(driver: MediaDriver) {
  function confirmTransfer(clientId: string, leaseId: string) { return serialize(async () => {
   const lease = leases.get(leaseId); leases.delete(leaseId);
   if (!lease || lease.owner !== clientId || lease.expires < now() || lease.revision !== state.revision) throw new Error("media_transfer_expired");
-  active?.pause(); active?.dispose(); active = null; progressSeq = -1; lastBrowserReport = now(); update(lease.next || { owner: clientId }, true); leases.clear(); return state;
+  await driver.save({ ...state, ...lease.next, owner: clientId, playing: false });
+  active?.pause(); active?.dispose(); active = null; progressSeq = -1; lastBrowserReport = now(); update(lease.next || { owner: clientId }, true, true); leases.clear(); return state;
  }); }
  function toPhone(revision?: number) { return serialize(async () => { assertRevision(revision); await activate({ ...state, owner: "phone" }); }); }
  function reportBrowser(clientId: string, revision: number, sequence: number, position: number, duration: number, playing: boolean, ended = false) {

@@ -43,7 +43,7 @@ async function apply(next: MediaState) {
 async function invoke<T>(method: string, args: unknown[] = [], write = true): Promise<T> {
  return browserBackend.invoke<T>(`playback.${method}`, args, { domain: "playback", write, atomic: false });
 }
-async function refresh() { if (!remoteEnabled) return; return refreshing ??= invoke<MediaState>("state", [], false).then(apply).catch(error => { state = { ...state, error: String(error) }; notify(); }).finally(() => { refreshing = null; }); }
+async function refresh() { if (!remoteEnabled) return; return refreshing ??= invoke<MediaState>("state", [state.revision], false).then(next=>apply({...next,queue:next.queue??state.queue})).catch(error => { state = { ...state, error: String(error) }; notify(); }).finally(() => { refreshing = null; }); }
 async function report(ended = false) {
  const media = active; if (!media || state.owner !== playbackClientId || !remoteState.getSnapshot().connected) return;
  await invoke("progress", [playbackClientId, state.revision, ++sequence, media.currentTime || 0, Number.isFinite(media.duration) ? media.duration : 0, !media.paused, ended], false).catch(() => {});

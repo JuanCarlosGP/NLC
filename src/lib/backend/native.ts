@@ -19,7 +19,7 @@ async function versions(domain: string) {
   return Object.fromEntries(rows.map(row => [row.key, row.version]));
 }
 async function perform<T>(operation: string, args: unknown[], options: OperationOptions, task: () => Promise<T>, request?: Command, sentGeneration = editGeneration()): Promise<Reply<T>> {
-  if (restoring && (options.write || ["weight", "training", "medication", "body", "nutrition"].includes(options.domain) || operation.startsWith("source."))) throw new BackendError(423, "Restauración en curso en el móvil");
+  if (restoring && (options.write || ["weight", "training", "medication", "body", "nutrition", "healthBackup"].includes(options.domain) || operation.startsWith("source."))) throw new BackendError(423, "Restauración en curso en el móvil");
   const db = await getDb();
   const key = `${options.domain}:${options.key?.(args) ?? "$collection"}`;
   const fingerprint = request ? await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, JSON.stringify([request.operation, request.args, request.expectedVersion, request.expectedDomainVersion])) : "";
@@ -55,7 +55,7 @@ async function perform<T>(operation: string, args: unknown[], options: Operation
     if (request && options.write) await db.runAsync("UPDATE backend_requests SET result = ? WHERE id = ?", JSON.stringify(reply), request.requestId);
     return reply;
   };
-  const reply = options.write && options.atomic !== false ? await runInTransaction(db, () => backendTransaction(work)) : await work();
+  const reply = options.write && options.atomic !== false ? await runInTransaction(db, () => backendTransaction(work, db)) : await work();
   if (!request) { observeVersions(reply.versions); if (options.write) confirmEdit(options.domain, sentGeneration, reply.versions); }
   if (options.write) { try { await afterMutation(options.domain); } catch { publishWebEvent({ type: "effect-error", domain: options.domain }); } }
   if (options.write) publishWebEvent({ type: "change", domain: options.domain, key, versions: reply.versions });

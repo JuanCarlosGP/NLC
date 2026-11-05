@@ -1,3 +1,5 @@
+import { saveMediaRemap } from "@/lib/player/media-remap";
+import { serialize } from "@/lib/backend/write-queue";
 import { dumpPlaylists } from "@/lib/spotify/playlist-sync.internal";
 import { emitPlaylistStoreChanged } from "@/lib/spotify/playlist-store.internal";
 import * as Crypto from "expo-crypto";
@@ -82,7 +84,7 @@ export async function prepareMove(
 ) {
   moveNative();
   const db = await getDb();
-  await runInTransaction(db, async () => {
+  await serialize(() => runInTransaction(db, async () => {
     const lock = await db.getFirstAsync<{ value: string }>(
       "SELECT value FROM meta WHERE key = ?",
       MOVE_ACTIVE,
@@ -93,7 +95,7 @@ export async function prepareMove(
       MOVE_ACTIVE,
       id,
     );
-  });
+  }));
   notifyLocalMoveLock(true);
   await drainLocalSourceSync();
   pauseOfflineSync();
@@ -149,10 +151,11 @@ export async function commitMove(
   let applied!: Awaited<ReturnType<typeof applyMove>>;
   try {
     await db.execAsync("PRAGMA synchronous = FULL");
-    await runInTransaction(db, async () => {
+    await serialize(() => runInTransaction(db, async () => {
       if (cancelled()) throw new Error("cancelled");
       applied = await applyMove(db, job, files, fallback);
-    });
+      await saveMediaRemap(db,Object.fromEntries(applied.ids),Object.fromEntries(applied.uris));
+    }));
   } finally {
     await db.closeAsync?.();
   }

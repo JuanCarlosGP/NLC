@@ -59,6 +59,7 @@ class NlcLanBridgeModule : Module() {
     }
     AsyncFunction("stopWebInterface") { appContext.reactContext?.let { PhoneWebService.stop(it) } }
     Function("webInterfaceState") { mapOf("enabled" to (appContext.reactContext?.getSharedPreferences(PhoneWebService.PREFS, android.content.Context.MODE_PRIVATE)?.getBoolean("enabled", false) ?: false), "running" to PhoneWebRuntime.running(), "bundleId" to PhoneWebRuntime.server?.bundle, "port" to 7682, "lanAddress" to LanBridgeServer.lanAddress(), "batteryExempt" to (appContext.reactContext?.let { PhoneWebService.battery(it) } ?: false), "tuiRunning" to WebTuiProcess.running()) }
+    Function("readWebRequestBody") { id:String -> PhoneWebRuntime.requestBody(id) }
     Function("resolveWebRequest") { id: String, json: String -> PhoneWebRuntime.resolve(id, json) }
     Function("publishWebEvent") { json: String -> PhoneWebRuntime.publish(json) }
     Function("openWebBatterySettings") { appContext.reactContext?.let { PhoneWebService.openBattery(it) } }

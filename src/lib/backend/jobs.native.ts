@@ -13,6 +13,7 @@ import { archiveSummary, validateServiceArchive } from "@/lib/service-backup/mod
 const active = new Set<string>();
 expose("transfers.run", async (id: string, action: string, service: ServiceId) => {
  if (!SERVICES.includes(service) || !["preview", "restore", "export"].includes(action)) throw new BackendError(400, "invalid_transfer");
+ if(action!=="preview")await assertWriteAvailable();
  const native = webNative(), job = JSON.parse((await native.webTransferInfo(id)).state);
  if (job.private?.service && job.private.service !== service) throw new BackendError(400, "invalid_transfer");
  if (job.status === "processing" || job.private?.restored || job.status === "complete" && (action === "export" && job.action === action || action === "preview" && job.private?.stage)) return { ...job, private: undefined };
@@ -58,6 +59,6 @@ export async function runWebJob(id: string, action: string) {
   else await native.updateWebTransfer(id, JSON.stringify({ status: "error", error: error instanceof Error ? error.message : "storage" })).catch(() => {}); }
  finally { if (stage) await discardArchive(stage).catch(() => {}); listener?.remove(); active.delete(id); }
 }
-import { withExclusiveRestore, runMutationEffects } from "./native";
+import { withExclusiveRestore, runMutationEffects, assertWriteAvailable } from "./native";
 
 import { getDb } from "@/lib/db/client";

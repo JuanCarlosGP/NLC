@@ -38,12 +38,14 @@ term.loadAddon(new ImageAddon.ImageAddon({ iipSupport: true, sixelScrolling: tru
 term.open(document.getElementById("t"));
 fit.fit();
 let video = document.getElementById("player"), audio = document.getElementById("audio");
+let sessionQueue = [];
 let current = null, sequence = 0, busyMedia = false, polling = false, reporting = false, lastReport = 0;
 const clientId=Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,"0")).join("");
 const leaseId=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,"0")).join("");
 async function session(op,args={}) {
+ if(op==="state"&&current)args={revision:current.revision,...args};
  const query=new URLSearchParams({op,client:clientId,...args});const response=await fetch("/session?"+query,{headers:{"X-NLC-Protocol":"1"},cache:"no-store"});
- if(!response.ok)throw new Error("No se pudo conectar con el móvil");const result=await response.json();if(!result.ok)throw new Error(result.error||"phone_unavailable");return result;
+ if(!response.ok)throw new Error("No se pudo conectar con el móvil");const result=await response.json();if(!result.ok)throw new Error(result.error||"phone_unavailable");if(result.state){if(result.state.queue)sessionQueue=result.state.queue;else result.state.queue=sessionQueue;}return result;
 }
 function localPause() {video.pause();audio.pause();}
 function report(el) {

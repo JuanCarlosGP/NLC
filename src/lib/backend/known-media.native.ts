@@ -38,3 +38,11 @@ export async function validateArtworkInput(value: unknown): Promise<void> {
  function visit(value:any, depth=0) { if(depth>20)return; if(typeof value === "string") {if (/^(file:|content:|data:|blob:)/i.test(value) && !known.has(value)) throw new BackendError(403,"unknown_artwork");} else if(Array.isArray(value)) value.forEach(item=>visit(item,depth+1)); else if(value && typeof value === "object") Object.values(value).forEach(item=>visit(item,depth+1)); }
  visit(value);
 }
+
+export async function knownTracks(ids:string[]):Promise<Track[]> {
+ const db=await getDb(),catalogue=new Map((await getTracks()).map(track=>[track.id,track]));
+ const retired=new Set((await db.getAllAsync<{id:string}>("SELECT id FROM service_media_retired")).map(row=>row.id));
+ const missing=ids.filter(id=>!catalogue.has(id));
+ if(missing.length){const stamp=signature(await loadNasSettings()),wanted=new Set(missing);for(const row of await db.getAllAsync<{id:string;payload:string}>("SELECT id,payload FROM backend_source_tracks WHERE signature=?",stamp))if(wanted.has(row.id))catalogue.set(row.id,JSON.parse(row.payload));}
+ return ids.map(id=>{const track=catalogue.get(id);if(!track||retired.has(id))throw new BackendError(404,"unknown_track");return track;});
+}

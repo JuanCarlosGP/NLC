@@ -168,3 +168,15 @@ test("desktop reconnect retries a cold bootstrap and refreshes readers without r
   assert.ok(requests.every(url=>url==="/api/v1/bootstrap"));assert.equal(requests.length,3);
  }finally{Module._load=previousLoad;Object.assign(global,previous);delete require.cache[file];if(cached)require.cache[file]=cached;}
 });
+
+test("nested transactions never join a different SQLite connection",async()=>{
+ const scope=require("../src/lib/backend/transaction-scope.ts"),primary={},isolated={};
+ await scope.backendTransaction(async()=>{assert.equal(scope.inBackendTransaction(primary),true);assert.equal(scope.inBackendTransaction(isolated),false);},primary);
+ assert.equal(scope.inBackendTransaction(),false);
+});
+test("a persistence failure during transfer keeps the previous player active",async()=>{
+ let fail=false,paused=false;
+ const session=createMediaSession({changed(){},save:async()=>{if(fail)throw new Error("storage");},prepare:async()=>({object:{},play(){},pause(){paused=true;},seek(){},dispose(){}})});
+ await session.play([track]);const before=session.getSnapshot();const owner="browser_1234567890123456",lease="lease_storage_1234567890";session.prepareTransfer(owner,lease);fail=true;
+ await assert.rejects(session.confirmTransfer(owner,lease),/storage/);assert.equal(paused,false);assert.deepEqual(session.getSnapshot(),before);
+});

@@ -32,14 +32,18 @@ Las restauraciones tienen un recibo SQLite. Los archivos importados mantienen un
 
 ## Evidencias de la implementación
 
-- Los 15 grupos Node pasan. Backend: 21 pruebas sobre SQLite real, incluido rollback con productores en segundo plano y reconexión sin repetir escrituras. Copias de servicios: 23 pruebas. Rust: 14 pruebas; una prueba histórica con dispositivo físico queda excluida.
+- Los 15 grupos Node pasan. Backend: 23 pruebas sobre SQLite real, incluido rollback con productores en segundo plano y reconexión sin repetir escrituras. Copias de servicios: 23 pruebas. Rust: 14 pruebas; una prueba histórica con dispositivo físico queda excluida.
 - API de los seis servicios: catálogo de música/podcasts, listas, tareas, finanzas, nutrición, tomas, vídeo/rangos, fotos y estado de credenciales comprobados en la APK del emulador.
 - Navegador en origen HTTP de LAN: entrenamiento de 40 kg × 8, descanso, finalización y analíticas de 320 kg·rep; comparación de fotos servidas desde Android; importación MacroFactor por archivo con 1000 kcal, 60 g de proteínas, 115 g de carbohidratos y 30 g de grasas.
 - ZIP de 339.974.445 bytes: exportación y descarga por streaming, subida por bloques, reintento del mismo bloque, cancelación, falta de espacio e integridad verificados. Restaurar dos veces el mismo trabajo no duplica registros. Una segunda importación independiente conserva las fuentes/carpetas y recalcula también la cola multimedia.
-- Audio activo transferido móvil → navegador → móvil, conservando dos pistas y posición. Borrado y sustitución probados con archivos desechables de un NAS/downloader simulado; las peticiones sin confirmación se rechazan.
+- Audio y vídeo activos transferidos móvil → navegador → móvil, conservando cola y posición. La TUI reproduce su cola de dos pistas sobre la misma sesión. Borrado y sustitución probados con archivos desechables de un NAS/downloader simulado; las peticiones sin confirmación se rechazan.
 - Actividad Android retirada, pantalla apagada y Doze forzado: lecturas y escrituras funcionan con la excepción de batería. Internet está bloqueado en el emulador y se usa su conexión TCP virtual, no solo el túnel ADB.
 - Muerte del proceso: el servicio sticky vuelve a arrancar; Headless JS atiende peticiones sin pantalla y recupera la cola con sus rutas nuevas. El tema del navegador cambia sin modificar Geist Pixel en el teléfono.
-- Pendiente en la revisión final: vídeo y TUI activos, corte de red con borrador, reinicio completo y comprobación de la APK firmada sobre los datos anteriores. Estas comprobaciones se anotarán antes del cierre.
+- Cola de 10.000 pistas (petición de 1.910.216 bytes): validación por lotes, persistencia SQLite y recuperación tras muerte del proceso. Las actualizaciones de posición omiten la cola cuando no ha cambiado.
+- Corte del puente LAN durante una edición: se conserva la nota, aparece el error de guardado y el reintento tras reconectar guarda un único registro. El cambio de paquete pide recarga conservando el borrador.
+- SSE a un cliente que acepta gzip: entrega sin compresión, evento de escritura recibido en 176 ms. La compresión de NanoHTTPD retenía mensajes pequeños hasta cerrar el flujo; el servidor la excluye para `text/event-stream`.
+- Acción Detener pulsada en la notificación real: cierra HTTP, persiste el interruptor apagado y libera el wake lock. Con un proceso de QA ocupando 7682, el intento desde Ajustes muestra «El puerto 7682 está ocupado» y permanece apagado.
+- Reinicio completo del emulador: cambia el identificador de arranque, el receptor restaura el paquete verificado y Headless JS responde sin Activity. Queda comprobar la APK firmada sobre los datos de la versión anterior tras publicarla mediante el flujo oficial.
 
 Las integraciones reales de WHOOP y Mercury no utilizan credenciales en QA; se comprueban el contrato, los estados y la persistencia con datos sintéticos.
 

@@ -42,6 +42,7 @@ async function boot(db: CatalogDb): Promise<CatalogDb> {
   // The OPFS VFS used by Expo's web worker supports rollback journals, not WAL.
   await db.getFirstAsync(Platform.OS === "web" ? "PRAGMA journal_mode = DELETE" : "PRAGMA journal_mode = WAL");
   await db.getFirstAsync("PRAGMA foreign_keys = ON");
+  await db.execAsync("PRAGMA busy_timeout = 5000");
 
   let current: string | undefined;
   try {
@@ -91,7 +92,7 @@ export async function runInTransaction<T = void>(
   db: CatalogDb,
   task: () => Promise<T>,
 ): Promise<T> {
-  if (inBackendTransaction()) return task();
+  if (inBackendTransaction(db)) return task();
   const previous = txQueue;
   let resolveCurrent!: () => void;
   txQueue = new Promise<void>((resolve) => {
