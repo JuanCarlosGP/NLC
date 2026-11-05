@@ -110,6 +110,7 @@ export async function buildMovePlan(
     }
   const metadata: MoveMetadata = {
     fingerprint: moveFingerprint(settings),
+    source: settings,
     target,
   };
   return {

@@ -107,7 +107,7 @@ internal object LocalMove {
   }
   private fun committed(ctx: Context, id: String, db: SQLiteDatabase) = receipt(ctx,id,get(db,"nonce") ?: "")
   private fun dropMarkers(ctx: Context, db: SQLiteDatabase) {
-    val list=JSONArray(get(db,"markers") ?: "[]"), remaining=JSONArray()
+    val list=JSONArray(get(db,"markers") ?: "[]");val remaining=JSONArray()
     for(i in 0 until list.length()) {
       val marker=list.getString(i)
       try {
@@ -223,7 +223,7 @@ internal object LocalMove {
         val digest=MessageDigest.getInstance("SHA-256");var copied=0L;val buffer=ByteArray(BUFFER)
         val descriptor=ctx.contentResolver.openFileDescriptor(Uri.parse(target.uri),"w") ?: error("storage")
         descriptor.use { fd -> val space=Os.fstatvfs(fd.fileDescriptor);require(space.f_bavail*space.f_frsize>entry.bytes+8L*1024*1024){"space"}
-          open(ctx,entry.source).use{input->FileOutputStream(fd.fileDescriptor).buffered(BUFFER).use{out->while(true){check(id);val n=input.read(buffer);if(n<0)break;out.write(buffer,0,n);digest.update(buffer,0,n);copied+=n;bytes+=n;if(copied%(8L*1024*1024)<BUFFER)progress("copy",bytes,count)};out.flush()}}
+          open(ctx,entry.source).use{input->FileOutputStream(fd.fileDescriptor).buffered(BUFFER).use{out->while(true){check(id);val n=input.read(buffer);if(n<0)break;out.write(buffer,0,n);digest.update(buffer,0,n);copied+=n;bytes+=n;if(copied%(8L*1024*1024)<BUFFER)progress("copy",bytes,count)};out.flush();fd.fileDescriptor.sync()}}
         }
         val sha=digest.digest().joinToString(""){"%02x".format(it.toInt() and 255)}
         require(copied==entry.bytes&&sha==entry.hash){"sourceChanged"};require(hash(ctx,target.uri,id).sha==entry.hash){"integrity"}
@@ -237,7 +237,7 @@ internal object LocalMove {
     val root=JSONObject(get(d,"targets")!!).getJSONObject(service).getString("uri");val name=when(service){"music"->"nlc-playlists.json";"focus"->"nlc-tasks.json";else->"nlc-wealth.json"};val expected=key(payload)
     val current=children(ctx,root).firstOrNull{it.name==name&&!it.dir}
     if(get(d,"mirror:$service")==expected&&current!=null&&hash(ctx,current.uri,id).sha==expected)return
-    val temp=create(ctx,root,".nlc-sync-${UUID.randomUUID()}.json");ctx.contentResolver.openOutputStream(Uri.parse(temp.uri),"wt")!!.use{it.write(payload.toByteArray(Charsets.UTF_8))};require(hash(ctx,temp.uri,id).sha==expected){"integrity"}
+    val temp=create(ctx,root,".nlc-sync-${UUID.randomUUID()}.json");ctx.contentResolver.openFileDescriptor(Uri.parse(temp.uri),"wt")!!.use{fd->FileOutputStream(fd.fileDescriptor).use{it.write(payload.toByteArray(Charsets.UTF_8));it.flush();fd.fileDescriptor.sync()}};require(hash(ctx,temp.uri,id).sha==expected){"integrity"}
     var pending=temp.uri
     repeat(5){
       val old=children(ctx,root).firstOrNull{it.name==name}

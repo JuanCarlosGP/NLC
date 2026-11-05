@@ -32,7 +32,7 @@ export async function applyMove(
   );
   const current: NasSettings = row
     ? JSON.parse(row.value)
-    : job.metadata.target;
+    : (job.metadata.source ?? job.metadata.target);
   if (moveFingerprint(current) !== job.metadata.fingerprint)
     throw new Error("settingsChanged");
   const desired = job.metadata.target;

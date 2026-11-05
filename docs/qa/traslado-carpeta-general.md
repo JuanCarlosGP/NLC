@@ -5,7 +5,7 @@ Validación en Linux con un emulador Android API 34, ABI x86_64 y datos sintéti
 ## Comprobaciones automatizadas
 
 - `npm run typecheck`.
-- `npm run test:local-move`: transacción real con SQLite; conserva registros privados, metadatos, carátulas, favoritos, recientes, listas y orígenes multimedia. Actualiza progreso y favoritos de vídeo aunque el proveedor cambie un nombre. Comprueba rollback sin recibo, protección frente a configuración cambiada o identidades repetidas, reanudación sin aplicar dos veces y espera de espejos ya iniciados.
+- `npm run test:local-move`: 11 casos con transacción real con SQLite; conserva registros privados, metadatos, carátulas, favoritos, recientes, listas y orígenes multimedia. Actualiza progreso y favoritos de vídeo aunque el proveedor cambie un nombre. Comprueba rollback sin recibo, protección frente a configuración cambiada o identidades repetidas, reanudación sin aplicar dos veces y espera de espejos ya iniciados.
 - Regresión de carpetas, exportación/importación, comportamiento local y apariencia.
 - Compilación Android del módulo nativo.
 
@@ -17,7 +17,7 @@ python3 scripts/android-local-move-qa/run.py --serial emulator-5560 --size-mib 3
 
 Crea un directorio exclusivo con UUID, utiliza archivos sintéticos y solo elimina sus propios fixtures al terminar. La prueba con **320 MiB** copia y verifica por bloques de 128 KiB con un límite de heap Java de **192 MiB**. SHA-256 del fixture: `abac14964502070f6c750eda26a585c57407910717296eca1c334d85abbcda49`.
 
-Casos cubiertos: cancelación y continuación, nombres repetidos, copia parcial conservada como `.partial`, originales que cambian, rechazo de destino corrupto, preservación de los espejos anteriores de listas y tareas, carpeta de destino igual al origen y destino anidado. La retirada de originales exige un recibo real confirmado en la SQLite de la app; la prueba demuestra su rechazo antes de escribirlo y la recuperación de un cierre entre ese guardado y la limpieza. La pasada final añade originales sin lectura, marcadores editados y referencias compartidas que deben seguir en su ubicación.
+Casos cubiertos: cancelación y continuación, nombres repetidos, copia parcial conservada como `.partial`, originales que cambian, rechazo de destino corrupto, preservación de los espejos anteriores de listas y tareas, carpeta de destino igual al origen y destino anidado. La retirada de originales exige un recibo real confirmado en la SQLite de la app; la prueba demuestra su rechazo antes de escribirlo y la recuperación de un cierre entre ese guardado y la limpieza. La pasada final con 16 MiB verifica 15 casos y añade originales sin lectura, marcadores editados y referencias compartidas que deben seguir en su ubicación. Las copias y los espejos se vacían al almacenamiento y el recibo usa SQLite con `synchronous=FULL` antes de retirar originales; no se ha simulado un corte físico de energía.
 
 ## Flujo de interfaz
 

@@ -148,6 +148,7 @@ export async function commitMove(
   const db = await openIsolatedHealthDb();
   let applied!: Awaited<ReturnType<typeof applyMove>>;
   try {
+    await db.execAsync("PRAGMA synchronous = FULL");
     await runInTransaction(db, async () => {
       if (cancelled()) throw new Error("cancelled");
       applied = await applyMove(db, job, files, fallback);

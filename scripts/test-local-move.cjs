@@ -371,3 +371,23 @@ test("the source barrier waits for previously started mirror work", async () => 
   await barrier;
   assert.equal(drained, true);
 });
+
+test("first setup works before any settings row has been persisted", async () => {
+  const { sql, db, job, files } = setup();
+  sql.exec("DELETE FROM meta WHERE key='nas_settings'");
+  job.metadata.source = source;
+  await db.withTransactionAsync(() => applyMove(db, job, files, {}));
+  assert.equal(
+    JSON.parse(
+      sql.prepare("SELECT value FROM meta WHERE key='nas_settings'").get()
+        .value,
+    ).localRootFolderUri,
+    target.localRootFolderUri,
+  );
+  assert.equal(
+    sql
+      .prepare("SELECT value FROM meta WHERE key=?")
+      .get("local_move_receipt:" + job.id).value,
+    job.nonce,
+  );
+});
