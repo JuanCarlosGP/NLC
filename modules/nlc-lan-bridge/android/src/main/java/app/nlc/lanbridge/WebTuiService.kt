@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import java.io.File
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicReference
@@ -45,8 +46,13 @@ object WebTuiProcess {
     val child = pb.start()
     process.set(child)
     Thread {
-      val text = child.inputStream.bufferedReader().readText()
-      if (text.isNotBlank()) lastError = text.takeLast(500)
+      val text = try {
+        child.inputStream.bufferedReader().use { it.readText() }
+      } catch (error: IOException) {
+        // Destroying the process can interrupt a read from its output pipe.
+        error.message ?: "web tui output unavailable"
+      }
+      if (process.get() === child && text.isNotBlank()) lastError = text.takeLast(500)
     }.start()
     val deadline = System.currentTimeMillis() + 8_000
     while (System.currentTimeMillis() < deadline) {
