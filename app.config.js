@@ -34,7 +34,7 @@ export default {
     newArchEnabled: true,
     android: {
       package: process.env.NLC_ANDROID_PACKAGE || "app.nlc.player",
-      versionCode: 23,
+      versionCode: 24,
       softwareKeyboardLayoutMode: "resize",
       usesCleartextTraffic: true,
       adaptiveIcon: {
@@ -83,6 +83,7 @@ export default {
         },
       ],
       "./plugins/with-media-skip-buttons.js",
+      "./plugins/with-headless-video.js",
       ["expo-image-picker", {
         photosPermission: "NLC uses the photos you select to save progress photos on this device.",
         cameraPermission: "NLC uses the camera to pair the desktop TUI.",
