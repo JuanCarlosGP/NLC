@@ -180,3 +180,10 @@ test("a persistence failure during transfer keeps the previous player active",as
  await session.play([track]);const before=session.getSnapshot();const owner="browser_1234567890123456",lease="lease_storage_1234567890";session.prepareTransfer(owner,lease);fail=true;
  await assert.rejects(session.confirmTransfer(owner,lease),/storage/);assert.equal(paused,false);assert.deepEqual(session.getSnapshot(),before);
 });
+
+test("restored playback state reaches remote observers after a backend reload",()=>{
+ let observed;
+ const session=createMediaSession({changed:state=>{observed=state;},save:async()=>{},prepare:async()=>{throw new Error("restoring must not start a player");}});
+ session.restore({...session.getSnapshot(),queue:[track],owner:"browser_1234567890123456",playing:true,currentTime:42,revision:6});
+ assert.deepEqual(observed,session.getSnapshot());assert.equal(observed.playing,false);assert.equal(observed.owner,"phone");assert.equal(observed.currentTime,42);assert.equal(observed.queue[0].id,track.id);
+});
