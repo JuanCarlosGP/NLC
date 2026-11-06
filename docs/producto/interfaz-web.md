@@ -8,6 +8,8 @@ Mientras esté activo, cualquier equipo de la LAN puede acceder sin contraseña 
 
 Se reutilizan Inicio, Biblioteca, búsqueda, Mensajes, Ajustes y las rutas de los seis servicios: Música, Podcasts, Vídeo, Tareas, Patrimonio y Salud. Classic y Geist Pixel conservan sus estilos y densidad compacta. Cada navegador conserva su idioma, tema y presentación; la primera visita toma los valores del teléfono.
 
+En pantallas anchas, la barra lateral reúne la navegación y el selector de servicios. Ajustes separa la configuración del servicio, las preferencias y los controles del dispositivo y la reproducción de audio tiene controles al pie de la ventana. En ventanas estrechas se usa el menú inferior.
+
 La selección «Reproducir en: este navegador / móvil» conserva la cola y posición. El destino anterior se pausa cuando el nuevo está preparado. Si el formato no es compatible con el navegador, se ofrece reproducir en el móvil. No hay transcodificación.
 
 Las fotos, CSV de MacroFactor y copias se seleccionan en el ordenador y se transfieren al teléfono por bloques. Las copias de servicios incluyen multimedia; Salud conserva además su formato anterior y la copia de recuperación. Las restauraciones desde el navegador mantienen las carpetas y fuentes configuradas en el teléfono. Si falta un destino multimedia, debe elegirse en la APK.

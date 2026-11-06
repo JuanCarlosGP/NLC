@@ -5,7 +5,7 @@ import { LayoutChangeEvent, Pressable, View } from "react-native";
 import { Text } from "@/components/ui/themed-text";
 import { colors, fonts } from "@/lib/theme";
 
-function formatTime(seconds: number): string {
+export function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
   const total = Math.floor(seconds);
   const min = Math.floor(total / 60);

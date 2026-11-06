@@ -29,11 +29,14 @@ export function Screen({
   const { miniPlayerDismissed } = usePlayerUi();
   const dock = useDock();
   const mini =
-    current && !miniPlayerDismissed
+    dock?.enabled !== false && current && !miniPlayerDismissed
       ? layout.miniPlayerHeight + layout.miniPlayerGap
       : 0;
   const reserved = dock?.reservedBottom ?? insets.bottom + layout.dockHeight + layout.dockMargin;
   const bottom = reserved + mini + 16;
+  const pagePadding = dock?.enabled === false
+    ? "var(--nlc-workspace-gutter, 24px)" as unknown as number
+    : space(layout.screenPad);
 
   if (!scroll) {
     return (
@@ -44,7 +47,7 @@ export function Screen({
           {
             paddingTop: flush ? 0 : insetSpace(insets.top, 8),
             paddingBottom: flush ? 0 : bottom,
-            paddingHorizontal: flush ? 0 : space(layout.screenPad),
+            paddingHorizontal: flush ? 0 : pagePadding,
           },
         ]}
       >
@@ -63,7 +66,7 @@ export function Screen({
         {
           paddingTop: flush ? 0 : insetSpace(insets.top, 12),
           paddingBottom: bottom,
-          paddingHorizontal: flush ? 0 : space(layout.screenPad),
+          paddingHorizontal: flush ? 0 : pagePadding,
         },
       ]}
       scrollEventThrottle={16}

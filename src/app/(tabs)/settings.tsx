@@ -2,17 +2,18 @@ import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
 import { DesktopWebInterface } from "@/components/settings/desktop-web-interface";
 import { LocalMoveSheet } from "@/components/settings/local-move-sheet";
 import { ServiceSourcePicker } from "@/components/settings/service-source-picker";
-import { usesNas, usesLocal } from "@/lib/settings/service-source";
+import { localFolder, usesNas, usesLocal } from "@/lib/settings/service-source";
 import { healthSourceSettings, applyHealthSourceSettings } from "@/lib/settings/storage";
+import { folderDisplayName, getWebDirectoryHandle } from "@/lib/local/pick-folder";
 import { probeWebDav } from "@/lib/nas/webdav-source";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
-import { createStyles } from "@/lib/appearance/density";
+import { createStyles, densityData } from "@/lib/appearance/density";
 import { AppearancePicker } from "@/components/settings/appearance-picker";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Animated, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "@/components/ui/themed-text";
 import { useRouter, type Href } from "expo-router";
-import { ChevronRight } from "lucide-react-native";
+import { ChevronRight, Monitor, SlidersHorizontal } from "lucide-react-native";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useActiveProjects, useProductivity } from "@/lib/productivity/productivity-context";
 import { useWealth } from "@/lib/wealth/wealth-context";
@@ -22,7 +23,7 @@ import { NasExplorerSheet } from "@/components/settings/nas-explorer-sheet";
 import { OfflineSheet } from "@/components/settings/offline-sheet";
 import { LocalFolderSheet } from "@/components/settings/local-folder-sheet";
 import { SourceConfigSheet } from "@/components/settings/source-config-sheet";
-import { ZoneSwitch, ZoneVisibilitySheet, zoneVisibilitySummary } from "@/components/layout/zone-switch";
+import { ZONE_ICONS, ZoneSwitch, ZoneVisibilitySheet, zoneVisibilitySummary } from "@/components/layout/zone-switch";
 import { Screen } from "@/components/ui/screen";
 import { useAppUpdate } from "@/hooks/use-app-update";
 import { useDownloadSettings } from "@/hooks/use-download-settings";
@@ -45,7 +46,10 @@ import {
 import { useI18n } from "@/lib/i18n/context";
 import { colors, fonts, type } from "@/lib/theme";
 import { USE_NATIVE_DRIVER } from "@/lib/use-native-driver";
-import { useZone, isMediaZone } from "@/lib/zone/zone-context";
+import { useDock } from "@/lib/dock-context";
+import { useZone, isMediaZone, type AppZone } from "@/lib/zone/zone-context";
+
+type SettingsPanel = "service" | "preferences" | "device";
 
 export default function SettingsScreen() {
   useThemeId();
@@ -55,6 +59,11 @@ export default function SettingsScreen() {
   const download = useDownloadSettings();
   const offline = useOffline();
   const { zone, enabled } = useZone();
+  const web = Platform.OS === "web";
+  const standaloneWeb = web && !remoteEnabled;
+  const hasSidebar = useDock()?.enabled === false;
+  const [panel, setPanel] = useState<SettingsPanel>("service");
+  useEffect(() => setPanel("service"), [zone]);
   const { clearDone } = useProductivity();
   const { positions, txs, accounts, goalProgress } = useWealth();
   const projects = useActiveProjects();
@@ -111,23 +120,17 @@ export default function SettingsScreen() {
     };
   }, [t]);
 
-  const localSummary = settings.localFolderUri
-    ? settings.localFolderName || t("common.phoneFolder")
-    : t("common.none");
-  const podcastLocalSummary = settings.podcastLocalFolderUri
-    ? settings.podcastLocalFolderName || t("common.phoneFolder")
-    : settings.localFolderUri
-      ? `${settings.localFolderName || t("settings.music")} / ${t("explorer.podcasts")}`
-      : t("common.none");
-  const videoLocalSummary = settings.videoLocalFolderUri
-    ? settings.videoLocalFolderName || t("common.phoneFolder")
-    : t("common.none");
-  const wealthLocalSummary = settings.wealthLocalFolderUri
-    ? settings.wealthLocalFolderName || t("common.phoneFolder")
-    : t("common.none");
-  const focusLocalSummary = settings.focusLocalFolderUri
-    ? settings.focusLocalFolderName || t("common.phoneFolder")
-    : t("common.none");
+  const folder = localFolder(settings, zone);
+  const musicFolder = localFolder(settings, "music");
+  const inheritsMusicFolder = zone === "podcast" && !folder.uri && Boolean(musicFolder.uri);
+  const localUri = inheritsMusicFolder ? musicFolder.uri : folder.uri;
+  const localReady = Boolean(localUri && (!standaloneWeb || getWebDirectoryHandle(localUri)));
+  const folderName = inheritsMusicFolder
+    ? `${folderDisplayName(musicFolder.uri, musicFolder.name)} / ${t("explorer.podcasts")}`
+    : folderDisplayName(folder.uri, folder.name);
+  const localSummary = standaloneWeb && localUri && !localReady
+    ? t("localFolder.reselect", { folder: folderName })
+    : folderName || t(zone === "health" ? "localSetup.internal" : "common.none");
   const nasFeedback = feedback?.text;
   const downloadFeedback = download.feedback && !downloadOpen ? download.feedback.text : null;
   const mediaZone = isMediaZone(zone) ? zone : "music";
@@ -173,168 +176,182 @@ export default function SettingsScreen() {
     setPushSummary(result.message);
   };
 
-  return (
-    <Screen>
-      <View style={styles.heading}>
-        <Text style={[type.pageTitle, styles.title]}>{t("settings.title")}</Text>
-        <ZoneSwitch />
-      </View>
+  const localSourceRow = standaloneWeb && !isMediaZone(zone) ? (
+    <SettingsRow title={t("settings.data")} summary={t("localSetup.internalBrowser")} />
+  ) : (
+    <SettingsRow
+      deviceOnly
+      title={t(standaloneWeb ? "localFolder.computerTitle" : remoteEnabled ? "localFolder.phoneTitle" : "settings.localFolder")}
+      summary={localSummary}
+      ready={localReady}
+      showStatus
+      onPress={() => {
+        triggerUiHaptic();
+        setLocalOpen(true);
+      }}
+    />
+  );
 
-      <View style={styles.groups}>
-        <ServiceSourcePicker service={zone} />
-        {zone === "health" ? (
-          <SettingsGroup label={t("settings.source")} hint={t("localSetup.healthFolderHint")}>
-            <SettingsRow title="WHOOP" summary={t("serviceBackup.whoopHint")} onPress={() => router.push("/health/whoop")} />
-            <View style={styles.divider} />
-            {usesNas(settings, zone) ? <SettingsRow title={t("settings.shareFolder")} summary={settings.healthSharePath || t("common.none")} onPress={() => setConfigOpen(true)} /> : null}
-            {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-            {usesLocal(settings, zone) ? <SettingsRow deviceOnly title={t("settings.localFolder")} summary={settings.healthLocalFolderName || t("localSetup.internal")} ready={Boolean(settings.healthLocalFolderUri)} showStatus onPress={() => setLocalOpen(true)} /> : null}
-          </SettingsGroup>
-        ) : null}
-        {zone === "focus" ? (
-          <>
-            <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
-              {usesNas(settings, zone) ? <SettingsRow
-                title={t("settings.shareFolder")}
-                summary={focusSummary}
-                ready={focusConnected}
-                showStatus
-                onPress={() => {
-                  triggerUiHaptic();
-                  setConfigOpen(true);
-                }}
-              /> : null}
-              {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-              {usesLocal(settings, zone) ? <SettingsRow deviceOnly
-                title={t("settings.localFolder")}
-                summary={focusLocalSummary}
-                ready={Boolean(settings.focusLocalFolderUri)}
-                showStatus
-                onPress={() => {
-                  triggerUiHaptic();
-                  setLocalOpen(true);
-                }}
-              /> : null}
-            </SettingsGroup>
-            <SettingsGroup label={t("settings.data")} hint={t("settings.focusDataHint")}>
-              <SettingsRow
-                title={t("settings.projects")}
-                summary={
-                  projects.length
-                    ? t(projects.length === 1 ? "settings.projectOne" : "settings.projectMany", {
-                        count: projects.length,
-                      })
-                    : t("settings.inboxOnly")
-                }
-                onPress={() => {
-                  triggerUiHaptic();
-                  router.push("/projects");
-                }}
-              />
-              <View style={styles.divider} />
-              <SettingsRow
-                title={t("settings.clearDone")}
-                summary={t("settings.clearDoneSummary")}
-                onPress={() => {
-                  triggerUiHaptic();
-                  setClearOpen(true);
-                }}
-              />
-            </SettingsGroup>
-          </>
-        ) : null}
-
-        {zone === "wealth" ? (
-          <>
-            <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
-              {usesNas(settings, zone) ? <SettingsRow
-                title={t("settings.shareFolder")}
-                summary={wealthSummary}
-                ready={wealthConnected}
-                showStatus
-                onPress={() => {
-                  triggerUiHaptic();
-                  setConfigOpen(true);
-                }}
-              /> : null}
-              {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-              {usesLocal(settings, zone) ? <SettingsRow deviceOnly
-                title={t("settings.localFolder")}
-                summary={wealthLocalSummary}
-                ready={Boolean(settings.wealthLocalFolderUri)}
-                showStatus
-                onPress={() => {
-                  triggerUiHaptic();
-                  setLocalOpen(true);
-                }}
-              /> : null}
-            </SettingsGroup>
-            <SettingsGroup label={t("settings.data")} hint={t("settings.wealthDataHint")}>
-            <SettingsRow
-              title={t("settings.assets")}
-              summary={
-                positions.length
-                  ? t(positions.length === 1 ? "settings.positionOne" : "settings.positionMany", {
-                      count: positions.length,
-                    })
-                  : t("common.none")
-              }
-              onPress={() => {
-                triggerUiHaptic();
-                router.push("/wealth/assets");
-              }}
-            />
-            <View style={styles.divider} />
-            <SettingsRow
-              title={t("settings.activity")}
-              summary={
-                txs.length
-                  ? t(txs.length === 1 ? "settings.txOne" : "settings.txMany", { count: txs.length })
-                  : t("common.noneMasc")
-              }
-              onPress={() => {
-                triggerUiHaptic();
-                router.push("/wealth/activity");
-              }}
-            />
-            <View style={styles.divider} />
-            <SettingsRow
-              title={t("settings.accounts")}
-              summary={t(
-                accounts.filter((item) => !item.archived).length === 1
-                  ? "settings.accountOne"
-                  : "settings.accountMany",
-                { count: accounts.filter((item) => !item.archived).length },
-              )}
-              onPress={() => {
-                triggerUiHaptic();
-                router.push("/wealth/accounts");
-              }}
-            />
-            <View style={styles.divider} />
-            <SettingsRow
-              title={t("settings.goals")}
-              summary={
-                goalProgress.length
-                  ? t(goalProgress.length === 1 ? "settings.goalOne" : "settings.goalMany", {
-                      count: goalProgress.length,
-                    })
-                  : t("common.noneMasc")
-              }
-              onPress={() => {
-                triggerUiHaptic();
-                router.push("/wealth/goals");
-              }}
-            />
-          </SettingsGroup>
-          </>
-        ) : null}
-
-        {zone === "music" ? (
+  const serviceGroups = (
+    <>
+      {web ? (
+        <SettingsGroup label={t("localSetup.storage")}>
+          <ServiceSourcePicker service={zone} showLabel={false} />
+        </SettingsGroup>
+      ) : <ServiceSourcePicker service={zone} />}
+      {zone === "health" ? (
+        <SettingsGroup label={t("settings.source")} hint={t(standaloneWeb ? "localSetup.healthFolderHintBrowser" : "localSetup.healthFolderHint")}>
+          <SettingsRow title="WHOOP" summary={t("serviceBackup.whoopHint")} onPress={() => router.push("/health/whoop")} />
+          <View style={styles.divider} {...densityData("settings-divider")} />
+          {usesNas(settings, zone) ? <SettingsRow title={t("settings.shareFolder")} summary={settings.healthSharePath || t("common.none")} onPress={() => setConfigOpen(true)} /> : null}
+          {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} {...densityData("settings-divider")} /> : null}
+          {usesLocal(settings, zone) ? localSourceRow : null}
+        </SettingsGroup>
+      ) : null}
+      {zone === "focus" ? (
+        <>
           <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
             {usesNas(settings, zone) ? <SettingsRow
               title={t("settings.shareFolder")}
-              summary={musicSummary}
+              summary={focusSummary}
+              ready={focusConnected}
+              showStatus
+              onPress={() => {
+                triggerUiHaptic();
+                setConfigOpen(true);
+              }}
+            /> : null}
+            {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} {...densityData("settings-divider")} /> : null}
+            {usesLocal(settings, zone) ? localSourceRow : null}
+          </SettingsGroup>
+          <SettingsGroup label={t("settings.data")} hint={t("settings.focusDataHint")}>
+            <SettingsRow
+              title={t("settings.projects")}
+              summary={
+                projects.length
+                  ? t(projects.length === 1 ? "settings.projectOne" : "settings.projectMany", {
+                      count: projects.length,
+                    })
+                  : t("settings.inboxOnly")
+              }
+              onPress={() => {
+                triggerUiHaptic();
+                router.push("/projects");
+              }}
+            />
+            <View style={styles.divider} {...densityData("settings-divider")} />
+            <SettingsRow
+              title={t("settings.clearDone")}
+              summary={t("settings.clearDoneSummary")}
+              onPress={() => {
+                triggerUiHaptic();
+                setClearOpen(true);
+              }}
+            />
+          </SettingsGroup>
+        </>
+      ) : null}
+
+      {zone === "wealth" ? (
+        <>
+          <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
+            {usesNas(settings, zone) ? <SettingsRow
+              title={t("settings.shareFolder")}
+              summary={wealthSummary}
+              ready={wealthConnected}
+              showStatus
+              onPress={() => {
+                triggerUiHaptic();
+                setConfigOpen(true);
+              }}
+            /> : null}
+            {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} {...densityData("settings-divider")} /> : null}
+            {usesLocal(settings, zone) ? localSourceRow : null}
+          </SettingsGroup>
+          <SettingsGroup label={t("settings.data")} hint={t("settings.wealthDataHint")}>
+          <SettingsRow
+            title={t("settings.assets")}
+            summary={
+              positions.length
+                ? t(positions.length === 1 ? "settings.positionOne" : "settings.positionMany", {
+                    count: positions.length,
+                  })
+                : t("common.none")
+            }
+            onPress={() => {
+              triggerUiHaptic();
+              router.push("/wealth/assets");
+            }}
+          />
+          <View style={styles.divider} {...densityData("settings-divider")} />
+          <SettingsRow
+            title={t("settings.activity")}
+            summary={
+              txs.length
+                ? t(txs.length === 1 ? "settings.txOne" : "settings.txMany", { count: txs.length })
+                : t("common.noneMasc")
+            }
+            onPress={() => {
+              triggerUiHaptic();
+              router.push("/wealth/activity");
+            }}
+          />
+          <View style={styles.divider} {...densityData("settings-divider")} />
+          <SettingsRow
+            title={t("settings.accounts")}
+            summary={t(
+              accounts.filter((item) => !item.archived).length === 1
+                ? "settings.accountOne"
+                : "settings.accountMany",
+              { count: accounts.filter((item) => !item.archived).length },
+            )}
+            onPress={() => {
+              triggerUiHaptic();
+              router.push("/wealth/accounts");
+            }}
+          />
+          <View style={styles.divider} {...densityData("settings-divider")} />
+          <SettingsRow
+            title={t("settings.goals")}
+            summary={
+              goalProgress.length
+                ? t(goalProgress.length === 1 ? "settings.goalOne" : "settings.goalMany", {
+                    count: goalProgress.length,
+                  })
+                : t("common.noneMasc")
+            }
+            onPress={() => {
+              triggerUiHaptic();
+              router.push("/wealth/goals");
+            }}
+          />
+        </SettingsGroup>
+        </>
+      ) : null}
+
+      {zone === "music" ? (
+        <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
+          {usesNas(settings, zone) ? <SettingsRow
+            title={t("settings.shareFolder")}
+            summary={musicSummary}
+            ready={shareReady}
+            showStatus
+            onPress={() => {
+              triggerUiHaptic();
+              setConfigOpen(true);
+            }}
+          /> : null}
+          {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} {...densityData("settings-divider")} /> : null}
+          {usesLocal(settings, zone) ? localSourceRow : null}
+        </SettingsGroup>
+      ) : null}
+
+      {zone === "podcast" ? (
+        <>
+          <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
+            {usesNas(settings, zone) ? <SettingsRow
+              title={t("settings.shareFolder")}
+              summary={podcastSummary}
               ready={shareReady}
               showStatus
               onPress={() => {
@@ -342,88 +359,44 @@ export default function SettingsScreen() {
                 setConfigOpen(true);
               }}
             /> : null}
-            {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-            {usesLocal(settings, zone) ? <SettingsRow deviceOnly
-              title={t("settings.localFolder")}
-              summary={localSummary}
-              ready={Boolean(settings.localFolderUri)}
-              showStatus
-              onPress={() => {
-                triggerUiHaptic();
-                setLocalOpen(true);
-              }}
-            /> : null}
+            {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} {...densityData("settings-divider")} /> : null}
+            {usesLocal(settings, zone) ? localSourceRow : null}
           </SettingsGroup>
-        ) : null}
+        </>
+      ) : null}
 
-        {zone === "podcast" ? (
-          <>
-            <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
-              {usesNas(settings, zone) ? <SettingsRow
-                title={t("settings.shareFolder")}
-                summary={podcastSummary}
-                ready={shareReady}
-                showStatus
-                onPress={() => {
-                  triggerUiHaptic();
-                  setConfigOpen(true);
-                }}
-              /> : null}
-              {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-              {usesLocal(settings, zone) ? <SettingsRow deviceOnly
-                title={t("settings.localFolder")}
-                summary={podcastLocalSummary}
-                ready={Boolean(settings.podcastLocalFolderUri || settings.localFolderUri)}
-                showStatus
-                onPress={() => {
-                  triggerUiHaptic();
-                  setLocalOpen(true);
-                }}
-              /> : null}
-            </SettingsGroup>
-          </>
-        ) : null}
+      {zone === "video" ? (
+        <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
+          {usesNas(settings, zone) ? <SettingsRow
+            title={t("settings.videoFolder")}
+            summary={videoSummary}
+            ready={videoReady}
+            showStatus
+            onPress={() => {
+              triggerUiHaptic();
+              setConfigOpen(true);
+            }}
+          /> : null}
+          {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} {...densityData("settings-divider")} /> : null}
+          {usesLocal(settings, zone) ? localSourceRow : null}
+        </SettingsGroup>
+      ) : null}
 
-        {zone === "video" ? (
-          <SettingsGroup label={t("settings.source")} hint={nasFeedback} hintColor={feedback?.color}>
-            {usesNas(settings, zone) ? <SettingsRow
-              title={t("settings.videoFolder")}
-              summary={videoSummary}
-              ready={videoReady}
-              showStatus
+      {isMediaZone(zone) ? (
+        <>
+          <SettingsGroup label={t("settings.download")} hint={downloadFeedback} hintColor={download.feedback?.color}>
+            <SettingsRow
+              title={t("settings.ytdlp")}
+              summary={downloadSummary}
+              ready={download.settings.enabled}
               onPress={() => {
                 triggerUiHaptic();
-                setConfigOpen(true);
+                setDownloadOpen(true);
               }}
-            /> : null}
-            {usesNas(settings, zone) && usesLocal(settings, zone) ? <View style={styles.divider} /> : null}
-            {usesLocal(settings, zone) ? <SettingsRow deviceOnly
-              title={t("settings.localFolder")}
-              summary={videoLocalSummary}
-              ready={Boolean(settings.videoLocalFolderUri)}
-              showStatus
-              onPress={() => {
-                triggerUiHaptic();
-                setLocalOpen(true);
-              }}
-            /> : null}
+            />
           </SettingsGroup>
-        ) : null}
 
-        {isMediaZone(zone) ? (
-          <>
-            <SettingsGroup label={t("settings.download")} hint={downloadFeedback} hintColor={download.feedback?.color}>
-              <SettingsRow
-                title={t("settings.ytdlp")}
-                summary={downloadSummary}
-                ready={download.settings.enabled}
-                onPress={() => {
-                  triggerUiHaptic();
-                  setDownloadOpen(true);
-                }}
-              />
-            </SettingsGroup>
-
+          {!standaloneWeb && (
             <SettingsGroup label={t("settings.offline")} hint={offlineHint}>
               <SettingsRow
                 title={
@@ -442,132 +415,199 @@ export default function SettingsScreen() {
                 }}
               />
             </SettingsGroup>
-          </>
-        ) : null}
+          )}
+        </>
+      ) : null}
+    </>
+  );
+  const desktopGroup = (
+    <SettingsGroup label={t("settings.desktop")}>
+      <SettingsRow deviceOnly
+        title={t("desktop.title")}
+        summary={desktopSummary}
+        ready={desktopLinked}
+        showStatus
+        onPress={() => {
+          triggerUiHaptic();
+          router.push("/desktop-bridge" as Href);
+        }}
+      />
+      <View style={styles.divider} {...densityData("settings-divider")} />
+      <DesktopWebTui />
+      <View style={styles.divider} {...densityData("settings-divider")} />
+      <DesktopWebInterface />
+    </SettingsGroup>
+  );
+  const zonesGroup = (
+    <SettingsGroup label={t("settings.zones")}>
+      <SettingsRow
+        title={t("settings.zonePicker")}
+        summary={zoneVisibilitySummary(enabled, t)}
+        onPress={() => {
+          triggerUiHaptic();
+          setZonesOpen(true);
+        }}
+      />
+    </SettingsGroup>
+  );
+  const deviceRows = (
+    <>
+      <SettingsRow
+        title={t("settings.version")}
+        summary={update.buildLabel}
+        chevron={false}
+        onPress={() => {
+          triggerUiHaptic();
+          void update.refresh();
+        }}
+      />
+      <View style={styles.divider} {...densityData("settings-divider")} />
+      <SettingsRow deviceOnly
+        title={t("settings.apk")}
+        summary={update.apkSummary}
+        ready={update.apkStatus === "current"}
+        showStatus={update.apkStatus === "current" || update.apkStatus === "apk"}
+        tone={update.apkStatus === "apk" ? "warn" : update.apkStatus === "current" ? "ok" : undefined}
+        chevron={update.apkStatus === "apk"}
+        onPress={() => {
+          triggerUiHaptic();
+          if (update.apkStatus === "apk" || update.apkError) update.downloadApk();
+          else void update.refresh();
+        }}
+      />
+      <View style={styles.divider} {...densityData("settings-divider")} />
+      <SettingsRow deviceOnly
+        title={t("settings.ota")}
+        summary={update.otaSummary}
+        ready={update.otaStatus === "current"}
+        showStatus={update.otaStatus === "current" || update.otaStatus === "available"}
+        tone={update.otaStatus === "available" ? "warn" : update.otaStatus === "current" ? "ok" : undefined}
+        chevron={update.otaStatus === "available"}
+        onPress={() => {
+          triggerUiHaptic();
+          if (update.otaStatus === "available") void update.applyOta();
+          else void update.refresh();
+        }}
+      />
+      <View style={styles.divider} {...densityData("settings-divider")} />
+      <SettingsRow deviceOnly
+        title={t("settings.notifications")}
+        summary={pushSummary}
+        ready={pushStatus === "ok"}
+        showStatus={pushStatus === "ok" || pushStatus === "error"}
+        tone={pushStatus === "error" ? "warn" : pushStatus === "ok" ? "ok" : undefined}
+        chevron={false}
+        onPress={() => {
+          triggerUiHaptic();
+          void sendTest();
+        }}
+      />
+    </>
+  );
+  const languageRow = (
+    <SettingsRow
+      title={t("language.title")}
+      summary={locale === "es" ? t("language.spanish") : t("language.english")}
+      onPress={() => {
+        triggerUiHaptic();
+        setLocale(locale === "en" ? "es" : "en");
+      }}
+    />
+  );
+  const backupRow = (
+    <SettingsRow title={t("serviceBackup.openSettings")} summary={`${t(`zones.${zone}`)} · ${t("serviceBackup.settingsHint")}`} onPress={() => router.push({ pathname: "/service-backup", params: { service: zone } } as Href)} />
+  );
+  const moveRow = (
+    <SettingsRow deviceOnly title={t("localMove.title")} summary={settings.localRootFolderName || t("localSetup.generalFolder")} onPress={() => setMoveOpen(true)} />
+  );
+  const foldersRow = (
+    usesNas(settings, zone) ? <SettingsRow
+      title={t("settings.folders")}
+      summary={t("settings.foldersHint")}
+      onPress={() => {
+        triggerUiHaptic();
+        setExplorerOpen(true);
+      }}
+    /> : null
+  );
+  const onboardingRow = (
+    <SettingsRow deviceOnly
+      title={t("settings.onboarding")}
+      summary={t("settings.onboardingReplay")}
+      onPress={() => {
+        triggerUiHaptic();
+        void nas.replayOnboarding();
+      }}
+    />
+  );
+  const updateHint = update.apkStatus === "apk" ? t("settings.apkHint")
+    : update.otaStatus === "available" ? t("settings.otaHint") : null;
 
-        <SettingsGroup label={t("settings.desktop")}>
-          <SettingsRow deviceOnly
-            title={t("desktop.title")}
-            summary={desktopSummary}
-            ready={desktopLinked}
-            showStatus
-            onPress={() => {
-              triggerUiHaptic();
-              router.push("/desktop-bridge" as Href);
-            }}
-          />
-          <View style={styles.divider} />
-          <DesktopWebTui />
-          <View style={styles.divider} />
-          <DesktopWebInterface />
-        </SettingsGroup>
+  return (
+    <Screen>
+      {web ? (
+        <WebSettingsHeader zone={zone} panel={panel} onChange={setPanel} showZoneSwitch={!hasSidebar} />
+      ) : (
+        <View style={styles.heading}>
+          <Text style={[type.pageTitle, styles.title]}>{t("settings.title")}</Text>
+          <ZoneSwitch />
+        </View>
+      )}
 
-        <SettingsGroup label={t("settings.zones")}>
-          <SettingsRow
-            title={t("settings.zonePicker")}
-            summary={zoneVisibilitySummary(enabled, t)}
-            onPress={() => {
-              triggerUiHaptic();
-              setZonesOpen(true);
-            }}
-          />
-        </SettingsGroup>
-
-        <SettingsGroup
-          label={t("settings.app")}
-          hint={
-            update.apkStatus === "apk"
-              ? t("settings.apkHint")
-              : update.otaStatus === "available"
-                ? t("settings.otaHint")
-                : null
-          }
-        >
-          <SettingsRow
-            title={t("settings.version")}
-            summary={update.buildLabel}
-            chevron={false}
-            onPress={() => {
-              triggerUiHaptic();
-              void update.refresh();
-            }}
-          />
-          <View style={styles.divider} />
-          <SettingsRow deviceOnly
-            title={t("settings.apk")}
-            summary={update.apkSummary}
-            ready={update.apkStatus === "current"}
-            showStatus={update.apkStatus === "current" || update.apkStatus === "apk"}
-            tone={update.apkStatus === "apk" ? "warn" : update.apkStatus === "current" ? "ok" : undefined}
-            chevron={update.apkStatus === "apk"}
-            onPress={() => {
-              triggerUiHaptic();
-              if (update.apkStatus === "apk" || update.apkError) update.downloadApk();
-              else void update.refresh();
-            }}
-          />
-          <View style={styles.divider} />
-          <SettingsRow deviceOnly
-            title={t("settings.ota")}
-            summary={update.otaSummary}
-            ready={update.otaStatus === "current"}
-            showStatus={update.otaStatus === "current" || update.otaStatus === "available"}
-            tone={update.otaStatus === "available" ? "warn" : update.otaStatus === "current" ? "ok" : undefined}
-            chevron={update.otaStatus === "available"}
-            onPress={() => {
-              triggerUiHaptic();
-              if (update.otaStatus === "available") void update.applyOta();
-              else void update.refresh();
-            }}
-          />
-          <View style={styles.divider} />
-          <SettingsRow deviceOnly
-            title={t("settings.notifications")}
-            summary={pushSummary}
-            ready={pushStatus === "ok"}
-            showStatus={pushStatus === "ok" || pushStatus === "error"}
-            tone={pushStatus === "error" ? "warn" : pushStatus === "ok" ? "ok" : undefined}
-            chevron={false}
-            onPress={() => {
-              triggerUiHaptic();
-              void sendTest();
-            }}
-          />
-          <View style={styles.divider} />
-          <SettingsRow
-            title={t("language.title")}
-            summary={locale === "es" ? t("language.spanish") : t("language.english")}
-            onPress={() => {
-              triggerUiHaptic();
-              setLocale(locale === "en" ? "es" : "en");
-            }}
-          />
-          <View style={styles.divider} />
-          <SettingsRow title={t("serviceBackup.openSettings")} summary={`${t(`zones.${zone}`)} · ${t("serviceBackup.settingsHint")}`} onPress={() => router.push({ pathname: "/service-backup", params: { service: zone } } as Href)} />
-          <View style={styles.divider} />
-          <SettingsRow deviceOnly title={t("localMove.title")} summary={settings.localRootFolderName || t("localSetup.generalFolder")} onPress={() => setMoveOpen(true)} />
-          {moveOpen ? <LocalMoveSheet onClose={() => setMoveOpen(false)}/> : null}
-          <AppearancePicker />
-          <View style={styles.divider} />
-          {usesNas(settings, zone) ? <SettingsRow
-            title={t("settings.folders")}
-            summary={t("settings.foldersHint")}
-            onPress={() => {
-              triggerUiHaptic();
-              setExplorerOpen(true);
-            }}
-          /> : null}
-          <View style={styles.divider} />
-          <SettingsRow deviceOnly
-            title={t("settings.onboarding")}
-            summary={t("settings.onboardingReplay")}
-            onPress={() => {
-              triggerUiHaptic();
-              void nas.replayOnboarding();
-            }}
-          />
-        </SettingsGroup>
-      </View>
+      {web ? (
+        <View {...densityData("settings-workspace")}>
+          {panel === "service" && (
+            <>
+              {serviceGroups}
+              <SettingsGroup label={t("settings.storageTools")}>
+                {backupRow}
+                {foldersRow && <><View style={styles.divider} {...densityData("settings-divider")} />{foldersRow}</>}
+              </SettingsGroup>
+            </>
+          )}
+          {panel === "preferences" && (
+            <>
+              <SettingsGroup label={t("settings.presentation")}>
+                {languageRow}
+                <AppearancePicker />
+              </SettingsGroup>
+              {zonesGroup}
+            </>
+          )}
+          {panel === "device" && (
+            <>
+              {desktopGroup}
+              <SettingsGroup label={t("settings.app")} hint={updateHint}>
+                {deviceRows}
+                {!standaloneWeb && <><View style={styles.divider} {...densityData("settings-divider")} />{moveRow}</>}
+                <View style={styles.divider} {...densityData("settings-divider")} />
+                {onboardingRow}
+              </SettingsGroup>
+            </>
+          )}
+        </View>
+      ) : (
+        <View style={styles.groups}>
+          {serviceGroups}
+          {desktopGroup}
+          {zonesGroup}
+          <SettingsGroup label={t("settings.app")} hint={updateHint}>
+            {deviceRows}
+            <View style={styles.divider} {...densityData("settings-divider")} />
+            {languageRow}
+            <View style={styles.divider} {...densityData("settings-divider")} />
+            {backupRow}
+            <View style={styles.divider} {...densityData("settings-divider")} />
+            {moveRow}
+            <AppearancePicker />
+            <View style={styles.divider} {...densityData("settings-divider")} />
+            {foldersRow}
+            <View style={styles.divider} {...densityData("settings-divider")} />
+            {onboardingRow}
+          </SettingsGroup>
+        </View>
+      )}
+      {moveOpen ? <LocalMoveSheet onClose={() => setMoveOpen(false)} /> : null}
 
       <SourceConfigSheet
         open={configOpen}
@@ -688,6 +728,36 @@ export default function SettingsScreen() {
   );
 }
 
+function WebSettingsHeader({ zone, panel, onChange, showZoneSwitch }: {
+  zone: AppZone;
+  panel: SettingsPanel;
+  onChange: (panel: SettingsPanel) => void;
+  showZoneSwitch: boolean;
+}) {
+  const { t } = useI18n();
+  const sections = [
+    { id: "service", label: t(`zones.${zone}`), Icon: ZONE_ICONS[zone] },
+    { id: "preferences", label: t("settings.preferences"), Icon: SlidersHorizontal },
+    { id: "device", label: t("settings.device"), Icon: Monitor },
+  ] as const;
+  return (
+    <header className="nlc-settings-header">
+      <div className="nlc-settings-heading">
+        <h1>{t("settings.title")}</h1>
+        {showZoneSwitch && <ZoneSwitch />}
+      </div>
+      <nav className="nlc-settings-nav" aria-label={t("settings.title")}>
+        {sections.map(({ id, label, Icon }) => (
+          <button key={id} type="button" aria-pressed={panel === id} onClick={() => onChange(id)}>
+            <Icon size={17} aria-hidden={true} />
+            {label}
+          </button>
+        ))}
+      </nav>
+    </header>
+  );
+}
+
 function SettingsGroup({
   label,
   hint,
@@ -701,10 +771,10 @@ function SettingsGroup({
 }) {
   useThemeId();
   return (
-    <View style={styles.group}>
-      <Text style={styles.groupLabel}>{label}</Text>
-      <View style={styles.card}>{children}</View>
-      {hint ? <Text style={[styles.hint, hintColor ? { color: hintColor } : null]}>{hint}</Text> : null}
+    <View style={styles.group} {...densityData("settings-group")}>
+      <Text accessibilityRole="header" style={styles.groupLabel} {...densityData("settings-group-title")}>{label}</Text>
+      <View style={styles.card} {...densityData("settings-group-body")}>{children}</View>
+      {hint ? <Text style={[styles.hint, hintColor ? { color: hintColor } : null]} {...densityData("settings-group-hint")}>{hint}</Text> : null}
     </View>
   );
 }
@@ -731,7 +801,7 @@ function SettingsRow({
   useThemeId();
   const body = (
     <>
-      <View style={styles.rowMeta}>
+      <View style={styles.rowMeta} {...densityData("settings-row-meta")}>
         <View style={styles.rowTitleLine}>
           <Text style={styles.rowTitle}>{title}</Text>
           {ready || showStatus ? <StatusDot on={Boolean(ready)} /> : null}
@@ -751,11 +821,11 @@ function SettingsRow({
   );
 
   if (!onPress) {
-    return <View style={styles.row}>{body}</View>;
+    return <View style={styles.row} {...densityData("settings-row")}>{body}</View>;
   }
 
   return (
-    <Pressable disabled={remoteEnabled && deviceOnly} accessibilityState={{ disabled: remoteEnabled && deviceOnly }} onPress={onPress} style={({ pressed }) => [styles.row, { opacity: remoteEnabled && deviceOnly ? 0.45 : pressed ? 0.82 : 1 }]}>
+    <Pressable {...densityData("settings-row")} accessibilityRole="button" disabled={remoteEnabled && deviceOnly} accessibilityState={{ disabled: remoteEnabled && deviceOnly }} onPress={onPress} style={({ pressed }) => [styles.row, { opacity: remoteEnabled && deviceOnly ? 0.45 : pressed ? 0.82 : 1 }]}>
       {body}
     </Pressable>
   );

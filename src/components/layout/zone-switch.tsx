@@ -1,5 +1,5 @@
 import { useThemeId } from "@/lib/appearance/use-theme-id";
-import { isNativePixel, createStyles } from "@/lib/appearance/density";
+import { isNativePixel, createStyles, densityData } from "@/lib/appearance/density";
 import { Pressable, Switch, View } from "react-native";
 import { Text } from "@/components/ui/themed-text";
 import { Clapperboard, HeartPulse, Mic, Music2, SquareCheck, Wallet } from "lucide-react-native";
@@ -10,7 +10,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { triggerUiHaptic } from "@/lib/ui-haptics";
 import { colors, fonts, type } from "@/lib/theme";
 
-const ICONS: Record<AppZone, typeof Music2> = {
+export const ZONE_ICONS: Record<AppZone, typeof Music2> = {
   music: Music2,
   podcast: Mic,
   video: Clapperboard,
@@ -33,10 +33,10 @@ export function ZoneSwitch() {
   if (options.length <= 1) return null;
 
   return (
-    <View style={styles.switch}>
+    <View style={styles.switch} {...densityData("zone-switch")}>
       {options.map((item) => {
         const active = zone === item.id;
-        const Icon = ICONS[item.id];
+        const Icon = ZONE_ICONS[item.id];
         return (
           <Pressable
             key={item.id}
@@ -82,7 +82,7 @@ export function ZoneVisibilitySheet({
         </View>
         <Text style={styles.hint}>{t("settings.zoneHint")}</Text>
         {APP_ZONES.map((item) => {
-          const Icon = ICONS[item.id];
+          const Icon = ZONE_ICONS[item.id];
           const on = enabled[item.id];
           return (
             <View key={item.id} style={styles.visibilityRow}>

@@ -1,6 +1,7 @@
+import { remoteEnabled } from "@/lib/backend/profile";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import { Text } from "@/components/ui/themed-text";
 import { BottomSheet } from "@/components/layout/bottom-sheet";
 import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
@@ -52,7 +53,7 @@ export function SourceConfigSheet({
             : t("sourceSheet.musicTitle");
   const summary = `${settings.useHttps ? "https" : "http"}://${settings.host}:${settings.port}`;
   const folderHint =
-    variant === "health" ? t("localSetup.healthFolderHint") : variant === "video"
+    variant === "health" ? t(Platform.OS === "web" && !remoteEnabled ? "localSetup.healthFolderHintBrowser" : "localSetup.healthFolderHint") : variant === "video"
       ? t("sourceSheet.videoHint")
       : variant === "podcast"
         ? t("sourceSheet.podcastHint")
