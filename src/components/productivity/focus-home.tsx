@@ -1,5 +1,5 @@
 import { useThemeId } from "@/lib/appearance/use-theme-id";
-import { createStyles } from "@/lib/appearance/density";
+import { createStyles, densityData } from "@/lib/appearance/density";
 import { useMemo } from "react";
 import { View } from "react-native";
 import { Text } from "@/components/ui/themed-text";
@@ -47,7 +47,7 @@ export function FocusHome() {
 
   return (
     <Screen>
-      <View style={styles.hero}>
+      <View style={styles.hero} {...densityData("zone-hero")}>
         <LadybugMark />
         <ZoneSwitch />
       </View>

@@ -63,7 +63,7 @@ export function ImportedEntityView({
   const dock = useDock();
   const insets = useSafeAreaInsets();
   const mini =
-    current && !miniPlayerDismissed
+    dock?.enabled !== false && current && !miniPlayerDismissed
       ? layout.miniPlayerHeight + layout.miniPlayerGap
       : 0;
   const reserved = dock?.reservedBottom ?? insets.bottom + layout.dockHeight + layout.dockMargin;

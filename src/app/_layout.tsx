@@ -6,7 +6,7 @@ import { RemoteGate } from "@/lib/backend/remote-gate";
 import { LocalMoveRecovery } from "@/components/settings/local-move-sheet";
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { IntegrationsProvider } from "@/lib/integrations/integrations-context";
-import { createStyles } from "@/lib/appearance/density";
+import { createStyles, densityData } from "@/lib/appearance/density";
 import { AppearanceProvider } from "@/lib/appearance/context";
 import "@/lib/health/backup/service";
 import { NutritionProvider } from "@/lib/health/nutrition/nutrition-context";
@@ -14,7 +14,7 @@ import { BodyPhotosProvider } from "@/lib/health/body-photos/body-context";
 import { MedicationProvider } from "@/lib/health/medication/medication-context";
 import { TrainingProvider } from "@/lib/health/training/training-context";
 import { type ReactNode, useEffect, useState } from "react";
-import { LogBox, Platform, StyleSheet, View } from "react-native";
+import { LogBox, Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -30,12 +30,13 @@ import { InstrumentSerif_400Regular } from "@expo-google-fonts/instrument-serif"
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatSheet } from "@/components/chat/chat-sheet";
 import { Dock } from "@/components/layout/dock";
+import { DesktopPlayer, DesktopSidebar, DesktopToolbar } from "@/components/layout/desktop-workspace";
 import { MiniPlayer } from "@/components/layout/mini-player";
 import { NowPlayingSheet } from "@/components/player/now-playing-sheet";
 import { PlaylistActionsSheet } from "@/components/library/playlist-actions-sheet";
 import { TrackActionsSheet } from "@/components/player/track-actions-sheet";
 import { VideoActionsSheet } from "@/components/video/video-actions-sheet";
-import { DockProvider } from "@/lib/dock-context";
+import { DockProvider, useDock } from "@/lib/dock-context";
 import { FavoritesProvider } from "@/lib/favorites/favorites-context";
 import { CursorProvider } from "@/lib/cursor/cursor-context";
 import { DownloadSettingsProvider } from "@/lib/podcasts/download-settings-context";
@@ -137,6 +138,7 @@ export default function RootLayout() {
                 <DockChrome>
                   <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.void }}>
                     <StatusBar style="light" />
+                    <WorkspaceChrome>
                     <Stack
                       screenOptions={{
                         headerShown: false,
@@ -186,8 +188,7 @@ export default function RootLayout() {
                       <Stack.Screen name="queue" />
                       <Stack.Screen name="desktop-bridge" />
                     </Stack>
-                    <MiniPlayer />
-                    <Dock />
+                    </WorkspaceChrome>
                     <ChatSheet />
                     <NowPlayingSheet />
                     <TrackActionsSheet />
@@ -252,14 +253,39 @@ function OnboardingGate({ children }: { children: ReactNode }) {
 function DockChrome({ children }: { children: ReactNode }) {
   useThemeId();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const desktop = Platform.OS === "web" && width >= 1000;
   return (
-    <DockProvider enabled bottomInset={insets.bottom}>
+    <DockProvider enabled={!desktop} bottomInset={insets.bottom}>
       {children}
     </DockProvider>
   );
 }
 
+function WorkspaceChrome({ children }: { children: ReactNode }) {
+  const desktop = useDock()?.enabled === false;
+  const pathname = usePathname();
+  const watching = pathname === "/watch" || pathname.startsWith("/watch/");
+  const showWorkspace = desktop && !watching;
+
+  return (
+    <>
+      <View style={styles.workspace} {...(showWorkspace ? densityData("desktop-workspace") : {})}>
+        {showWorkspace && <DesktopSidebar />}
+        <View style={styles.workspaceBody}>
+          {showWorkspace && <DesktopToolbar />}
+          {children}
+          {showWorkspace && <DesktopPlayer />}
+        </View>
+      </View>
+      {!desktop && <><MiniPlayer /><Dock /></>}
+    </>
+  );
+}
+
 const styles = createStyles(() => ({
+  workspace: { flex: 1, minHeight: 0, flexDirection: "row" },
+  workspaceBody: { flex: 1, minWidth: 0, minHeight: 0 },
   boot: {
     flex: 1,
     backgroundColor: colors.void,

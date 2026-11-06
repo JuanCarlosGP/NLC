@@ -1,3 +1,4 @@
+import { desktopCss } from "./desktop-css";
 import { APPEARANCE_KEY, appearanceVariables } from "./themes";
 const declarations = (id: "classic" | "geist-pixel") => Object.entries(appearanceVariables(id)).map(([key, value]) => `${key}:${value}`).join(";");
 export const appearanceCss = `
@@ -46,5 +47,6 @@ html[data-nlc-theme="geist-pixel"] :where(textarea) { min-height:96px; }
 @media (min-width:1100px) {
   html[data-nlc-theme="geist-pixel"] { --nlc-media-cell:16.6667%; }
 }
+${desktopCss}
 `;
 export const appearanceBootstrap = `try{document.documentElement.dataset.nlcTheme=localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})==="geist-pixel"?"geist-pixel":"classic"}catch(e){}`;

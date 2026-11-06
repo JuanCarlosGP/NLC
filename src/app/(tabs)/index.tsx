@@ -1,5 +1,5 @@
 import { useThemeId } from "@/lib/appearance/use-theme-id";
-import { createStyles } from "@/lib/appearance/density";
+import { createStyles, densityData, responsiveBasis } from "@/lib/appearance/density";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Text } from "@/components/ui/themed-text";
@@ -220,7 +220,7 @@ function ExistingHomeScreen() {
   return (
     <>
       <Screen>
-        <View style={styles.hero}>
+        <View style={styles.hero} {...densityData("zone-hero")}>
           <LadybugMark />
           <ZoneSwitch />
         </View>
@@ -374,7 +374,7 @@ const styles = createStyles(() => ({
     marginHorizontal: -6,
   },
   cell: {
-    width: "33.333%",
+    width: responsiveBasis("33.333%", "media-cell"),
     paddingHorizontal: 6,
     paddingBottom: 18,
   },

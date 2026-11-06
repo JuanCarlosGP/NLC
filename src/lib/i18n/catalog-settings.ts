@@ -1,6 +1,10 @@
 export const settingsEn = {
   settings: {
     title: "Settings",
+    preferences: "Preferences",
+    presentation: "Interface",
+    device: "Device",
+    storageTools: "Backups and files",
     folders: "Folders",
     foldersHint: "Browse the NAS layout",
     onboarding: "Onboarding",
@@ -129,6 +133,9 @@ export const settingsEn = {
   },
   localFolder: {
     title: "Local folder",
+    computerTitle: "Computer folder",
+    phoneTitle: "Phone folder",
+    reselect: "Choose «{folder}» again",
     how: "How to organise it",
     howA11y: "How to organise the local folder",
     helpCloseA11y: "Close help",
@@ -165,7 +172,7 @@ export const settingsEn = {
     focusFileHint: "nlc-tasks.json is saved there. You can copy it to another phone or the NAS.",
     musicFileHint: "Audio plus nlc-playlists.json, so lists travel with the library.",
     mediaHint: "Combined with the NAS. One folder per section.",
-    webHint: "On web: until reload. In the app: saved.",
+    webHint: "This browser can use the folder until you reload the page.",
     openFail: "Could not open the folder.",
     nas: "NAS",
     close: "Close local folder",
@@ -389,6 +396,10 @@ export const settingsEn = {
 export const settingsEs = {
   settings: {
     title: "Ajustes",
+    preferences: "Preferencias",
+    presentation: "Interfaz",
+    device: "Dispositivo",
+    storageTools: "Copias y carpetas",
     folders: "Carpetas",
     foldersHint: "Explorar la estructura en el NAS",
     onboarding: "Onboarding",
@@ -517,6 +528,9 @@ export const settingsEs = {
   },
   localFolder: {
     title: "Carpeta local",
+    computerTitle: "Carpeta del ordenador",
+    phoneTitle: "Carpeta del teléfono",
+    reselect: "Vuelve a elegir «{folder}»",
     how: "Cómo organizarla",
     howA11y: "Cómo organizar la carpeta local",
     helpCloseA11y: "Cerrar ayuda",
@@ -553,7 +567,7 @@ export const settingsEs = {
     focusFileHint: "Ahí se guarda nlc-tasks.json. Puedes copiarla a otro teléfono o al NAS.",
     musicFileHint: "Audio y nlc-playlists.json, para que las listas viajen con la biblioteca.",
     mediaHint: "Una carpeta por servicio. El NAS es opcional.",
-    webHint: "En web: hasta recargar. En la app: guardada.",
+    webHint: "El navegador puede usar esta carpeta hasta que recargues la página.",
     openFail: "No se pudo abrir la carpeta.",
     nas: "NAS",
     close: "Cerrar carpeta local",

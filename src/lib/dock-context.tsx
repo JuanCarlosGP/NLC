@@ -38,7 +38,7 @@ export function DockProvider({
   const [visible, setVisible] = useState(true);
   const lastOffsetY = useRef(0);
   const pathname = usePathname();
-  const reservedBottom = DOCK_HEIGHT + DOCK_MARGIN + bottomInset;
+  const reservedBottom = enabled ? DOCK_HEIGHT + DOCK_MARGIN + bottomInset : bottomInset;
 
   useEffect(() => {
     if (!enabled) return;

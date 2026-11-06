@@ -29,7 +29,7 @@ export function HealthHome() {
   return (
     <>
       <Screen>
-        <View style={styles.hero}><LadybugMark /><ZoneSwitch /></View>
+        <View style={styles.hero} {...densityData("zone-hero")}><LadybugMark /><ZoneSwitch /></View>
         <View style={styles.heading}>
           <Text style={type.pageTitle}>{t("health.overview")}</Text>
 

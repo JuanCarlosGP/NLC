@@ -108,7 +108,7 @@ export function LocalFolderSheet({
         <View style={styles.titleRow}>
           <View style={styles.titleMeta}>
             <Text style={type.label}>{t("sourceSheet.title")}</Text>
-            <Text style={type.pageTitle}>{t("localFolder.title")}</Text>
+            <Text style={type.pageTitle}>{t(Platform.OS === "web" ? "localFolder.computerTitle" : "localFolder.title")}</Text>
           </View>
           <Pressable
             accessibilityRole="button"

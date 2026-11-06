@@ -31,6 +31,10 @@ const coreEn = {
     ledger: "Ledger",
     settings: "Settings",
     novelty: "update",
+    navigation: "Main navigation",
+    previousTrack: "Previous track",
+    nextTrack: "Next track",
+    playbackPosition: "Playback position",
   },
   zones: {
     music: "Music",
@@ -143,6 +147,10 @@ const coreEs = {
     ledger: "Libro",
     settings: "Ajustes",
     novelty: "novedad",
+    navigation: "Navegación principal",
+    previousTrack: "Pista anterior",
+    nextTrack: "Pista siguiente",
+    playbackPosition: "Posición de reproducción",
   },
   zones: {
     music: "Música",
