@@ -1,6 +1,7 @@
 import type { AudioPlayer } from "expo-audio";
 import { browserBackend, mediaUrl, onBackendChange, remoteState, requestId } from "@/lib/backend/remote";
 import { remoteEnabled } from "@/lib/backend/profile";
+import { getBrowserMusicVolume } from "./browser-music-volume";
 import { EMPTY_MEDIA, type MediaState } from "./session-core";
 import type { Track } from "@/lib/nas/types";
 export const playbackClientId = typeof window === "undefined" ? "web" : requestId();
@@ -9,17 +10,22 @@ let preferredTarget: "phone" | "browser" = "phone";
 let active: HTMLMediaElement | null = null; let activeKey = ""; let sequence = 0; let generation = 0; let lastReport = 0;
 let refreshing: Promise<void> | null = null;
 const listeners = new Set<() => void>();
+const musicElements = new Set<HTMLMediaElement>();
 function notify() { listeners.forEach(fn => fn()); }
 function key(value: MediaState) { return `${value.kind}:${value.videoPath || value.queue[value.index]?.id || ""}:${value.playNonce}`; }
 async function prepare(value: MediaState): Promise<HTMLMediaElement> {
  const media = document.createElement(value.kind === "video" ? "video" : "audio"); media.preload = "auto"; media.setAttribute("playsinline", "");
+ if (value.kind === "audio") {
+  media.volume = getBrowserMusicVolume();
+  musicElements.add(media);
+ }
  media.src = mediaUrl(value.kind === "video" ? "video" : "track", value.videoPath || value.queue[value.index]?.id || "");
  try {
   await new Promise<void>((resolve, reject) => { const timer = setTimeout(() => { cleanup(); reject(new Error("Formato no compatible. Puedes reproducirlo en el móvil.")); }, 15000); const cleanup = () => { clearTimeout(timer); media.removeEventListener("canplay", ready); media.removeEventListener("error", fail); }; const ready = () => { cleanup(); resolve(); }; const fail = () => { cleanup(); reject(new Error("Formato no compatible. Puedes reproducirlo en el móvil.")); }; media.addEventListener("canplay", ready); media.addEventListener("error", fail); media.load(); });
   media.currentTime = value.currentTime; return media;
  } catch (error) { dispose(media); throw error; }
 }
-function dispose(media: HTMLMediaElement) { media.pause(); media.removeAttribute("src"); media.load(); media.remove(); }
+function dispose(media: HTMLMediaElement) { musicElements.delete(media); media.pause(); media.removeAttribute("src"); media.load(); media.remove(); }
 function install(media: HTMLMediaElement, value: MediaState) {
  if (active && active !== media) dispose(active); active = media; activeKey = key(value); sequence = 0;
  media.onended = () => { void report(true); };
@@ -34,7 +40,12 @@ async function apply(next: MediaState) {
  if (activeKey !== key(next)) {
   const prepared = await prepare(next);
   if (version !== generation) { dispose(prepared); return; }
-  if (next.playing) await prepared.play(); install(prepared, next);
+  try {
+   if (next.playing) await prepared.play();
+  } catch (error) {
+   dispose(prepared); throw error;
+  }
+  install(prepared, next);
  } else if (active) {
   if (next.revision !== previousRevision && Math.abs(active.currentTime - next.currentTime) > 1.5) active.currentTime = next.currentTime;
   if (next.playing && active.paused) await active.play(); else if (!next.playing) active.pause();
@@ -69,6 +80,9 @@ async function transfer(owner: "phone" | "browser") {
 }
 export const mediaSession = {
  getSnapshot: () => state, getPlayer: () => active as unknown as AudioPlayer,
+ setMusicVolume(volume: number) {
+  for (const media of musicElements) media.volume = volume;
+ },
  subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; },
  play, video: async (path: string, position = 0) => { let candidate: HTMLMediaElement | null = null; const owner = preferredTarget === "phone" ? "phone" : playbackClientId;
   try { if (owner !== "phone") { candidate = await prepare({ ...state, kind: "video", videoPath: path, currentTime: position }); await candidate.play(); } const reply = await invoke<MediaState>("video", [path, position, owner]); if (candidate) install(candidate, reply); await apply(reply); } catch (error) { candidate && dispose(candidate); throw error; }

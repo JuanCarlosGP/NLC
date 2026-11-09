@@ -273,7 +273,7 @@ html[data-nlc-theme="geist-pixel"] .nlc-settings-header h1 { font-weight: 400; }
 }
 .nlc-desktop-player {
   display: grid;
-  grid-template-columns: minmax(135px, 1fr) minmax(235px, 2fr) minmax(90px, 1fr);
+  grid-template-columns: minmax(135px, 1fr) minmax(235px, 2fr) minmax(190px, 1fr);
   flex: none;
   align-items: center;
   gap: 16px;
@@ -307,14 +307,33 @@ html[data-nlc-theme="geist-pixel"] .nlc-settings-header h1 { font-weight: 400; }
   font-variant-numeric: tabular-nums;
   color: var(--nlc-color-muted);
 }
-.nlc-player-timeline input[type="range"] {
-  width: 0;
+.nlc-desktop-player input[type="range"] {
   min-height: 16px;
-  flex: 1;
   margin: 0;
   accent-color: var(--nlc-color-accent);
 }
-.nlc-player-queue { justify-self: end; }
+.nlc-player-timeline input[type="range"] {
+  width: 0;
+  flex: 1;
+}
+.nlc-player-actions {
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 10px;
+}
+.nlc-player-volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--nlc-color-inkSoft);
+}
+.nlc-player-volume input[type="range"] {
+  width: 78px;
+  cursor: pointer;
+}
+.nlc-player-volume:has(input:disabled) { opacity: .5; }
+.nlc-player-volume input:disabled { cursor: default; }
 .nlc-sidebar :focus-visible,
 .nlc-desktop-toolbar :focus-visible,
 .nlc-desktop-player :focus-visible {

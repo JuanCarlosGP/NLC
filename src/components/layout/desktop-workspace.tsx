@@ -5,6 +5,7 @@ import {
   Pause, Play, Search, Settings, SkipBack, SkipForward,
 } from "lucide-react-native";
 import { Cover } from "@/components/ui/cover";
+import { DesktopVolume } from "@/components/layout/desktop-volume";
 import { ZONE_ICONS } from "@/components/layout/zone-switch";
 import { useTrackArtwork } from "@/hooks/use-cover-url";
 import { useNowPlaying } from "@/hooks/use-now-playing";
@@ -210,10 +211,13 @@ export function DesktopPlayer() {
           <span>{formatTime(max)}</span>
         </div>
       </div>
-      <button type="button" className="nlc-sidebar-item nlc-player-queue" onClick={openNowPlaying}>
-        <ListMusic size={17} aria-hidden={true} />
-        <span>{t("player.queue")}</span>
-      </button>
+      <div className="nlc-player-actions">
+        <DesktopVolume />
+        <button type="button" className="nlc-sidebar-item" onClick={openNowPlaying}>
+          <ListMusic size={17} aria-hidden={true} />
+          <span>{t("player.queue")}</span>
+        </button>
+      </div>
     </footer>
   );
 }

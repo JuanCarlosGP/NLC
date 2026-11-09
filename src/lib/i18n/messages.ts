@@ -35,6 +35,8 @@ const coreEn = {
     previousTrack: "Previous track",
     nextTrack: "Next track",
     playbackPosition: "Playback position",
+    browserVolume: "Browser volume",
+    browserVolumeHint: "Select This browser under Play on to adjust volume.",
   },
   zones: {
     music: "Music",
@@ -151,6 +153,8 @@ const coreEs = {
     previousTrack: "Pista anterior",
     nextTrack: "Pista siguiente",
     playbackPosition: "Posición de reproducción",
+    browserVolume: "Volumen del navegador",
+    browserVolumeHint: "Elige «Este navegador» en «Reproducir en» para ajustar el volumen.",
   },
   zones: {
     music: "Música",
