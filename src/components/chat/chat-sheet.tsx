@@ -11,6 +11,8 @@ import { SheetScrollView } from "@/components/layout/sheet-scroll-view";
 import { ChatBubble, ChatTypingMarker } from "@/components/chat/chat-bubble";
 import { useKeyboardBottomOverlap } from "@/components/chat/use-keyboard-bottom-overlap";
 import { useCursor } from "@/hooks/use-cursor";
+import { remoteEnabled } from "@/lib/backend/profile";
+import { ASSISTANT_PROVIDERS, PROVIDER_IDS } from "@/lib/cursor/providers";
 import { useI18n } from "@/lib/i18n/context";
 import { webInteractiveStyle } from "@/lib/interactive";
 import { colors, fonts } from "@/lib/theme";
@@ -26,6 +28,9 @@ const SEND_ICON = "#ffffff";
 
 function buildUtilities(t: (path: string) => string): { id: string; label: string; hint: string; draft: string }[] {
   return [
+    { id: "wealth-month", label: t("chat.assistantMonth"), hint: "", draft: t("chat.assistantMonth") },
+    { id: "relocate-audio", label: t("chat.assistantMove"), hint: t("chat.assistantRelocate"), draft: t("chat.assistantRelocate") },
+    { id: "suggest-feature", label: t("chat.assistantPublish"), hint: t("chat.assistantReviewPhone"), draft: t("chat.assistantFeature") },
     { id: "task-create", label: t("chat.utilCreateTask"), hint: t("chat.utilCreateTaskHint"), draft: t("chat.utilDraftTaskCreate") },
     { id: "task-move", label: t("chat.utilMoveTask"), hint: t("chat.utilMoveTaskHint"), draft: t("chat.utilDraftTaskMove") },
     { id: "rename", label: t("chat.utilRename"), hint: t("chat.utilRenameHint"), draft: t("chat.utilDraftRename") },
@@ -99,22 +104,40 @@ function ChatSheetBody() {
   useThemeId();
   const { t } = useI18n();
   const {
-    apiKey,
-    setApiKey,
+    provider,
+    configuredProviders,
+    clearFeedback,
+    ready,
+    configured,
     busy,
     messages,
     persist,
     testConnection,
     send,
     feedback,
+    proposal,
+    proposalError,
+    decide,
     clearHistory,
   } = useCursor();
   const [draft, setDraft] = useState("");
-  const [setupOpen, setSetupOpen] = useState(!apiKey);
+  const [setupOpen, setSetupOpen] = useState(ready && !configured);
+  const [selectedProvider, setSelectedProvider] = useState(provider);
+  const [apiKey, setApiKey] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [githubToken, setGithubToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const canReview = Platform.OS === "android";
+  const canEnterKey = !remoteEnabled && (Platform.OS !== "web" || selectedProvider === "cursor");
+  const hasSelectedKey = configuredProviders.includes(selectedProvider);
+  const selected = ASSISTANT_PROVIDERS[selectedProvider];
+  const canTest = hasSelectedKey || (canEnterKey && Boolean(apiKey.trim()));
+  const canSave = Boolean(githubToken.trim()) || (canEnterKey && Boolean(apiKey.trim())) || (hasSelectedKey && provider !== selectedProvider);
   const [utilsOpen, setUtilsOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const canSend = Boolean(draft.trim()) && !busy && Boolean(apiKey.trim());
+  const messagesRef = useRef<ScrollView>(null);
+  const canSend = Boolean(draft.trim()) && !busy && configured;
   const insets = useSafeAreaInsets();
   const bottomInset = resolveBottomInset(insets.bottom);
   const { overlap: keyboardOverlap } = useKeyboardBottomOverlap(true);
@@ -126,13 +149,56 @@ function ChatSheetBody() {
   const utilities = buildUtilities(t);
 
   useEffect(() => {
-    if (!apiKey) setSetupOpen(true);
-  }, [apiKey]);
+    if (ready && !configured) {
+      setSelectedProvider(provider);
+      setSetupOpen(true);
+    }
+  }, [ready, configured, provider]);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => messagesRef.current?.scrollToEnd({ animated: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [messages, proposal, busy]);
 
   async function onSend() {
     const text = draft.trim();
-    if (!text || busy) return;
+    if (!canSend) return;
     try { await send(text); setDraft(""); } catch { /* Keep the draft while disconnected. */ }
+  }
+
+  function openSettings() {
+    setSelectedProvider(provider);
+    setApiKey("");
+    clearFeedback();
+    setSetupOpen(true);
+  }
+
+  function closeSettings() {
+    setSetupOpen(false);
+    setApiKey("");
+    setGithubToken("");
+  }
+
+  async function testSelectedProvider() {
+    if (testing || !canTest) return;
+    setTesting(true);
+    try {
+      await testConnection(selectedProvider, canEnterKey ? apiKey : "");
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function saveSettings() {
+    if (saving || !canSave) return;
+    setSaving(true);
+    try {
+      const key = canEnterKey ? apiKey : "";
+      const target = key.trim() || hasSelectedKey ? selectedProvider : provider;
+      if (await persist(target, key, githubToken)) closeSettings();
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -140,7 +206,7 @@ function ChatSheetBody() {
       <View style={[styles.header, { borderBottomColor: colors.rule }]}>
         <View style={styles.headerText}>
           <Text style={styles.title}>{t("chat.title")}</Text>
-          <Text style={styles.description}>{t("chat.agent")}</Text>
+          <Text style={styles.description}>{t("chat.agent", { provider: ASSISTANT_PROVIDERS[provider].label })}</Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable
@@ -180,7 +246,7 @@ function ChatSheetBody() {
           <Pressable
             accessibilityLabel={t("chat.agentSettings")}
             onPress={() => {
-              setSetupOpen((value) => !value);
+              openSettings();
               setUtilsOpen(false);
             }}
             style={({ pressed }) => [
@@ -206,10 +272,40 @@ function ChatSheetBody() {
             <Text style={styles.emptyBody}>{t("chat.empty")}</Text>
           </View>
         ) : (
-          <SheetScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+          <SheetScrollView scrollRef={messagesRef} style={styles.scroll} contentContainerStyle={styles.scrollContent}>
             {messages.map((item) => (
               <ChatBubble key={item.id} role={item.role} content={item.text} />
             ))}
+            {proposal ? (
+              <View style={styles.proposal}>
+                <Text style={styles.dialogTitle}>{proposal.title}</Text>
+                {proposal.kind === "issue" ? <Text style={styles.dialogHint}>{t("chat.assistantIssueNotice")}</Text> : null}
+                <Text selectable style={styles.proposalBody}>{proposal.body}</Text>
+                {canReview ? (
+                  <View style={styles.setupActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={busy}
+                      onPress={() => void decide(proposal.id, false)}
+                      style={[styles.setupBtn, styles.setupGhost]}
+                    >
+                      <Text style={styles.setupGhostText}>{t("common.cancel")}</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={busy}
+                      onPress={() => void decide(proposal.id, true)}
+                      style={[styles.setupBtn, styles.setupSolid]}
+                    >
+                      <Text style={styles.setupSolidText}>
+                        {t(proposal.kind === "issue" ? "chat.assistantPublish" : "chat.assistantMove")}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : <Text style={styles.dialogHint}>{t("chat.assistantReviewPhone")}</Text>}
+                {proposalError ? <Text style={[styles.feedback, { color: colors.danger }]}>{proposalError}</Text> : null}
+              </View>
+            ) : null}
             {busy ? <ChatTypingMarker /> : null}
           </SheetScrollView>
         )}
@@ -285,38 +381,77 @@ function ChatSheetBody() {
               style={({ pressed }) => [styles.utilRow, { opacity: pressed ? 0.75 : 1 }]}
             >
               <Text style={styles.utilLabel}>{item.label}</Text>
-              <Text style={styles.utilHint}>{item.hint}</Text>
+              {item.hint ? <Text style={styles.utilHint}>{item.hint}</Text> : null}
             </Pressable>
           ))}
         </ScrollView>
       </ChatDialog>
 
-      <ChatDialog open={setupOpen} title={t("chat.agentSection")} onClose={() => setSetupOpen(false)}>
+      <ChatDialog open={setupOpen} title={t("chat.agentSection")} onClose={closeSettings}>
         <Text style={styles.dialogHint}>{t("chat.agentSetupHint")}</Text>
-        <TextInput
-          value={apiKey}
-          onChangeText={setApiKey}
-          secureTextEntry
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder={t("chat.keyPlaceholder")}
-          placeholderTextColor={colors.muted}
-          style={styles.keyInput}
-        />
+        <View style={styles.providerList} accessibilityRole="radiogroup" accessibilityLabel={t("chat.provider")}>
+          {PROVIDER_IDS.map(id => (
+            <Pressable
+              key={id}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: id === selectedProvider, disabled: busy || saving || testing }}
+              disabled={busy || saving || testing}
+              onPress={() => {
+                setSelectedProvider(id);
+                setApiKey("");
+                clearFeedback();
+              }}
+              style={[styles.providerChip, id === selectedProvider && styles.providerSelected]}
+            >
+              <Text style={styles.providerLabel}>{ASSISTANT_PROVIDERS[id].label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {selected.model ? <Text style={styles.dialogHint}>{selected.model}</Text> : null}
+        {canEnterKey ? (
+          <TextInput
+            value={apiKey}
+            onChangeText={setApiKey}
+            editable={!saving && !testing && !busy}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={4096}
+            accessibilityLabel={t("chat.keyPlaceholder", { provider: selected.label })}
+            placeholder={hasSelectedKey ? t("chat.providerKeyStored") : t("chat.keyPlaceholder", { provider: selected.label })}
+            placeholderTextColor={colors.muted}
+            style={styles.keyInput}
+          />
+        ) : <Text style={styles.dialogHint}>{t(hasSelectedKey ? "chat.providerKeyStored" : "chat.providerKeyOnPhone")}</Text>}
+        {canReview ? (
+          <>
+            <Text style={styles.dialogHint}>{t("chat.githubTokenHint")}</Text>
+            <TextInput
+              value={githubToken}
+              onChangeText={setGithubToken}
+              editable={!saving}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={512}
+              accessibilityLabel={t("chat.githubTokenPlaceholder")}
+              placeholder={t("chat.githubTokenPlaceholder")}
+              placeholderTextColor={colors.muted}
+              style={styles.keyInput}
+            />
+          </>
+        ) : null}
         <View style={styles.setupActions}>
           <Pressable
-            disabled={busy}
-            onPress={() => void testConnection()}
+            disabled={busy || saving || testing || !canTest}
+            onPress={() => void testSelectedProvider()}
             style={({ pressed }) => [styles.setupBtn, styles.setupGhost, { opacity: pressed ? 0.85 : 1 }]}
           >
-            <Text style={styles.setupGhostText}>{t("chat.test")}</Text>
+            <Text style={styles.setupGhostText}>{t(testing ? "chat.testing" : "chat.test")}</Text>
           </Pressable>
           <Pressable
-            disabled={busy}
-            onPress={() => {
-              void persist();
-              if (apiKey.trim()) setSetupOpen(false);
-            }}
+            disabled={busy || saving || testing || !canSave}
+            onPress={() => void saveSettings()}
             style={({ pressed }) => [styles.setupBtn, styles.setupSolid, { opacity: pressed ? 0.85 : 1 }]}
           >
             <Text style={styles.setupSolidText}>{t("chat.save")}</Text>
@@ -414,6 +549,10 @@ const styles = createStyles(() => ({
     paddingVertical: 10,
     borderRadius: 8,
   },
+  providerList: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  providerChip: { borderWidth: 1, borderColor: colors.rule, borderRadius: 8, paddingVertical: 7, paddingHorizontal: 10 },
+  providerSelected: { borderColor: colors.accent, backgroundColor: colors.sheetHover },
+  providerLabel: { color: colors.ink, fontFamily: fonts.sansMedium, fontSize: 13 },
   setupActions: { flexDirection: "row", gap: 8 },
   setupBtn: {
     flex: 1,
@@ -427,6 +566,16 @@ const styles = createStyles(() => ({
   setupSolidText: { fontFamily: fonts.sansSemiBold, color: colors.accentText },
   feedback: { fontFamily: fonts.sans, fontSize: 13 },
   messagesShell: { flex: 1, minHeight: 0 },
+  proposal: {
+    gap: 8,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.rule,
+    borderRadius: 8,
+    backgroundColor: colors.sheetRaised,
+  },
+  proposalBody: { color: colors.ink, fontFamily: fonts.sans, fontSize: 14, lineHeight: 20 },
   scroll: { flex: 1 },
   scrollContent: {
     paddingHorizontal: 14,

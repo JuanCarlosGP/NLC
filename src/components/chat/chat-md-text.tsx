@@ -1,6 +1,6 @@
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { type StyleProp, type TextStyle } from "react-native";
+import { Linking, type StyleProp, type TextStyle } from "react-native";
 import { Text } from "@/components/ui/themed-text";
 import { fonts } from "@/lib/theme";
 
@@ -46,7 +46,8 @@ type InlineSeg =
   | { kind: "text"; value: string }
   | { kind: "bold"; value: string }
   | { kind: "italic"; value: string }
-  | { kind: "code"; value: string };
+  | { kind: "code"; value: string }
+  | { kind: "issueLink"; value: string; url: string };
 
 type Block =
   | { type: "paragraph"; text: string }
@@ -127,7 +128,7 @@ function splitBlocks(source: string): Block[] {
 
 function parseInline(text: string): InlineSeg[] {
   const segments: InlineSeg[] = [];
-  const pattern = /(\*\*[^*]+?\*\*|\*[^*]+?\*|`[^`]+?`)/g;
+  const pattern = /(\[#([1-9]\d*)\]\((https:\/\/github\.com\/JuanCarlosGP\/NLC\/issues\/\2)\)|\*\*[^*]+?\*\*|\*[^*]+?\*|`[^`]+?`)/g;
   let last = 0;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(text)) != null) {
@@ -135,7 +136,9 @@ function parseInline(text: string): InlineSeg[] {
       segments.push({ kind: "text", value: text.slice(last, match.index) });
     }
     const token = match[0];
-    if (token.startsWith("**") && token.endsWith("**")) {
+    if (match[3]) {
+      segments.push({ kind: "issueLink", value: `#${match[2]}`, url: match[3] });
+    } else if (token.startsWith("**") && token.endsWith("**")) {
       segments.push({ kind: "bold", value: token.slice(2, -2) });
     } else if (token.startsWith("*") && token.endsWith("*")) {
       segments.push({ kind: "italic", value: token.slice(1, -1) });
@@ -154,6 +157,13 @@ function parseInline(text: string): InlineSeg[] {
 
 function renderInline(text: string, color: string) {
   return parseInline(text).map((seg, index) => {
+    if (seg.kind === "issueLink") {
+      return (
+        <Text key={`i-${index}`} accessibilityRole="link" style={styles.link} onPress={() => void Linking.openURL(seg.url).catch(() => {})}>
+          {seg.value}
+        </Text>
+      );
+    }
     if (seg.kind === "bold") {
       return (
         <Text key={`i-${index}`} style={styles.bold}>
@@ -193,6 +203,7 @@ const styles = createStyles(() => ({
   bold: {
     fontFamily: fonts.sansSemiBold,
   },
+  link: { textDecorationLine: "underline" },
   italic: {
     fontStyle: "italic",
   },

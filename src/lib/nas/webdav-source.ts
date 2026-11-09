@@ -514,6 +514,7 @@ export async function moveWebDavPath(
   });
   const body = await response.text();
   throwIfDavWriteFailed(response, body);
+  libraryRevision++;
 }
 
 let libraryRevision = 0;

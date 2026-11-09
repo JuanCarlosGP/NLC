@@ -114,6 +114,7 @@ export async function createCursorAgent(
     body: JSON.stringify({
       name: "NLC",
       prompt: { text },
+      autoCreatePR: false,
     }),
   });
   if (!response.ok) throw new Error(await readError(response));
