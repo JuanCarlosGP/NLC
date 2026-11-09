@@ -1,3 +1,4 @@
+import { Directory } from "expo-file-system";
 import { Platform } from "react-native";
 import { tr } from "@/lib/i18n/runtime";
 import { forgetLocalVideoTree } from "@/lib/local/local-video";
@@ -12,6 +13,7 @@ import { assertWriteAvailable, serialize } from "@/lib/backend/native";
 import { publishWebEvent, webNative } from "@/lib/backend/native-module";
 import type { ProposedAction } from "./proposals";
 
+type Storage = "local" | "nas";
 type AudioFile = { name: string; relative: string; uri: string };
 const SONGS = "Canciones";
 const ignored = new Set(["@eadir", "#recycle", "#snapshot", "lost+found", "storyboards"]);
@@ -39,29 +41,97 @@ function localPair(settings: NasSettings) {
   return { from, to };
 }
 
-async function scanNas(settings: NasSettings, password: string, root: string) {
-  const audio: AudioFile[] = [];
-  let directories = 0;
+function scanLimit() {
   const deadline = Date.now() + 25000;
-  async function scan(path: string, relative: string, depth: number) {
+  let directories = 0;
+  return (depth: number) => {
     if (++directories > 400 || depth > 12 || Date.now() > deadline) {
       throw new Error(tr("The video folder is too large to scan in one request.", "La carpeta de Vídeo es demasiado grande para revisarla en una sola petición."));
     }
+  };
+}
+
+function isVisible(name: string) {
+  return safeName(name) && !name.startsWith(".") && !ignored.has(name.toLowerCase());
+}
+
+function addAudio(audio: AudioFile[], file: AudioFile) {
+  if (audio.length >= 2000) {
+    throw new Error(tr("There are too many audio files to check.", "Hay demasiados archivos de audio para revisarlos."));
+  }
+  audio.push(file);
+}
+
+async function scanNas(settings: NasSettings, password: string, root: string) {
+  const audio: AudioFile[] = [];
+  const check = scanLimit();
+  async function scan(path: string, relative: string, depth: number) {
+    check(depth);
     for (const row of await listWebDavDir(settings, password, path)) {
-      if (!safeName(row.name) || row.name.startsWith(".") || ignored.has(row.name.toLowerCase())) continue;
+      if (!isVisible(row.name)) continue;
       const child = `${path}/${row.name}`;
       if (row.path.replace(/\/+$/, "") !== child) continue;
       const filePath = relative ? `${relative}/${row.name}` : row.name;
       if (row.dir) await scan(child, filePath, depth + 1);
-      else if (isAudioFile(row.name)) audio.push({ name: row.name, relative: filePath, uri: child });
-      if (audio.length > 2000) throw new Error(tr("Too many audio files to disambiguate.", "Hay demasiados archivos de audio para elegir uno."));
+      else if (isAudioFile(row.name)) addAudio(audio, { name: row.name, relative: filePath, uri: child });
     }
   }
   await scan(root, "", 0);
   return audio;
 }
 
-export async function proposeVideoToMusic(query: unknown, storage?: string): Promise<ProposedAction | string> {
+function localName(uri: string) {
+  const segment = decodeURIComponent(uri.split("/").at(-1) ?? "");
+  if (!uri.startsWith("content://")) return segment;
+  const document = segment.slice(segment.indexOf(":") + 1);
+  return document.split("/").at(-1) ?? "";
+}
+
+async function scanLocal(root: string) {
+  const audio: AudioFile[] = [];
+  const check = scanLimit();
+  async function scan(folder: Directory, relative: string, depth: number) {
+    check(depth);
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    const entries = folder.list().map(entry => {
+      const uri = entry.uri.replace(/\/+$/, "");
+      return { entry, uri, name: localName(uri) };
+    });
+    if (entries.some(({ name }) => /^\.nlc-(importing|moving)-/.test(name))) {
+      throw new Error(tr("Video files are being imported or moved.", "Hay una importación o un traslado de archivos en Vídeo."));
+    }
+    for (const { entry, uri, name } of entries) {
+      if (!isVisible(name)) continue;
+      const filePath = relative ? `${relative}/${name}` : name;
+      if (entry instanceof Directory) await scan(entry, filePath, depth + 1);
+      else if (isAudioFile(name)) addAudio(audio, { name, relative: filePath, uri });
+    }
+  }
+  const folder = new Directory(root);
+  if (!folder.exists) throw new Error("video_folder_unavailable");
+  await scan(folder, "", 0);
+  return audio;
+}
+
+const storageName = (storage: Storage) => storage === "nas" ? "NAS" : tr("Phone", "Teléfono");
+
+function moveUnavailable(storage: Storage, settings: NasSettings) {
+  if (storage === "local") {
+    if (!usesLocal(settings, "music") || !settings.localFolderUri.trim()) {
+      return tr("Choose a local folder in Music → Settings → Source to move it from the phone.",
+        "Elige una carpeta local en Música → Ajustes → Fuente para trasladarlo dentro del teléfono.");
+    }
+    return tr("Choose separate folders for Music and Video.", "Elige carpetas distintas para Música y Vídeo.");
+  }
+  if (!usesNas(settings, "music") || settings.sourceKind !== "webdav" || !settings.sharePath.trim()) {
+    return tr("This file is on the NAS. Moving it requires a WebDAV folder for Music on the same server.",
+      "El archivo está en el NAS. Para moverlo, Música necesita una carpeta WebDAV en ese mismo servidor.");
+  }
+  return tr("Music and Video need separate WebDAV folders on the same server and account to move this file.",
+    "Para mover este archivo, Música y Vídeo necesitan carpetas WebDAV distintas en el mismo servidor y con la misma cuenta.");
+}
+
+export async function proposeVideoToMusic(query: unknown, storage?: string, inspectOnly = false): Promise<ProposedAction | string> {
   if (query !== undefined && (typeof query !== "string" || query.length > 300)) {
     throw new Error(tr("Give me the song title or filename.", "Dime el título o el nombre del archivo."));
   }
@@ -70,44 +140,59 @@ export async function proposeVideoToMusic(query: unknown, storage?: string): Pro
   }
   const settings = await loadNasSettings();
   const password = await loadNasPassword();
-  const nas = storage === "local" ? null : nasPair(settings);
-  const local = storage === "nas" ? null : localPair(settings);
-  const localApi = local ? webNative() : null;
-  if (local && !localApi?.listAssistantAudio) {
-    throw new Error(tr("Update the APK to move local audio files.", "Actualiza la APK para mover archivos de audio locales."));
+  const video = videoSourceSettings(settings);
+  const nasRoot = toWebDavPath(video.sharePath);
+  const localRoot = settings.videoLocalFolderUri.trim();
+  const sources: { storage: Storage; scan: () => Promise<AudioFile[]> }[] = [];
+  if (storage !== "local" && usesNas(settings, "video") && video.host.trim() && validRoot(nasRoot)) {
+    sources.push({ storage: "nas", scan: () => scanNas(video, password, nasRoot) });
   }
-  if (!local && !nas) return tr(
-    "Configure separate Music and Video folders on the phone or on the same WebDAV server.",
-    "Configura carpetas distintas para Música y Vídeo en el teléfono o en el mismo servidor WebDAV.",
+  if (storage !== "nas" && Platform.OS === "android" && usesLocal(settings, "video") && localRoot) {
+    sources.push({ storage: "local", scan: () => scanLocal(localRoot) });
+  }
+  if (!sources.length) return tr(
+    "There is no Video folder to check in this source. Check Video → Settings → Source.",
+    "No hay una carpeta de Vídeo disponible en esa fuente. Revisa Vídeo → Ajustes → Fuente.",
   );
-
-  const [localFiles, nasFiles] = await Promise.all([
-    local && localApi?.listAssistantAudio
-      ? localApi.listAssistantAudio(local.from, local.to).then(value => JSON.parse(value) as AudioFile[])
-      : Promise.resolve([]),
-    nas ? scanNas(videoSourceSettings(settings), password, nas.from) : Promise.resolve([]),
-  ]);
-  const files = [
-    ...localFiles.map(file => ({ ...file, storage: "local" as const })),
-    ...nasFiles.map(file => ({ ...file, storage: "nas" as const })),
-  ];
+  const scans = await Promise.allSettled(sources.map(source => source.scan()));
+  const failures = sources.filter((_, index) => scans[index]?.status === "rejected");
+  const files = scans.flatMap((result, index) =>
+    result.status === "fulfilled" ? result.value.map(file => ({ ...file, storage: sources[index]!.storage })) : []);
   const match = normalize(typeof query === "string" ? query : "");
   const exact = files.filter(file => [file.name, file.relative, file.name.replace(/\.[^.]+$/, "")].some(name => normalize(name) === match));
   const candidates = exact.length ? exact : files.filter(file => normalize(file.relative).includes(match));
-  if (!candidates.length) return tr("I found no matching audio files in Video.", "No encontré ningún archivo de audio que coincida en Vídeo.");
-  const storageName = (storage: "nas" | "local") => storage === "nas" ? "NAS" : tr("Phone", "Teléfono");
-  if (candidates.length !== 1) return tr(
-    "Which file do you want to move?",
-    "¿Qué archivo quieres mover?",
-  ) + "\n\n" + candidates.slice(0, 6).map((file, index) => `${index + 1}. ${file.relative} · ${storageName(file.storage)}`).join("\n\n");
+  const labels = candidates.slice(0, 6).map((file, index) => `${index + 1}. ${file.relative} · ${storageName(file.storage)}`).join("\n\n");
+  if (failures.length) {
+    const where = failures.map(source => storageName(source.storage)).join(" · ");
+    const error = tr(`I couldn't finish checking Video in ${where}. Check access to that folder and try again.`,
+      `No pude terminar de revisar Vídeo en ${where}. Comprueba el acceso a esa carpeta y vuelve a intentarlo.`);
+    return labels ? `${error}\n\n${labels}` : error;
+  }
+  if (!candidates.length) return tr(
+    "I found no matching audio files in Video. If the song is listed as a video, tell me the exact title shown.",
+    "No encontré archivos de audio que coincidan en Vídeo. Si la canción aparece como vídeo, dime el título exacto que ves.",
+  );
+  if (inspectOnly) return tr(
+    "I found these audio files in the folder configured for Video. Tell me which one you want to move to Music.",
+    "Encontré estos archivos de audio en la carpeta configurada para Vídeo. Dime cuál quieres mover a Música.",
+  ) + `\n\n${labels}`;
+  if (candidates.length !== 1) return tr("Which file do you want to move?", "¿Qué archivo quieres mover?") + `\n\n${labels}`;
 
   const file = candidates[0]!;
   const location = storageName(file.storage);
   const music = tr("Music", "Música");
+  const nas = file.storage === "nas" ? nasPair(settings) : null;
+  const local = file.storage === "local" ? localPair(settings) : null;
+  const localApi = local ? webNative() : null;
+  const found = `${location} · ${tr("Video", "Vídeo")} / ${file.relative}`;
+  if (!nas && !local) return `${found}\n\n${moveUnavailable(file.storage, settings)}`;
+  if (local && !localApi?.moveAssistantAudio) {
+    return `${found}\n\n${tr("Update the APK to move local audio files.", "Actualiza la APK para mover archivos de audio locales.")}`;
+  }
   return {
     kind: "move",
     title: tr("Move audio to Music", "Mover audio a Música"),
-    body: `${location} · ${tr("Video", "Vídeo")} / ${file.relative}\n→ ${location} · ${music} / ${SONGS} / ${file.name}`,
+    body: `${found}\n→ ${location} · ${music} / ${SONGS} / ${file.name}`,
     execute: () => withLocalSourceSync(async () => {
       const { current, secret, removed } = await serialize(async () => {
         await assertWriteAvailable();

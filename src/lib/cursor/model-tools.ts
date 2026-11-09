@@ -49,7 +49,8 @@ export const MODEL_TOOLS: readonly Tool[] = [
   }),
   tool("wealth_month", "Show the locally calculated change in net worth this calendar month."),
   tool("health_month", "Show a local monthly summary for the requested part of Health.", { kind: choices("weight", "nutrition", "training", "medication", "bodyPhotos") }),
-  tool("move_audio_to_music", "Find an audio file misplaced in Video. Show matches or prepare a move to Music for confirmation. Omit match when the user gives no title.", {}, { match: { type: "string", maxLength: 300 }, storage: choices("local", "nas") }),
+  tool("inspect_video_audio", "Check Video for misplaced audio files without moving anything. Use when the user asks to inspect or diagnose. Omit match when no title is known.", {}, { match: { type: "string", maxLength: 300 }, storage: choices("local", "nas") }),
+  tool("move_audio_to_music", "Prepare a move to Music for confirmation when the user asks to fix or move misplaced audio. Omit match when the user gives no title.", {}, { match: { type: "string", maxLength: 300 }, storage: choices("local", "nas") }),
   tool("propose_issue", "Prepare a public issue for a missing NLC feature. Describe the problem and expected behavior in Spanish. Exclude private data and secrets.", { title: { type: "string", maxLength: 100 }, body: { type: "string", maxLength: 3000 } }),
   tool("create_task", "Create a task. Use today, tomorrow, none or YYYY-MM-DD for due.", { title: text }, taskFields),
   tool("update_task", "Edit the task whose title matches match.", { match: text }, { ...taskFields, title: text, append_notes: text }),
@@ -136,8 +137,9 @@ export async function runAssistantTool(action: AssistantAction, setZone: Assista
       return { text: await answerWealthMonth(), terminal: true };
     case "health_month":
       return { text: await answerHealthSummary(action.kind), terminal: true };
+    case "inspect_video_audio":
     case "move_audio_to_music": {
-      const proposal = await proposeVideoToMusic(action.match, action.storage);
+      const proposal = await proposeVideoToMusic(action.match, action.storage, action.op === "inspect_video_audio");
       return typeof proposal === "string" ? { text: proposal, terminal: true, modelContext: true } : {
         text: tr("Review the move in NLC on Android.", "Revisa el traslado en NLC para Android."),
         terminal: true, proposal,

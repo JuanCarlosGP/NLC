@@ -443,7 +443,8 @@ Use a single action in the block for these requests. NLC will display its verifi
 - search_nlc_records {kind, match} to look up candidates. kind = task|project|track|playlist|album|artist|video|transaction|account|asset|goal|reminder.
 - wealth_month {} for net worth change this calendar month. Do not estimate it yourself.
 - health_month {kind} for a summary of this month's records. kind = weight|nutrition|training|medication|bodyPhotos.
-- move_audio_to_music {match?, storage? (local|nas)} for an audio file misplaced in Video. Pass the title or filename if known. Omit match if the user gave no title. NLC asks for confirmation before moving.
+- inspect_video_audio {match?, storage? (local|nas)} to check Video for misplaced audio without changing files.
+- move_audio_to_music {match?, storage? (local|nas)} when the user asks to fix or move audio misplaced in Video. Pass the title or filename if known. Omit match if the user gave no title. NLC asks for confirmation before moving.
 - propose_issue {title, body} for a missing NLC feature. Ask for the problem or desired behavior if unclear. Draft in Spanish with a problem and a proposal. It will be public. Exclude personal data, song names, health and finance records, files, addresses, and credentials. NLC handles publication after review.
 For other questions, respond without an actions block. For other requests, use only the operations listed above. Never claim an action succeeded before NLC executes it.
 
@@ -1060,7 +1061,8 @@ Usa una sola acción para estas peticiones. NLC mostrará el resultado que obten
 - search_nlc_records {kind, match} para buscar registros. kind = task|project|track|playlist|album|artist|video|transaction|account|asset|goal|reminder.
 - wealth_month {} para la variación de patrimonio en el mes natural actual. No la estimes.
 - health_month {kind} para un resumen del mes de Salud. kind = weight|nutrition|training|medication|bodyPhotos.
-- move_audio_to_music {match?, storage? (local|nas)} para audio mal colocado en Vídeo. Pasa el título o nombre de archivo si lo dio el usuario. Si no lo dio, omite match. NLC solicita confirmación.
+- inspect_video_audio {match?, storage? (local|nas)} para revisar si hay audio en Vídeo sin modificar archivos.
+- move_audio_to_music {match?, storage? (local|nas)} si el usuario pide corregir o mover audio mal colocado en Vídeo. Pasa el título o nombre de archivo si lo dio el usuario. Si no lo dio, omite match. NLC solicita confirmación.
 - propose_issue {title, body} cuando falte una función de NLC. Si el problema o comportamiento deseado no está claro, pregunta. Redacta en español un problema y una propuesta. Será público. Excluye datos personales, títulos de la biblioteca, registros de Salud o Patrimonio, archivos, direcciones y credenciales. NLC se encarga de la publicación tras revisión.
 Para otras consultas, responde sin bloque. Para otros cambios, usa solo las operaciones de la lista. Nunca afirmes que se ejecutó una acción antes de que NLC la ejecute.
 

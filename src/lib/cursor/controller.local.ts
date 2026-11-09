@@ -78,7 +78,7 @@ export const chatController = createChatController({
 
     const parsed = extractAssistantActions(done.result);
     const tool = parsed.actions.find(action => [
-      "search_nlc_records", "wealth_month", "health_month", "move_audio_to_music", "propose_issue",
+      "search_nlc_records", "wealth_month", "health_month", "inspect_video_audio", "move_audio_to_music", "propose_issue",
     ].includes(action.op));
     if (tool) {
       const { text, proposal, modelContext, modelText } = await runAssistantTool(tool, setZone);
