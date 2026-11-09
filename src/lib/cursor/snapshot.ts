@@ -21,21 +21,32 @@ import { listReminders } from "@/lib/reminders/store.internal";
 import { formatReminderWhen } from "@/lib/reminders/types";
 import { accountDisplayName, TX_KIND_LABEL } from "@/lib/wealth/types";
 import type { AppZone } from "@/lib/zone/zone-context";
+import { listVideoShows } from "@/lib/video/catalog";
+import { loadNasPassword, loadNasSettings } from "@/lib/settings/storage.impl";
 
 export async function buildAssistantSnapshot(zone: AppZone): Promise<string> {
-  const [projects, tasks, playlists, music, podcasts, albums, accounts, assets, txs, reminders, goals] =
+  const focus = zone === "focus";
+  const wealth = zone === "wealth";
+  const media = zone === "music" || zone === "podcast";
+  if (zone === "video") {
+    const shows = await listVideoShows(await loadNasSettings(), await loadNasPassword());
+    return [
+      t("chat.snapActiveZone", { zone }),
+      ...shows.slice(0, 25).map(show => `- ${show.title} · ${show.kind}`),
+    ].join("\n");
+  }
+  const [projects, tasks, playlists, tracks, albums, accounts, assets, txs, reminders, goals] =
     await Promise.all([
-      listProjects(),
-      listTasks(),
-      loadPlaylists(),
-      getTracks({ kind: "music" }),
-      getTracks({ kind: "podcast" }),
-      getAlbums(),
-      listAccounts(),
-      listAssets(),
-      listTx(),
-      listReminders(),
-      listGoals(),
+      focus ? listProjects() : [],
+      focus ? listTasks() : [],
+      media ? loadPlaylists() : [],
+      media ? getTracks({ kind: zone }) : [],
+      zone === "music" ? getAlbums({ home: "music" }) : [],
+      wealth ? listAccounts() : [],
+      wealth ? listAssets() : [],
+      wealth ? listTx() : [],
+      focus ? listReminders() : [],
+      wealth ? listGoals() : [],
     ]);
 
   const liveAccounts = accounts.filter((item) => !item.archived);
@@ -88,8 +99,8 @@ export async function buildAssistantSnapshot(zone: AppZone): Promise<string> {
     (playlist) =>
       `- ${playlist.name} · ${t("chat.snapTracksCount", { count: playlist.tracks.length })}${playlist.liked ? ` · ${t("chat.snapHome")}` : ""}`,
   );
-  const musicLines = music.slice(0, 16).map((track) => `- ${track.title} · ${track.artistName}`);
-  const podcastLines = podcasts.slice(0, 12).map((track) => `- ${track.title}`);
+  const musicLines = tracks.slice(0, 16).map((track) => `- ${track.title} · ${track.artistName}`);
+  const podcastLines = tracks.slice(0, 12).map((track) => `- ${track.title}`);
   const albumLines = albums.slice(0, 12).map((album) => `- ${album.name} · ${album.artistName}`);
 
   const none = `- (${t("chat.snapNone")})`;
@@ -97,36 +108,37 @@ export async function buildAssistantSnapshot(zone: AppZone): Promise<string> {
 
   return [
     t("chat.snapActiveZone", { zone }),
-    "",
-    t("chat.snapProjects"),
-    projectLines.join("\n") || none,
-    "",
-    t("chat.snapTasks"),
-    taskLines.join("\n") || none,
-    "",
-    t("chat.snapPlaylists"),
-    playlistLines.join("\n") || none,
-    "",
-    t("chat.snapTracksSample"),
-    musicLines.join("\n") || empty,
-    "",
-    t("chat.snapPodcastsSample"),
-    podcastLines.join("\n") || empty,
-    "",
-    t("chat.snapAlbumsSample"),
-    albumLines.join("\n") || empty,
-    "",
-    t("chat.snapReminders"),
-    reminderLines.join("\n") || none,
-    "",
-    t("chat.snapWealthLine", { total: formatEuro(total), cash: formatEuro(cash), invested: formatEuro(invested) }),
-    t("chat.snapAccounts"),
-    accountLines.join("\n") || none,
-    t("chat.snapAssets"),
-    assetLines.join("\n") || none,
-    t("chat.snapRecentTx"),
-    txLines.join("\n") || none,
-    t("chat.snapGoals"),
-    goalLines.join("\n") || none,
+    ...(focus ? [
+      "",
+      t("chat.snapProjects"),
+      projectLines.join("\n") || none,
+      "",
+      t("chat.snapTasks"),
+      taskLines.join("\n") || none,
+      "",
+      t("chat.snapReminders"),
+      reminderLines.join("\n") || none,
+    ] : []),
+    ...(media ? [
+      "",
+      t("chat.snapPlaylists"),
+      playlistLines.join("\n") || none,
+      "",
+      zone === "music" ? t("chat.snapTracksSample") : t("chat.snapPodcastsSample"),
+      (zone === "music" ? musicLines : podcastLines).join("\n") || empty,
+    ] : []),
+    ...(zone === "music" ? ["", t("chat.snapAlbumsSample"), albumLines.join("\n") || empty] : []),
+    ...(wealth ? [
+      "",
+      t("chat.snapWealthLine", { total: formatEuro(total), cash: formatEuro(cash), invested: formatEuro(invested) }),
+      t("chat.snapAccounts"),
+      accountLines.join("\n") || none,
+      t("chat.snapAssets"),
+      assetLines.join("\n") || none,
+      t("chat.snapRecentTx"),
+      txLines.join("\n") || none,
+      t("chat.snapGoals"),
+      goalLines.join("\n") || none,
+    ] : []),
   ].join("\n");
 }

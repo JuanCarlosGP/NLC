@@ -9,13 +9,16 @@ import {
 } from "@/lib/db/catalog";
 import { loadFavorites, toggleFavorite } from "@/lib/library/cache";
 import { moveWebDavPath } from "@/lib/nas/webdav-source";
-import { sidecarCoverPath } from "@/lib/nas/webdav";
-import type { NasSettings } from "@/lib/settings/storage.impl";
+import { isPathInside, sidecarCoverPath, toWebDavPath } from "@/lib/nas/webdav";
+import { videoSourceSettings, type NasSettings } from "@/lib/settings/storage.impl";
+import { usesNas } from "@/lib/settings/service-source";
+import { isLocalVideoPath } from "@/lib/local/local-video";
 import {
   addTracksToImportedPlaylist,
   createEmptyImportedPlaylist,
   loadImportedPlaylists,
   removeImportedPlaylist,
+  removeTrackFromImportedPlaylist,
   renameImportedPlaylist,
   toggleImportedPlaylistLiked,
 } from "@/lib/spotify/playlist-store";
@@ -30,7 +33,7 @@ import {
   updateTask,
 } from "@/lib/productivity/store";
 import { dueToday, dueTomorrow, startOfDay } from "@/lib/productivity/dates";
-import { INBOX_PROJECT_ID, type TaskStatus } from "@/lib/productivity/types";
+import { INBOX_PROJECT_ID, projectDisplayName, type TaskStatus } from "@/lib/productivity/types";
 import { notifyAssistantMutations } from "@/lib/cursor/assistant-bus";
 import { loadVideoFavorites, toggleVideoFavorite, type VideoFavorite } from "@/lib/video/favorites";
 import { listVideoShows } from "@/lib/video/catalog";
@@ -48,6 +51,7 @@ import {
   listAssets,
   listGoals,
   listTx,
+  updateTx,
   renameAccount,
   updateAsset,
   updateGoal,
@@ -67,7 +71,8 @@ import {
   updateReminder,
 } from "@/lib/reminders/store";
 import type { ReminderFrequency } from "@/lib/reminders/types";
-import { t } from "@/lib/i18n/runtime";
+import { dateLocale, t } from "@/lib/i18n/runtime";
+import { AssistantChoiceError, describeMatches, normalizeRecordName as normalize, uniqueRecord } from "./record-match";
 
 export type AssistantAction = {
   op: string;
@@ -105,6 +110,7 @@ export type AssistantAction = {
   asset_kind?: string;
   target?: number | string;
   scope?: string;
+  storage?: string;
 };
 
 export type AssistantRuntime = {
@@ -113,37 +119,9 @@ export type AssistantRuntime = {
   setZone: (zone: AppZone) => boolean;
 };
 
-export type ActionResult = { ok: boolean; message: string };
+export type ActionResult = { ok: boolean; message: string; modelText?: string };
 
 const ACTION_BLOCK = /\[\[\[(?:NLC|SND)\]\]\]([\s\S]*?)\[\[\[\/(?:NLC|SND)\]\]\]/g;
-
-function normalize(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}
-
-function bestMatch<T>(items: T[], nameOf: (item: T) => string, query: string): T | null {
-  const q = normalize(query);
-  if (!q || !items.length) return null;
-  const exact = items.find((item) => normalize(nameOf(item)) === q);
-  if (exact) return exact;
-  const scored = items
-    .map((item) => {
-      const name = normalize(nameOf(item));
-      let score = 0;
-      if (name.includes(q) || q.includes(name)) score += 4;
-      const tokens = q.split(/\s+/).filter(Boolean);
-      if (tokens.every((token) => name.includes(token))) score += 3;
-      if (name.startsWith(q) || q.startsWith(name)) score += 2;
-      return { item, score, len: name.length };
-    })
-    .filter((row) => row.score > 0)
-    .sort((a, b) => b.score - a.score || a.len - b.len);
-  return scored[0]?.item ?? null;
-}
 
 function parseDue(raw: string | null | undefined): number | null | undefined {
   if (raw == null) return undefined;
@@ -151,6 +129,14 @@ function parseDue(raw: string | null | undefined): number | null | undefined {
   if (!value || value === "none" || value === "sin fecha") return null;
   if (value === "today" || value === "hoy") return dueToday();
   if (value === "tomorrow" || value === "manana" || value === "mañana") return dueTomorrow();
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (day) {
+    const date = new Date(`${value}T00:00:00`);
+    if (date.getFullYear() !== Number(day[1]) || date.getMonth() + 1 !== Number(day[2]) || date.getDate() !== Number(day[3])) {
+      return undefined;
+    }
+    return date.getTime();
+  }
   const iso = Date.parse(raw);
   if (Number.isNaN(iso)) return undefined;
   return startOfDay(iso);
@@ -171,6 +157,7 @@ function parseZone(raw: string | undefined): AppZone | null {
   if (value === "podcast" || value === "podcasts") return "podcast";
   if (value === "video" || value === "video") return "video";
   if (value === "focus" || value === "productividad" || value === "tareas") return "focus";
+  if (value === "health" || value === "salud") return "health";
   if (value === "wealth" || value === "finanzas" || value === "patrimonio" || value === "dinero") return "wealth";
   return null;
 }
@@ -281,7 +268,13 @@ async function tryMove(
   from: string,
   to: string,
 ): Promise<string | null> {
-  if (!from.startsWith("/") || from === to) return null;
+  const root = toWebDavPath(settings.sharePath);
+  const source = toWebDavPath(from);
+  const target = toWebDavPath(to);
+  if (!from.startsWith("/") || from === to || !root || root === "/" || source === root
+    || !isPathInside(root, source) || !isPathInside(root, target)
+    || source.split("/").some(part => part === "." || part === "..")
+    || target.split("/").some(part => part === "." || part === "..")) return null;
   try {
     await moveWebDavPath(settings, password, from, to);
     if (/\.(mp3|flac|m4a|aac|wav|ogg|opus)$/i.test(from)) {
@@ -294,83 +287,6 @@ async function tryMove(
   } catch {
     return null;
   }
-}
-
-export function inferLocalActions(text: string): AssistantAction[] {
-  const raw = text.trim();
-  const money = raw.match(
-    /^(?:apunta|anota|registra)\s+(?:un\s+)?(gasto|ingreso|cobro)\s+de\s+([\d.,]+)\s*(?:€|eur)?(?:\s+(?:en|de|por)\s+(.+?))?\.?$/i,
-  );
-  if (money) {
-    const kind = parseTxKind(money[1]);
-    const amount = parseMoney(money[2]);
-    const title = money[3]?.trim() || (kind === "income" ? "Ingreso" : "Gasto");
-    if (kind && amount != null) return [{ op: "create_tx", kind, amount, title }];
-  }
-  const buy = raw.match(
-    /^(?:compré|compra|apunta(?:\s+una)?\s+compra)\s+(?:(\d+[.,]?\d*)\s+(?:de\s+)?)?(.+?)\s+(?:a|por)\s+([\d.,]+)\s*(?:€|eur)?\.?$/i,
-  );
-  if (buy) {
-    const quantity = buy[1] ? parseMoney(buy[1], 8) : 1;
-    const price = parseMoney(buy[3]);
-    const name = buy[2]?.trim();
-    if (name && price != null && quantity != null) {
-      return [{
-        op: "create_tx",
-        kind: "buy",
-        title: name,
-        asset: name,
-        quantity,
-        price,
-        amount: quantity * price,
-      }];
-    }
-  }
-  const reminder = raw.match(
-    /^(?:recuérdame|recuerdame|crea(?:r)?\s+(?:un\s+)?recordatorio)\s+(.+?)(?:\s+a\s+las\s+(\d{1,2})(?::(\d{2}))?)?\.?$/i,
-  );
-  if (reminder) {
-    return [{
-      op: "create_reminder",
-      title: reminder[1]?.trim(),
-      hour: reminder[2],
-      minute: reminder[3] ?? "0",
-      frequency: "daily",
-    }];
-  }
-  const create = raw.match(/^(?:crea(?:r)?|apunta|anota|añade|agrega)\s+(?:la\s+)?tarea\s+«?(.+?)»?(?:\s+en\s+(.+?))?(?:\s+para\s+(hoy|mañana|tomorrow))?\.?$/i);
-  if (create) {
-    return [{
-      op: "create_task",
-      title: create[1]?.trim(),
-      project: create[2]?.trim(),
-      due: create[3] ? create[3].toLowerCase() : undefined,
-    }];
-  }
-  const move = raw.match(/^(?:pasa|mueve|marca)\s+«?(.+?)»?\s+a\s+(por hacer|en curso|hecho|todo|doing|done)\.?$/i);
-  if (move) {
-    return [{ op: "move_task", match: move[1]?.trim(), status: move[2] }];
-  }
-  const note = raw.match(/^(?:anota|apunta|añade(?:le)?(?:\s+una)?\s+nota)\s+(?:en|a)\s+«?(.+?)»?\s*[:—-]\s*(.+)$/i);
-  if (note) {
-    return [{ op: "update_task", match: note[1]?.trim(), append_notes: note[2]?.trim() }];
-  }
-  const rename = raw.match(
-    /^renombra(?:r)?\s+(?:la\s+|el\s+)?(tarea|proyecto|playlist|canci[oó]n|pista|álbum|album|artista|v[ií]deo|serie)?\s*«?(.+?)»?\s+a\s+«?(.+?)»?\.?$/i,
-  );
-  if (rename) {
-    const kind = normalize(rename[1] ?? "cancion");
-    const match = rename[2]?.trim();
-    const name = rename[3]?.trim();
-    if (kind === "tarea") return [{ op: "update_task", match, title: name }];
-    if (kind === "proyecto") return [{ op: "rename_project", match, name }];
-    if (kind === "playlist") return [{ op: "rename_playlist", match, name }];
-    if (kind === "album" || kind === "álbum") return [{ op: "rename_album", match, name }];
-    if (kind === "artista") return [{ op: "rename_artist", match, name }];
-    if (kind === "video" || kind === "serie") return [{ op: "rename_video", match, name }];
-    return [{ op: "rename_track", match, name }];
-  }
-  return [];
 }
 
 export function extractAssistantActions(reply: string): { actions: AssistantAction[]; visible: string } {
@@ -396,7 +312,7 @@ export function extractAssistantActions(reply: string): { actions: AssistantActi
     }
     return "";
   });
-  return { actions, visible: visible.trim() };
+  return { actions: actions.filter(action => action && typeof action.op === "string").slice(0, 12), visible: visible.trim() };
 }
 
 export async function executeAssistantActions(
@@ -406,12 +322,16 @@ export async function executeAssistantActions(
   const results: ActionResult[] = [];
   for (const action of actions) {
     try {
-      results.push(await runAction(action, runtime));
+      const result = await runAction(action, runtime);
+      results.push(result);
+      if (!result.ok) break;
     } catch (error) {
       results.push({
         ok: false,
+        modelText: error instanceof AssistantChoiceError ? error.modelText : undefined,
         message: error instanceof Error ? error.message : t("cursor.actionFailed", { op: action.op }),
       });
+      break;
     }
   }
   if (results.some((item) => item.ok)) notifyAssistantMutations();
@@ -423,13 +343,17 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   if (op === "create_task") {
     const title = action.title?.trim();
     if (!title) return { ok: false, message: t("cursor.missingTaskTitle") };
+    const status = parseStatus(action.status);
+    if (action.status !== undefined && !status) return { ok: false, message: t("cursor.invalidTaskStatus") };
+    const dueAt = parseDue(action.due);
+    if (action.due != null && dueAt === undefined) return { ok: false, message: t("cursor.invalidTaskDate") };
     const projectId = await resolveProjectId(action.project);
     const task = await createTask({
       title,
       notes: action.notes,
       projectId,
-      status: parseStatus(action.status),
-      dueAt: parseDue(action.due) ?? null,
+      status,
+      dueAt: dueAt ?? null,
     });
     if (action.starred) await updateTask(task.id, { starred: true });
     return { ok: true, message: t("cursor.createdTask", { title: task.title }) };
@@ -437,6 +361,10 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   if (op === "update_task" || op === "move_task") {
     const task = await resolveTask(action.match || action.title);
     if (!task) return { ok: false, message: t("cursor.taskNotFound", { match: action.match || action.title || "" }) };
+    const status = parseStatus(action.status);
+    if (action.status !== undefined && !status) return { ok: false, message: t("cursor.invalidTaskStatus") };
+    const dueAt = parseDue(action.due);
+    if (action.due != null && dueAt === undefined) return { ok: false, message: t("cursor.invalidTaskDate") };
     const notes =
       action.append_notes != null
         ? [task.notes.trim(), action.append_notes.trim()].filter(Boolean).join("\n")
@@ -444,8 +372,8 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     await updateTask(task.id, {
       title: action.title,
       notes,
-      status: parseStatus(action.status),
-      dueAt: parseDue(action.due),
+      status,
+      dueAt,
       starred: action.starred,
       projectId: action.project ? await resolveProjectId(action.project) : undefined,
     });
@@ -480,15 +408,8 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   if (op === "create_playlist") {
     const name = action.name?.trim() || action.title?.trim();
     if (!name) return { ok: false, message: t("cursor.missingPlaylistName") };
-    await createEmptyImportedPlaylist(name);
-    if (action.tracks?.length) {
-      const lists = await loadImportedPlaylists();
-      const playlist = lists.find((item) => item.name === name);
-      if (playlist) {
-        const found = await resolveTracks(action.tracks);
-        if (found.length) await addTracksToImportedPlaylist(playlist.id, found);
-      }
-    }
+    const tracks = await resolveTracks(action.tracks ?? [], true);
+    await createEmptyImportedPlaylist(name, tracks);
     return { ok: true, message: t("cursor.createdPlaylist", { name }) };
   }
   if (op === "rename_playlist") {
@@ -520,10 +441,28 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   if (op === "add_to_playlist") {
     const playlist = await resolvePlaylist(action.playlist || action.match);
     if (!playlist) return { ok: false, message: t("cursor.playlistNotFound", { match: action.playlist ?? "" }) };
-    const found = await resolveTracks(action.tracks ?? []);
+    const found = await resolveTracks(action.tracks ?? [], true);
     if (!found.length) return { ok: false, message: t("cursor.missingTracks") };
-    await addTracksToImportedPlaylist(playlist.id, found);
-    return { ok: true, message: t("cursor.tracksAdded", { count: found.length, name: playlist.name }) };
+    const existing = new Set(playlist.tracks.map(track => track.matched?.id ?? track.spotifyId));
+    const added = found.filter(track => !existing.has(track.id));
+    if (!added.length) return { ok: true, message: t("cursor.tracksAlreadyInPlaylist", { name: playlist.name }) };
+    const result = await addTracksToImportedPlaylist(playlist.id, added);
+    if (!result.some(item => item.id === playlist.id)) {
+      return { ok: false, message: t("cursor.playlistNotFound", { match: playlist.name }) };
+    }
+    return { ok: true, message: t("cursor.tracksAdded", { count: added.length, name: playlist.name }) };
+  }
+  if (op === "remove_from_playlist") {
+    const playlist = await resolvePlaylist(action.playlist);
+    if (!playlist) return { ok: false, message: t("cursor.playlistNotFound", { match: action.playlist ?? "" }) };
+    const entries = playlist.tracks.map(track => ({ ...track, id: track.matched?.id ?? track.spotifyId }));
+    const track = uniqueRecord(entries, trackNames, action.match ?? "", trackLabel);
+    if (!track) return { ok: false, message: t("cursor.trackNotFound", { match: action.match ?? "" }) };
+    const result = await removeTrackFromImportedPlaylist(playlist.id, track.id);
+    if (!result.some(item => item.id === playlist.id)) {
+      return { ok: false, message: t("cursor.playlistNotFound", { match: playlist.name }) };
+    }
+    return { ok: true, message: t("cursor.trackRemovedFromPlaylist", { title: track.title, name: playlist.name }) };
   }
   if (op === "favorite_track") {
     const [track] = await resolveTracks([action.match || action.title || ""]);
@@ -556,7 +495,7 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   }
   if (op === "rename_album") {
     const albums = await getAlbums();
-    const album = bestMatch(albums, (item) => item.name, action.match || "");
+    const album = uniqueRecord(albums, albumNames, action.match || "", albumLabel);
     if (!album) return { ok: false, message: t("cursor.albumNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim();
     if (!name) return { ok: false, message: t("cursor.missingNewName") };
@@ -573,7 +512,7 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   }
   if (op === "rename_artist") {
     const artists = await getArtists();
-    const artist = bestMatch(artists, (item) => item.name, action.match || "");
+    const artist = uniqueRecord(artists, (item) => item.name, action.match || "");
     if (!artist) return { ok: false, message: t("cursor.artistNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim();
     if (!name) return { ok: false, message: t("cursor.missingNewName") };
@@ -590,11 +529,14 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   }
   if (op === "rename_video") {
     const shows = await listVideoShows(runtime.settings, runtime.password).catch(() => []);
-    const show = bestMatch(shows, (item) => item.title, action.match || "");
+    const show = uniqueRecord(shows, (item) => item.title, action.match || "");
     if (!show) return { ok: false, message: t("cursor.videoNotFound", { match: action.match ?? "" }) };
     const name = action.name?.trim();
     if (!name) return { ok: false, message: t("cursor.missingNewName") };
-    const moved = await tryMove(runtime.settings, runtime.password, show.path, withNewName(show.path, name));
+    const source = videoSourceSettings(runtime.settings);
+    const moved = usesNas(runtime.settings, "video") && !isLocalVideoPath(show.path)
+      ? await tryMove(source, runtime.password, show.path, withNewName(show.path, name))
+      : null;
     return {
       ok: Boolean(moved),
       message: moved
@@ -604,7 +546,7 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
   }
   if (op === "favorite_video") {
     const shows = await listVideoShows(runtime.settings, runtime.password).catch(() => []);
-    const show = bestMatch(shows, (item) => item.title, action.match || "");
+    const show = uniqueRecord(shows, (item) => item.title, action.match || "");
     if (!show) return { ok: false, message: t("cursor.videoNotFound", { match: action.match ?? "" }) };
     const fav: VideoFavorite = {
       id: show.id,
@@ -618,7 +560,8 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     return { ok: true, message: t("cursor.videoFav", { title: show.title }) };
   }
   if (op === "create_tx") {
-    const kind = parseTxKind(action.kind) ?? "expense";
+    const kind = action.kind == null ? "expense" : parseTxKind(action.kind);
+    if (!kind) return { ok: false, message: t("cursor.invalidTransactionKind") };
     const quantity = parseMoney(action.quantity, 8);
     const price = parseMoney(action.price);
     const amount = parseMoney(action.amount) ?? (quantity != null && price != null ? quantity * price : undefined);
@@ -626,10 +569,15 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
     if (amount == null || !(amount > 0)) return { ok: false, message: t("cursor.missingAmount") };
     if (!title) return { ok: false, message: t("cursor.missingConcept") };
     const account = await resolveAccount(action.account);
-    const counter = await resolveAccount(action.counter);
+    if (action.account?.trim() && !account) {
+      return { ok: false, message: t("cursor.accountNotFound", { match: action.account }) };
+    }
+    const counter = kind === "transfer" ? await resolveAccount(action.counter) : null;
     if (kind === "transfer" && !counter) {
       return { ok: false, message: t("cursor.missingTransferTo") };
     }
+    const bookedAt = parseDue(action.due);
+    if (action.due != null && bookedAt === undefined) return { ok: false, message: t("cursor.invalidTransactionDate") };
     const asset = await resolveAsset(action.asset || (kind === "sell" ? title : undefined));
     if (kind === "sell" && !asset) {
       return { ok: false, message: t("cursor.missingSellAsset") };
@@ -640,8 +588,8 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       title,
       category: action.category,
       notes: action.notes,
-      bookedAt: parseDue(action.due) ?? undefined,
-      accountId: kind === "transfer" ? account?.id ?? CASH_ACCOUNT_ID : account?.id ?? CASH_ACCOUNT_ID,
+      bookedAt: bookedAt ?? undefined,
+      accountId: account?.id ?? CASH_ACCOUNT_ID,
       counterAccountId: kind === "transfer" ? counter?.id ?? null : null,
       assetId: kind === "buy" || kind === "sell" ? asset?.id ?? null : null,
       quantity: kind === "buy" || kind === "sell" ? quantity ?? null : null,
@@ -651,6 +599,33 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
       assetKind: parseAssetKind(action.asset_kind) ?? (kind === "buy" ? "stock" : undefined),
     });
     return { ok: true, message: t("cursor.createdTx", { title: tx.title, kind: tx.kind, amount: tx.amount }) };
+  }
+  if (op === "update_tx") {
+    const tx = await resolveTx(action.match);
+    if (!tx) return { ok: false, message: t("cursor.txNotFound", { match: action.match ?? "" }) };
+    if (tx.kind !== "income" && tx.kind !== "expense") {
+      return { ok: false, message: t("cursor.editTransactionType") };
+    }
+    const title = action.title?.trim() ?? tx.title;
+    const amount = action.amount === undefined ? tx.amount : parseMoney(action.amount);
+    const date = action.due === undefined ? tx.bookedAt : parseDue(action.due);
+    if (!title) return { ok: false, message: t("cursor.missingConcept") };
+    if (amount === undefined || amount <= 0) return { ok: false, message: t("cursor.missingAmount") };
+    if (date == null) return { ok: false, message: t("cursor.invalidTransactionDate") };
+    const account = await resolveAccount(action.account);
+    if (action.account?.trim() && !account) {
+      return { ok: false, message: t("cursor.accountNotFound", { match: action.account }) };
+    }
+    const updated = await updateTx(tx.id, {
+      kind: tx.kind,
+      title,
+      amount,
+      bookedAt: date,
+      accountId: account?.id ?? tx.accountId,
+      category: action.category ?? tx.category,
+      notes: action.notes ?? tx.notes,
+    });
+    return { ok: true, message: t("cursor.updatedTransaction", { title: updated.title }) };
   }
   if (op === "delete_tx") {
     const tx = await resolveTx(action.match || action.title);
@@ -849,36 +824,64 @@ async function runAction(action: AssistantAction, runtime: AssistantRuntime): Pr
 async function resolveProject(match?: string) {
   const projects = await listProjects({ includeArchived: true });
   if (!match) return null;
-  return bestMatch(projects, (item) => item.name, match);
+  return uniqueRecord(projects, (item) => item.name, match);
 }
 
 async function resolveProjectId(match?: string): Promise<string> {
   if (!match || normalize(match) === "bandeja" || normalize(match) === "inbox") return INBOX_PROJECT_ID;
   const project = await resolveProject(match);
-  return project?.id ?? INBOX_PROJECT_ID;
+  if (!project || project.archived) throw new AssistantChoiceError(t("cursor.projectNotFound", { match }));
+  return project.id;
 }
 
 async function resolveTask(match?: string) {
   if (!match) return null;
-  const tasks = await listTasks({ includeArchived: true });
-  return bestMatch(tasks, (item) => item.title, match);
+  const { tasks, names, label } = await taskMatches();
+  return uniqueRecord(tasks, names, match, label);
 }
 
 async function resolvePlaylist(match?: string) {
   if (!match) return null;
   const playlists = await loadImportedPlaylists();
-  return bestMatch(playlists, (item) => item.name, match);
+  return uniqueRecord(playlists, (item) => item.name, match);
 }
 
-async function resolveTracks(queries: string[]) {
+type NamedTrack = { title: string; artistName: string; albumName: string };
+const trackLabel = (track: NamedTrack) =>
+  [track.title, track.artistName, track.albumName].filter(Boolean).join(" · ");
+const trackNames = (track: NamedTrack) =>
+  [track.title, `${track.title} ${track.artistName}`, trackLabel(track)];
+const albumLabel = (album: Awaited<ReturnType<typeof getAlbums>>[number]) =>
+  `${album.name} · ${album.artistName}`;
+const albumNames = (album: Awaited<ReturnType<typeof getAlbums>>[number]) =>
+  [album.name, albumLabel(album), `${album.name} ${album.artistName}`];
+const assetNames = (asset: Awaited<ReturnType<typeof listAssets>>[number]) =>
+  [asset.name, asset.ticker, `${asset.name} ${asset.ticker}`];
+const txLabel = (tx: Awaited<ReturnType<typeof listTx>>[number]) =>
+  `${tx.title} · ${new Date(tx.bookedAt).toLocaleDateString(dateLocale())} · ${tx.amount} ${tx.currency}`;
+const txNames = (tx: Awaited<ReturnType<typeof listTx>>[number]) => [tx.title, txLabel(tx)];
+
+async function taskMatches() {
+  const [tasks, projects] = await Promise.all([
+    listTasks({ includeArchived: true }), listProjects({ includeArchived: true }),
+  ]);
+  const projectNames = new Map(projects.map(project => [project.id, projectDisplayName(project)]));
+  type Task = typeof tasks[number];
+  const label = (task: Task) => [task.title, projectNames.get(task.projectId)].filter(Boolean).join(" · ");
+  const names = (task: Task) => [task.title, label(task)];
+  return { tasks, names, label };
+}
+
+async function resolveTracks(queries: string[], requireAll = false) {
   if (!queries.length) return [];
   const tracks = await getTracks();
-  const found = [];
+  const found = new Map<string, typeof tracks[number]>();
   for (const query of queries) {
-    const hit = bestMatch(tracks, (item) => `${item.title} ${item.artistName}`, query);
-    if (hit) found.push(hit);
+    const hit = uniqueRecord(tracks, trackNames, query, trackLabel);
+    if (hit) found.set(hit.id, hit);
+    else if (requireAll) throw new AssistantChoiceError(t("cursor.trackNotFound", { match: query }));
   }
-  return found;
+  return [...found.values()];
 }
 
 async function resolveAccount(match?: string) {
@@ -888,32 +891,50 @@ async function resolveAccount(match?: string) {
   if (q === "caja" || q === "cash" || q === "efectivo") {
     return accounts.find((item) => item.id === CASH_ACCOUNT_ID) ?? null;
   }
-  return bestMatch(accounts, (item) => item.name, match);
+  return uniqueRecord(accounts, (item) => item.name, match);
 }
 
 async function resolveAsset(match?: string) {
   if (!match) return null;
   const assets = await listAssets({ includeArchived: true });
-  return (
-    bestMatch(assets, (item) => item.ticker, match) ||
-    bestMatch(assets, (item) => item.name, match)
-  );
+  return uniqueRecord(assets, assetNames, match, asset => `${asset.name} · ${asset.ticker}`);
 }
 
 async function resolveTx(match?: string) {
   if (!match) return null;
   const txs = await listTx();
-  return bestMatch(txs, (item) => item.title, match);
+  return uniqueRecord(txs, txNames, match, txLabel);
 }
 
 async function resolveGoal(match?: string) {
   if (!match) return null;
   const goals = await listGoals({ includeArchived: true });
-  return bestMatch(goals, (item) => item.name, match);
+  return uniqueRecord(goals, (item) => item.name, match);
 }
 
 async function resolveReminder(match?: string) {
   if (!match) return null;
   const reminders = await listReminders();
-  return bestMatch(reminders, (item) => item.title, match);
+  return uniqueRecord(reminders, (item) => item.title, match);
+}
+
+export async function searchAssistantRecords(kind: unknown, query: string, runtime: AssistantRuntime) {
+  switch (kind) {
+    case "task": {
+      const { tasks, names, label } = await taskMatches();
+      return describeMatches(tasks, names, query, label);
+    }
+    case "project": return describeMatches(await listProjects({ includeArchived: true }), projectDisplayName, query);
+    case "track": return describeMatches(await getTracks(), trackNames, query, trackLabel);
+    case "playlist": return describeMatches(await loadImportedPlaylists(), item => item.name, query);
+    case "album": return describeMatches(await getAlbums(), albumNames, query, albumLabel);
+    case "artist": return describeMatches(await getArtists(), item => item.name, query);
+    case "video": return describeMatches(await listVideoShows(runtime.settings, runtime.password), item => item.title, query);
+    case "transaction": return describeMatches(await listTx(), txNames, query, txLabel);
+    case "account": return describeMatches(await listAccounts({ includeArchived: true }), item => item.name, query);
+    case "asset": return describeMatches(await listAssets({ includeArchived: true }), assetNames, query, item => `${item.name} · ${item.ticker}`);
+    case "goal": return describeMatches(await listGoals({ includeArchived: true }), item => item.name, query);
+    case "reminder": return describeMatches(await listReminders(), item => item.title, query);
+    default: throw new Error(t("cursor.searchKindMissing"));
+  }
 }

@@ -19,7 +19,12 @@ import pkg from "../../../package.json";
 export async function handleWebTask(request: { requestId: string; method: string; path: string; body: string }) {
  try {await recoverArchiveCommits();} catch {webNative().resolveWebRequest(request.requestId,JSON.stringify({status:503,body:JSON.stringify({error:"import_recovery_required"})}));return;}
  if (request.method === "BRIDGE") { await handleLegacyTask(request.body); return; }
- if (request.method === "CHAT") { const job = JSON.parse(request.body); await chatController.runReserved(job.text, job.zone, job.clientId); return; }
+ if (request.method === "CHAT") {
+  const job = JSON.parse(request.body);
+  setRuntimeLocale(await loadLocale());
+  await chatController.runReserved(job.text, job.zone, job.clientId, job.provider);
+  return;
+ }
  if (request.method === "JOB") { await runWebJob(request.requestId, request.path); return; }
  const native = webNative();
  const body = request.body || native.readWebRequestBody?.(request.requestId) || "";

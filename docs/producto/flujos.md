@@ -117,3 +117,11 @@ Pasos:
 1. Corazón en Canciones / Buscar / mini player. `#HelloKitty^^` ya venía likeado; Traw x Piru también.
 2. Atajo Favoritos música: 2 canciones, Reproducir / Aleatorio.
 3. Tras Reload de Expo Go el like de `#HelloKitty^^` seguía. No se mató el proceso Android.
+## Asistente de Mensajes
+
+- En **Mensajes → Ajustes del asistente**, elige Cursor, Grok, Gemini, OpenAI, Claude o MiniMax y guarda la clave de su API desde Android. Puedes cambiar de proveedor desde la APK o desde la web de escritorio conectada al móvil para usar una clave ya guardada.
+- NLC ejecuta las acciones en el dispositivo. Grok, Gemini, OpenAI, Claude y MiniMax piden las acciones mediante herramientas. Cursor usa su API de agentes y la clave existente. La conversación local conserva los mensajes de todos los proveedores y cada API solo recibe contexto conversacional de su propio proveedor.
+- El chat puede mover tareas, organizar listas de reproducción y corregir ingresos y gastos. Si varios registros coinciden, te pide que indiques cuál quieres modificar.
+- Para «¿Cuánto ha cambiado mi patrimonio este mes?», NLC calcula la diferencia desde el inicio del mes natural con los movimientos y valoraciones registrados. El chat también puede consultar resúmenes de peso, nutrición, entrenamientos, tomas y fotos del mes. Las fotos y los registros de Salud no forman parte del contexto enviado a Cursor.
+- Para mover una canción de Vídeo a Música, NLC busca en las carpetas configuradas. Si hay varias candidatas, muestra sus nombres. Si hay una, prepara el traslado a `Música/Canciones` dentro del mismo almacenamiento. Confirma desde Android. Los traslados locales requieren una APK con esta función y los del NAS requieren WebDAV en el mismo servidor.
+- Si falta una función de NLC, el asistente puede preparar una issue. Revisa el título y el cuerpo y pulsa **Publicar en GitHub** desde Android. Guarda antes, en los ajustes de Mensajes, un token de GitHub con permisos detallados para `JuanCarlosGP/NLC` y **Issues** de lectura y escritura. GitHub publica el contenido bajo la cuenta del token.

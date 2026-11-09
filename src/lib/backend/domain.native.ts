@@ -85,12 +85,22 @@ import type { AppZone } from "@/lib/zone/zone-context";
 for (const method of ["state", "configure", "test", "clear", "send"] as const) expose(`chat.${method}`, async (clientId: string, ...args: any[]) => {
  if (typeof clientId !== "string" || !/^[a-zA-Z0-9_-]{1,80}$/.test(clientId)) throw new BackendError(400, "invalid_client");
  await chatController.load();
+ if ((method === "configure" || method === "test") && args.length > 1) throw new BackendError(403, "Se configura en el móvil");
  if (method === "configure") await chatController.configure(args[0]);
- if (method === "test") await chatController.test(args[0]);
+ if (method === "test") {
+  const testResult = await chatController.test(args[0]);
+  return { ...chatController.getSnapshot(), intent: undefined, testResult };
+ }
  if (method === "clear") await chatController.clear();
  if (method === "send") {
   if (!["music", "podcast", "video", "focus", "wealth", "health"].includes(args[1])) throw new BackendError(400, "invalid_zone");
-  await chatController.reserve(args[0]); webNative().startWebChat(JSON.stringify({ text: args[0], zone: args[1], clientId }));
+  const provider = await chatController.reserve(args[0]);
+  try {
+   webNative().startWebChat(JSON.stringify({ text: args[0], zone: args[1], clientId, provider }));
+  } catch (error) {
+   chatController.cancelReserved();
+   throw error;
+  }
  }
  const snapshot = chatController.getSnapshot(); return { ...snapshot, intent: snapshot.intent?.clientId === clientId ? snapshot.intent : undefined };
 }, { domain: "chat", write: !["state", "test"].includes(method), atomic: false });
@@ -99,7 +109,7 @@ import "./playback.native";
 
 import { setSecret, deleteSecret } from "@/lib/settings/secret-store";
 for (const method of ["set", "clear"] as const) expose(`credentials.${method}`, async (key: string, value?: string) => {
- if (!["nlc.nas.password", "nlc.download.token", "nlc.cursor.api-key"].includes(key)) throw new BackendError(403, "Se configura en el móvil");
+ if (!["nlc.nas.password", "nlc.download.token"].includes(key)) throw new BackendError(403, "Se configura en el móvil");
  if (method === "clear") await deleteSecret(key); else if (value?.trim()) await setSecret(key, value);
 }, { domain: "credentials", write: true, atomic: false, key: args => args[0] });
 

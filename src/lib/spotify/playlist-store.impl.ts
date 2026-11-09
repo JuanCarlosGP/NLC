@@ -73,18 +73,19 @@ export async function updateImportedPlaylist(
   return next;
 }
 
-export async function createEmptyImportedPlaylist(name: string): Promise<ImportedPlaylist[]> {
+export async function createEmptyImportedPlaylist(name: string, initialTracks: Track[] = []): Promise<ImportedPlaylist[]> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error(t("nasExtra.playlistNeedName"));
+  const tracks = initialTracks.map(asImportedTrack);
   const playlist: ImportedPlaylist = {
     id: `local-${Date.now()}`,
     kind: "local",
     name: trimmed,
     ownerName: "NLC",
-    coverUrl: null,
+    coverUrl: tracks.find(track => track.coverUrl)?.coverUrl ?? null,
     spotifyUrl: "",
     importedAt: Date.now(),
-    tracks: [],
+    tracks,
   };
   return upsertImportedPlaylist(playlist);
 }

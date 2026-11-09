@@ -63,6 +63,12 @@ class NlcLanBridgeModule : Module() {
     Function("resolveWebRequest") { id: String, json: String -> PhoneWebRuntime.resolve(id, json) }
     Function("publishWebEvent") { json: String -> PhoneWebRuntime.publish(json) }
     Function("openWebBatterySettings") { appContext.reactContext?.let { PhoneWebService.openBattery(it) } }
+    AsyncFunction("listAssistantAudio") { video: String, music: String ->
+      LocalMove.listAssistantAudio(appContext.reactContext ?: error("storage"), video, music)
+    }
+    AsyncFunction("moveAssistantAudio") { video: String, music: String, source: String, name: String ->
+      LocalMove.moveAssistantAudio(appContext.reactContext ?: error("storage"), video, music, source, name)
+    }
     Function("startWebChat") { body: String ->
       require(body.length < 20000)
       val ctx = appContext.reactContext ?: error("storage")

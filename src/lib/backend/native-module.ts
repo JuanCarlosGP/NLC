@@ -11,6 +11,8 @@ type NativeWeb = {
  resolveWebRequest(id: string, result: string): void; publishWebEvent(json: string): void;
  openWebBatterySettings(): void;
  startWebChat(json: string): void;
+ listAssistantAudio?(video: string, music: string): Promise<string>;
+ moveAssistantAudio?(video: string, music: string, source: string, name: string): Promise<boolean>;
  startWebJob(id: string, action: string): void;
  inspectWebPhoto(id: string): Promise<{ width: number; height: number; mime: string; bytes: number }>;
  createEmptyWebTransfer(id:string,name:string):Promise<void>;

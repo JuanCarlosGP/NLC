@@ -173,6 +173,30 @@ function holdingsAtTime(
   return roundMoney(sum);
 }
 
+export function monthToDateChange(
+  accounts: WealthAccount[],
+  assets: WealthAsset[],
+  txs: WealthTx[],
+  quotes: WealthQuote[],
+  now = Date.now(),
+) {
+  const today = new Date(now);
+  const start = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
+  const beforeMonth = start - 1;
+  const booked = txs.filter(tx => tx.bookedAt <= now);
+  const recordedQuotes = quotes.filter(quote => quote.bookedAt <= now);
+  const liveAccounts = accounts.filter(account => !account.archived);
+  const liveAssets = assets.filter(asset => !asset.archived && asset.createdAt <= now);
+  if (!booked.length && !recordedQuotes.length && !liveAssets.length) return null;
+  const marks = priceMarks(liveAssets, recordedQuotes, booked);
+  const opening = roundMoney(
+    cashTotal(liveAccounts, booked.filter(tx => tx.bookedAt <= beforeMonth))
+    + holdingsAtTime(liveAssets, booked, marks, beforeMonth),
+  );
+  const closing = netWorth(liveAccounts, liveAssets, booked);
+  return { start, now, opening, closing, change: roundMoney(closing - opening) };
+}
+
 export type AssetHistoryItem = {
   id: string;
   kind: "quote" | "buy" | "sell";

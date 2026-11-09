@@ -1,6 +1,6 @@
 import { useThemeId } from "@/lib/appearance/use-theme-id";
 import { createStyles } from "@/lib/appearance/density";
-import { type ReactNode } from "react";
+import { type ReactNode, type Ref } from "react";
 import { Platform, ScrollView, type StyleProp, type ViewStyle } from "react-native";
 import { GestureDetector } from "react-native-gesture-handler";
 import { mergeSheetScrollProps, useBottomSheet } from "@/components/layout/sheet-context";
@@ -10,10 +10,12 @@ export function SheetScrollView({
   children,
   style,
   contentContainerStyle,
+  scrollRef,
 }: {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  scrollRef?: Ref<ScrollView>;
 }) {
   useThemeId();
   const sheet = useBottomSheet();
@@ -21,6 +23,7 @@ export function SheetScrollView({
 
   const scroll = (
     <ScrollView
+      ref={scrollRef}
       style={style}
       contentContainerStyle={contentContainerStyle}
       showsVerticalScrollIndicator={false}

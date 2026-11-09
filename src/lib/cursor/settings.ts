@@ -1,26 +1,46 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getSecret, setSecret } from "@/lib/settings/secret-store";
+import { isAssistantProvider, PROVIDER_IDS, type AssistantProvider } from "./providers";
 
 export type CursorChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  provider?: AssistantProvider;
+  modelContext?: boolean;
+  modelText?: string;
 };
 
-const API_KEY = "nlc.cursor.api-key";
 const AGENT_ID_KEY = "nlc.cursor.agent-id";
 const MESSAGES_KEY = "nlc.cursor.messages.v1";
+const PROVIDER_KEY = "nlc.assistant.provider.v1";
 
-export async function loadCursorApiKey(): Promise<string> {
-  try {
-    return (await getSecret(API_KEY)) ?? "";
-  } catch {
-    return "";
-  }
+function apiKeyStorage(provider: AssistantProvider) {
+  return provider === "cursor" ? "nlc.cursor.api-key" : `nlc.assistant.api-key.${provider}`;
 }
 
-export async function saveCursorApiKey(value: string): Promise<void> {
-  await setSecret(API_KEY, value.trim());
+export async function loadAssistantKey(provider: AssistantProvider): Promise<string> {
+  return await getSecret(apiKeyStorage(provider)) ?? "";
+}
+
+export async function loadAssistantProviders() {
+  const [saved, ...keys] = await Promise.all([
+    AsyncStorage.getItem(PROVIDER_KEY),
+    ...PROVIDER_IDS.map(loadAssistantKey),
+  ]);
+  return {
+    provider: isAssistantProvider(saved) ? saved : "cursor" as const,
+    configuredProviders: PROVIDER_IDS.filter((_id, index) => Boolean(keys[index])),
+  };
+}
+
+export async function saveAssistantProvider(provider: AssistantProvider, key: string) {
+  if (key && key !== await loadAssistantKey(provider)) {
+    await setSecret(apiKeyStorage(provider), key);
+    if (provider === "cursor") await saveCursorAgentId("");
+  }
+  await AsyncStorage.setItem(PROVIDER_KEY, provider);
+  return loadAssistantProviders();
 }
 
 export async function loadCursorAgentId(): Promise<string> {

@@ -1,16 +1,56 @@
 import { chatController as standalone } from "./controller.local";
-import { remoteEnabled } from "@/lib/backend/profile";
+import { remoteEnabled, PHONE_ONLY } from "@/lib/backend/profile";
 import { browserBackend, onBackendChange, requestId } from "@/lib/backend/remote";
+import { t } from "@/lib/i18n/runtime";
 import type { ChatState } from "./controller-core";
-import { createChatController } from "./controller-core";
+import type { AssistantProvider } from "./providers";
 import type { AppZone } from "@/lib/zone/zone-context";
+
 export const chatClientId = typeof window === "undefined" ? "web" : requestId();
-let state: ChatState = { ready: false, configured: false, connected: false, busy: false, messages: [], error: null };
+let state: ChatState = {
+  provider: "cursor", configuredProviders: [], ready: false, configured: false,
+  connected: false, busy: false, messages: [], error: null,
+};
 const listeners = new Set<() => void>();
-async function call(method: string, args: unknown[] = []) {
- const next = await browserBackend.invoke<ChatState>(`chat.${method}`, [chatClientId, ...args], { domain: "chat", write: !["state", "test"].includes(method), atomic: false }); state = next; listeners.forEach(fn => fn());
+type TestResult = { ok: boolean; message: string };
+let requestNumber = 0;
+let appliedRequest = 0;
+
+async function call(method: "state" | "configure" | "test" | "send" | "clear", args: unknown[] = []) {
+  const sequence = ++requestNumber;
+  const next = await browserBackend.invoke<ChatState & { testResult?: TestResult }>(
+    `chat.${method}`, [chatClientId, ...args],
+    { domain: "chat", write: method !== "state" && method !== "test", atomic: false },
+  );
+  const { testResult, ...snapshot } = next;
+  if (sequence > appliedRequest) {
+    appliedRequest = sequence;
+    state = snapshot;
+    listeners.forEach(fn => fn());
+  }
+  return testResult;
 }
-const remote = { getSnapshot: () => state, subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; }, load: () => call("state"), configure: (key: string) => call("configure", [key]), test: async (key?: string) => { await call("test", [key || ""]); return { ok: state.connected, message: state.error || "Conectado" }; }, send: (text: string, zone: AppZone) => call("send", [text, zone]), clear: () => call("clear"), reserve: async () => {}, runReserved: async () => {} };
-onBackendChange(domain => { if (remoteEnabled && ["chat", "*"].includes(domain)) void call("state").catch(() => {}); });
-// Standalone web preview retains its existing local chat, while the packaged profile always uses the phone.
+
+const remote = {
+  getSnapshot: () => state,
+  subscribe(fn: () => void) {
+    listeners.add(fn);
+    return () => { listeners.delete(fn); };
+  },
+  load: async () => { await call("state"); },
+  configure: async (provider: AssistantProvider, key = "") => {
+    if (key) throw new Error(PHONE_ONLY);
+    await call("configure", [provider]);
+  },
+  test: async (provider: AssistantProvider, key = "") => {
+    if (key) throw new Error(PHONE_ONLY);
+    return await call("test", [provider]) ?? { ok: false, message: t("chat.talkFail") };
+  },
+  send: async (text: string, zone: AppZone) => { await call("send", [text, zone]); },
+  clear: async () => { await call("clear"); },
+  decide: async (_id: string, _accept: boolean) => { throw new Error(PHONE_ONLY); },
+};
+onBackendChange(domain => {
+  if (remoteEnabled && ["chat", "*"].includes(domain)) void call("state").catch(() => {});
+});
 export const chatController = remoteEnabled ? remote : standalone;

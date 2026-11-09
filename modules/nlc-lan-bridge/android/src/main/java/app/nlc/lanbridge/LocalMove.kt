@@ -101,6 +101,87 @@ internal object LocalMove {
     val u=document(raw)
     return if(u.scheme=="file") { val f=File(requireNotNull(u.path));val to=File(f.parentFile,name);require(!to.exists() && f.renameTo(to)){"storage"};Uri.fromFile(to).toString() } else (DocumentsContract.renameDocument(ctx.contentResolver,u,name) ?: error("storage")).toString()
   }
+  private val audioExtensions = setOf("mp3", "m4a", "m4b", "flac", "ogg", "opus", "wav", "aac", "wma", "aiff", "aif")
+  private val ignoredAudioDirs = setOf("@eadir", "#recycle", "#snapshot", "lost+found", "storyboards")
+  private fun isAudio(name: String) = name.substringAfterLast('.', "").lowercase() in audioExtensions
+
+  private fun assistantRoots(ctx: Context, video: String, music: String) {
+    allowed(ctx, video)
+    allowed(ctx, music)
+    val from = identity(video)
+    val to = identity(music)
+    require(!inside(from, to) && !inside(to, from)) { "overlapping_folders" }
+  }
+
+  fun listAssistantAudio(ctx: Context, video: String, music: String): String {
+    assistantRoots(ctx, video, music)
+    val result = JSONArray()
+    val root = identity(video)
+    var directories = 0
+    fun visit(folder: String, relative: String, depth: Int) {
+      require(++directories <= 2000 && depth <= 12) { "folder_too_large" }
+      val rows = children(ctx, folder)
+      require(rows.none { it.name.startsWith(".nlc-importing-") || it.name.startsWith(".nlc-moving-") }) { "folder_busy" }
+      for (node in rows) {
+        if (node.name.startsWith(".") || node.name.lowercase() in ignoredAudioDirs) continue
+        if (!inside(identity(node.uri), root)) continue
+        val path = safe(if (relative.isEmpty()) node.name else "$relative/${node.name}")
+        if (node.dir) visit(node.uri, path, depth + 1)
+        else if (isAudio(node.name)) {
+          require(result.length() < 2000) { "folder_too_large" }
+          result.put(JSONObject().put("name", node.name).put("relative", path).put("uri", node.uri))
+        }
+      }
+    }
+    visit(video, "", 0)
+    return result.toString()
+  }
+
+  @Synchronized
+  fun moveAssistantAudio(ctx: Context, video: String, music: String, source: String, name: String): Boolean {
+    assistantRoots(ctx, video, music)
+    allowed(ctx, source)
+    require(isAudio(name) && !safe(name).contains('/')) { "invalid_audio" }
+    require(inside(identity(source), identity(video)) && identity(source) != identity(video)) { "outside_video" }
+    val sourceUri = document(source)
+    if (sourceUri.scheme == "file") require(File(requireNotNull(sourceUri.path)).name == name) { "source_changed" }
+    else {
+      val displayName = ctx.contentResolver.query(sourceUri, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)
+        ?.use { if (it.moveToFirst()) it.getString(0) else null }
+      require(displayName == name) { "source_changed" }
+    }
+
+    val musicRows = children(ctx, music)
+    require(musicRows.none { it.name.startsWith(".nlc-importing-") || it.name.startsWith(".nlc-moving-") }) { "folder_busy" }
+    val existing = musicRows.firstOrNull { it.name.equals("Canciones", ignoreCase = true) }
+    val folder = existing ?: create(ctx, music, "Canciones", directory = true)
+    require(folder.dir && inside(identity(folder.uri), identity(music))) { "music_folder_unavailable" }
+    require(children(ctx, folder.uri).none { it.name.equals(name, ignoreCase = true) }) { "audio_already_exists" }
+
+    val id = UUID.randomUUID().toString()
+    val original = hash(ctx, source, id)
+    require(original.bytes > 0) { "empty_audio" }
+    var written = create(ctx, folder.uri, ".nlc-assistant-$id.partial").uri
+    try {
+      val temp = document(written)
+      val output = if (temp.scheme == "file") FileOutputStream(requireNotNull(temp.path))
+        else ctx.contentResolver.openOutputStream(temp, "wt") ?: error("storage")
+      output.use { target ->
+        open(ctx, source).use { input -> input.copyTo(target, BUFFER) }
+        target.flush()
+      }
+      require(hash(ctx, written, id) == original && hash(ctx, source, id) == original) { "source_changed" }
+      require(children(ctx, folder.uri).none { it.name.equals(name, ignoreCase = true) }) { "audio_already_exists" }
+      written = rename(ctx, written, name)
+      require(children(ctx, folder.uri).any { it.uri == written && it.name == name && !it.dir }) { "audio_already_exists" }
+    } catch (error: Exception) {
+      runCatching { delete(ctx, written) }
+      throw error
+    }
+    // Once a verified copy is visible, keep it even if the provider refuses deletion.
+    return runCatching { hash(ctx, source, id) == original && delete(ctx, source) }.getOrDefault(false)
+  }
+
   private fun receipt(ctx: Context, id: String, nonce: String): Boolean = listOf("nlc-catalog.db","nlc-local-demo.db").any { name ->
     val file=File(ctx.filesDir,"SQLite/$name")
     if(!file.exists())false else try { SQLiteDatabase.openDatabase(file.path,null,SQLiteDatabase.OPEN_READONLY).use { d -> d.rawQuery("SELECT value FROM meta WHERE key=?",arrayOf("local_move_receipt:$id")).use { it.moveToFirst() && it.getString(0)==nonce } } } catch (_:Exception){false}
