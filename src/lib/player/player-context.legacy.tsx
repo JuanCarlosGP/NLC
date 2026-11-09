@@ -16,6 +16,7 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
   type AudioPlayer,
+  type AudioSource,
 } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import { bindDevicePlayer, deviceDrivesPlayback, findDeviceTrack, markDeviceEnded } from "@/lib/bridge/device-player";
@@ -29,6 +30,7 @@ import {
   resolveLockScreenArtwork,
 } from "@/lib/player/lock-screen";
 import type { RepeatMode } from "@/lib/player/types";
+import { getBrowserMusicVolume } from "./browser-music-volume";
 
 type PlayerSessionValue = {
   player: AudioPlayer;
@@ -114,6 +116,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   loadedRef.current = status.isLoaded;
 
   const current = queue[index] ?? null;
+  const replaceSource = useCallback((source: AudioSource) => {
+    player.replace(source);
+    if (Platform.OS === "web") player.volume = getBrowserMusicVolume();
+  }, [player]);
   useEffect(() => onLocalMoveLock(active => { if (active) { lockScreenGenRef.current++; player.pause(); } }), [player]);
   useEffect(() => onLocalMoveRemap((ids, uris) => {
     player.pause();
@@ -122,8 +128,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const track = queueRef.current[indexRef.current];
     const id = track && ids.get(track.id);
     const position = currentTimeRef.current;
-    if (id) void getLocalUri(id).then(uri => { if (uri) { player.replace({ uri }); void player.seekTo(position); } }).catch(() => {});
-  }), [player]);
+    if (id) void getLocalUri(id).then(uri => { if (uri) { replaceSource({ uri }); void player.seekTo(position); } }).catch(() => {});
+  }), [player, replaceSource]);
 
 
   useEffect(() => {
@@ -177,14 +183,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       const source = localUri ? { uri: localUri } : await sourceRef.current.streamUrl(track.id);
       if (gen !== lockScreenGenRef.current) return;
       try {
-        player.replace(source);
+        replaceSource(source);
         player.play();
       } catch (error) {
         if (localUri) {
           try {
             const remote = await sourceRef.current.streamUrl(track.id);
             if (gen !== lockScreenGenRef.current) return;
-            player.replace(remote);
+            replaceSource(remote);
             player.play();
           } catch (fallbackError) {
             console.warn("No se pudo cargar el audio", fallbackError);
@@ -200,7 +206,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       if (gen !== lockScreenGenRef.current) return;
       applyLockScreen(track);
     },
-    [applyLockScreen, player],
+    [applyLockScreen, player, replaceSource],
   );
 
   const playTracks = useCallback(

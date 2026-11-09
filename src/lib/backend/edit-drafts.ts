@@ -46,7 +46,7 @@ function persist() { if (remoteEnabled && typeof sessionStorage !== "undefined")
 // Values stay in this browser. Secure fields are deliberately excluded.
 export function rememberDraftFields() {
  if (!remoteEnabled || typeof document === "undefined") return;
- const fields = Array.from(document.querySelectorAll("input,textarea")).filter(element => !(element as HTMLInputElement).disabled && (element as HTMLInputElement).type !== "password").map((element, index) => ({ label: element.getAttribute("aria-label") || element.getAttribute("placeholder") || "", index, value: (element as HTMLInputElement).value })).filter(field => field.value && !/password|contrase|token|api.?key|clave/i.test(field.label));
+ const fields = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input:not([type=password], [type=range]),textarea")).filter(element => !element.disabled).map((element, index) => ({ label: element.getAttribute("aria-label") || element.getAttribute("placeholder") || "", index, value: element.value })).filter(field => field.value && !/password|contrase|token|api.?key|clave/i.test(field.label));
  try { sessionStorage.setItem("nlc.remote.draft-fields.v1", JSON.stringify({ path: location.pathname + location.search, fields })); } catch {}
 }
 export function restoreDraftField(label: string): string | null {
